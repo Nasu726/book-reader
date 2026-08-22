@@ -188,7 +188,7 @@ Unit / integration / E2Eを増やせる基盤を用意する。
 # 3. Dependency / security baseline
 
 ## DEP-001 — Dependency review workflow
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** BOOT-001
 
@@ -219,7 +219,7 @@ PDF / EPUB / auth等で外部依存を選ぶ前の判断ルールを実運用で
 # 4. Data
 
 ## DB-001 — DB / repository selection
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** ARCH-001
 
@@ -246,7 +246,7 @@ notes / vocabularyは将来追加可能であること。
 ---
 
 ## DB-002 — Document repository
-**Status:** TODO  
+**Status:** DONE  
 **Priority:** P0  
 **Depends on:** DB-001
 
@@ -961,5 +961,14 @@ YYYY-MM-DD — TASK-ID
 - Result: Added Node.js unit tests, Playwright Chromium E2E, and a combined `npm run verify` command.
 - Verification: lint, typecheck, 1 unit test, 1 Chromium E2E test, production build.
 - Important decision: Use Playwright Test as the proven browser E2E runner (Apache-2.0).
+
+2026-08-22 — DEP-001 / DB-001
+- Result: Selected SQLite via better-sqlite3 with Drizzle ORM schema definitions and a minimal migration function.
+- Verification: lint, typecheck, unit tests, Chromium E2E, production build; `npm audit` reports no vulnerabilities.
+- Important decision: Drizzle Kit was rejected because its current dependency chain includes vulnerable esbuild versions; use `tsx` for TypeScript execution instead.
+
+2026-08-22 — DB-002
+- Result: Implemented SQLite document metadata and ordered section repository APIs with regression tests for CRUD, section ordering/upserts, and cascade cleanup.
+- Verification: lint, typecheck, 4 unit tests, Chromium E2E, production build.
 
 ログを詳細な日記にしない。恒久的な仕様変更は `SPEC.md`、方針変更は `PLAN.md` に反映する。
