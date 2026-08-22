@@ -306,7 +306,7 @@ EPUB importとmetadata / section抽出を実装する。
 ---
 
 ## EPUB-002 — EPUB reader representation
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** EPUB-001
 
@@ -980,5 +980,9 @@ YYYY-MM-DD — TASK-ID
 - Result: Added a server-side EPUB parser using `@likecoin/epub-ts` with `linkedom`, extracting metadata, navigation titles, spine-ordered section text, and stable spine/CFI locations.
 - Verification: lint, typecheck, 9 unit tests including valid sample import, stable section order, and malformed EPUB failure isolation, Chromium E2E, production build; `npm audit` reports no vulnerabilities.
 - Important decision: `@likecoin/epub-ts` (BSD-2-Clause, actively maintained) was selected for its typed Node parser and single runtime dependency; `linkedom` supplies the documented server DOM parser.
+
+2026-08-22 — EPUB-002
+- Result: Added a versioned EPUB reader data model with first-open behavior, adjacent chapter navigation, reload-safe encoded locations, invalid-location rejection, and proportional character-offset preservation across font-size changes.
+- Verification: lint, typecheck, 15 unit tests including navigation, restoration, boundary behavior, and font-size intent, Chromium E2E, production build.
 
 ログを詳細な日記にしない。恒久的な仕様変更は `SPEC.md`、方針変更は `PLAN.md` に反映する。
