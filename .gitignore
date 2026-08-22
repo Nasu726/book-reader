@@ -1,0 +1,13 @@
+AGENTS.md
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
