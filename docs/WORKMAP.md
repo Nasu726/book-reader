@@ -265,7 +265,7 @@ Document metadataとsection locationを保存 / 取得できるRepository APIを
 # 5. Parsing
 
 ## PARSE-001 — Parser boundaries
-**Status:** TODO  
+**Status:** DONE  
 **Priority:** P0  
 **Depends on:** ARCH-001
 
@@ -970,5 +970,10 @@ YYYY-MM-DD — TASK-ID
 2026-08-22 — DB-002
 - Result: Implemented SQLite document metadata and ordered section repository APIs with regression tests for CRUD, section ordering/upserts, and cascade cleanup.
 - Verification: lint, typecheck, 4 unit tests, Chromium E2E, production build.
+
+2026-08-22 — PARSE-001
+- Result: Added stable document location contracts, typed parse failures, format detection, and a parser registry that isolates parser errors from callers.
+- Verification: lint, typecheck, 7 unit tests including invalid-file failure isolation, Chromium E2E, production build.
+- Important decision: Keep the boundary dependency-free until EPUB-001 and PDF-001 select concrete parsers.
 
 ログを詳細な日記にしない。恒久的な仕様変更は `SPEC.md`、方針変更は `PLAN.md` に反映する。
