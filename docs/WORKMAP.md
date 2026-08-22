@@ -84,7 +84,7 @@ PDF-003, DESK-001, NOTE-001, PAPER-001, LANG-001, VOC-001
 # 2. Foundation
 
 ## BOOT-001 — Repository reconnaissance
-**Status:** IN_PROGRESS  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** none
 
@@ -112,7 +112,7 @@ PDF-003, DESK-001, NOTE-001, PAPER-001, LANG-001, VOC-001
 ---
 
 ## BOOT-002 — Application scaffold
-**Status:** READY  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** BOOT-001
 
@@ -140,7 +140,7 @@ Next.js + TypeScript + Tailwindを中心とした実行可能なWebアプリ基�
 ---
 
 ## ARCH-001 — Architecture boundaries
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** BOOT-001
 
@@ -169,7 +169,7 @@ Next.js + TypeScript + Tailwindを中心とした実行可能なWebアプリ基�
 ---
 
 ## TEST-001 — Test harness
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** BOOT-002
 
@@ -946,5 +946,20 @@ YYYY-MM-DD — TASK-ID
 - Important decision:
 - Follow-up:
 ```
+
+2026-08-22 — BOOT-001 / BOOT-002
+- Result: Confirmed the merged scaffold and added `.env.example` for server-side AI configuration.
+- Verification: lint, typecheck, unit tests, Playwright Chromium E2E, production build.
+- Follow-up: Continue with DB-001 and DEP-001.
+
+2026-08-22 — ARCH-001
+- Result: Added minimal typed boundaries for AI provider, context builder, auth, parser, repository, and reader adapter.
+- Verification: lint and typecheck.
+- Important decision: Keep boundaries as interfaces/types only until concrete DB and provider tasks.
+
+2026-08-22 — TEST-001
+- Result: Added Node.js unit tests, Playwright Chromium E2E, and a combined `npm run verify` command.
+- Verification: lint, typecheck, 1 unit test, 1 Chromium E2E test, production build.
+- Important decision: Use Playwright Test as the proven browser E2E runner (Apache-2.0).
 
 ログを詳細な日記にしない。恒久的な仕様変更は `SPEC.md`、方針変更は `PLAN.md` に反映する。
