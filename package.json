@@ -13,7 +13,9 @@
     "verify": "npm run lint && npm run typecheck && npm run test && npm run test:e2e && npm run build"
   },
   "dependencies": {
+    "@likecoin/epub-ts": "^0.7.2",
     "better-sqlite3": "^13.0.3",
+    "linkedom": "^0.18.13",
     "next": "16.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"

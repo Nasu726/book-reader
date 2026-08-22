@@ -246,7 +246,7 @@ notes / vocabularyは将来追加可能であること。
 ---
 
 ## DB-002 — Document repository
-**Status:** DONE  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** DB-001
 
@@ -265,7 +265,7 @@ Document metadataとsection locationを保存 / 取得できるRepository APIを
 # 5. Parsing
 
 ## PARSE-001 — Parser boundaries
-**Status:** DONE  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** ARCH-001
 
@@ -289,7 +289,7 @@ PDF / EPUB parserをUIとReader表示から分離した共通境界として定�
 ---
 
 ## EPUB-001 — EPUB parser selection and import
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** PARSE-001, DEP-001
 
@@ -975,5 +975,10 @@ YYYY-MM-DD — TASK-ID
 - Result: Added stable document location contracts, typed parse failures, format detection, and a parser registry that isolates parser errors from callers.
 - Verification: lint, typecheck, 7 unit tests including invalid-file failure isolation, Chromium E2E, production build.
 - Important decision: Keep the boundary dependency-free until EPUB-001 and PDF-001 select concrete parsers.
+
+2026-08-22 — EPUB-001
+- Result: Added a server-side EPUB parser using `@likecoin/epub-ts` with `linkedom`, extracting metadata, navigation titles, spine-ordered section text, and stable spine/CFI locations.
+- Verification: lint, typecheck, 9 unit tests including valid sample import, stable section order, and malformed EPUB failure isolation, Chromium E2E, production build; `npm audit` reports no vulnerabilities.
+- Important decision: `@likecoin/epub-ts` (BSD-2-Clause, actively maintained) was selected for its typed Node parser and single runtime dependency; `linkedom` supplies the documented server DOM parser.
 
 ログを詳細な日記にしない。恒久的な仕様変更は `SPEC.md`、方針変更は `PLAN.md` に反映する。
