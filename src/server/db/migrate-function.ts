@@ -1,7 +1,13 @@
+import type { Database } from "better-sqlite3";
 import type { Db } from "./client.js";
 
-export function migrate(db: Db) {
-  db.run(`
+type SqliteMigratable = Database | Db;
+
+export function migrate(database: SqliteMigratable) {
+  const db = (
+    "$client" in database ? database.$client : database
+  ) as Database;
+  db.exec(`
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -9,11 +15,20 @@ export function migrate(db: Db) {
       format TEXT NOT NULL CHECK (format IN ('epub', 'pdf')),
       author TEXT,
       source_filename TEXT,
+      file_data TEXT,
+      last_opened_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
   `);
-  db.run(`
+  const columns = db.prepare("PRAGMA table_info(documents)").all() as { name: string }[];
+  if (!columns.some((column) => column.name === "file_data")) {
+    db.exec("ALTER TABLE documents ADD COLUMN file_data TEXT");
+  }
+  if (!columns.some((column) => column.name === "last_opened_at")) {
+    db.exec("ALTER TABLE documents ADD COLUMN last_opened_at INTEGER");
+  }
+  db.exec(`
     CREATE TABLE IF NOT EXISTS document_sections (
       document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
       section_id TEXT NOT NULL,
@@ -23,7 +38,7 @@ export function migrate(db: Db) {
       PRIMARY KEY (document_id, section_id)
     )
   `);
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS reading_progress (
       document_id TEXT PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
       user_id TEXT NOT NULL,
@@ -31,7 +46,7 @@ export function migrate(db: Db) {
       updated_at INTEGER NOT NULL
     )
   `);
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS highlights (
       id TEXT PRIMARY KEY,
       document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -42,7 +57,7 @@ export function migrate(db: Db) {
       created_at INTEGER NOT NULL
     )
   `);
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
       document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -50,12 +65,14 @@ export function migrate(db: Db) {
       created_at INTEGER NOT NULL
     )
   `);
-  db.run(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
       role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
       content TEXT NOT NULL,
+      selected_text TEXT,
+      location TEXT,
       created_at INTEGER NOT NULL
     )
   `);

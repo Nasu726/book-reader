@@ -13,3 +13,9 @@ export function createDb(path: string) {
 }
 
 export type Db = ReturnType<typeof createDb>;
+export function createSqliteDb(path: string) {
+  const sqlite = new Database(path);
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("foreign_keys = ON");
+  return sqlite;
+}

@@ -12,6 +12,8 @@ export const documents = sqliteTable("documents", {
   format: text("format", { enum: ["epub", "pdf"] }).notNull(),
   author: text("author"),
   sourceFilename: text("source_filename"),
+  fileData: text("file_data"),
+  lastOpenedAt: integer("last_opened_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -48,6 +50,8 @@ export const readingProgress = sqliteTable(
   },
 );
 
+export type ReadingProgressInsert = typeof readingProgress.$inferInsert;
+
 export const highlights = sqliteTable("highlights", {
   id: text("id").primaryKey(),
   documentId: text("document_id")
@@ -80,6 +84,8 @@ export const messages = sqliteTable("messages", {
     .references(() => conversations.id, { onDelete: "cascade" }),
   role: text("role", { enum: ["user", "assistant"] }).notNull(),
   content: text("content").notNull(),
+  selectedText: text("selected_text"),
+  location: text("location"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),

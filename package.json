@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "node --import tsx --test",
@@ -17,6 +17,7 @@
     "better-sqlite3": "^13.0.3",
     "linkedom": "^0.18.13",
     "next": "16.3.2",
+    "pdfjs-dist": "^6.2.108",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

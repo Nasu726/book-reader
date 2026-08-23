@@ -323,7 +323,7 @@ EPUB importとmetadata / section抽出を実装する。
 ---
 
 ## PDF-001 — PDF renderer and text layer
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** PARSE-001, DEP-001
 
@@ -375,7 +375,7 @@ PDF表示とtext layerを実装する。表示と抽出処理は分離する。
 # 6. Authentication
 
 ## AUTH-001 — Single-user authentication
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** BOOT-002
 
@@ -403,7 +403,7 @@ PDF表示とtext layerを実装する。表示と抽出処理は分離する。
 # 7. AI architecture
 
 ## AI-001 — Provider abstraction
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** ARCH-001
 
@@ -428,7 +428,7 @@ Provider / Modelを設定可能にする抽象層を作る。
 ---
 
 ## AI-002 — OpenRouter adapter
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** AI-001, DEP-001
 
@@ -446,7 +446,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 ---
 
 ## AI-003 — Explain / Translate / Simplify / Ask service
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** AI-001
 
@@ -473,7 +473,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 # 8. UI foundation
 
 ## UI-001 — App shell and responsive layout
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** BOOT-002
 
@@ -490,7 +490,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 ---
 
 ## UI-002 — Library and import UI
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** DB-002, UI-001
 
@@ -508,7 +508,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 ---
 
 ## UI-003 — Theme / typography controls
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on**: UI-001
 
@@ -527,7 +527,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 # 9. Reading experience
 
 ## READ-001 — Document open route
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** DB-002, EPUB-002, PDF-001, UI-002
 
@@ -544,7 +544,7 @@ Libraryから文書を開き、正しいReaderへ遷移する。
 ---
 
 ## READ-002 — Navigation and progress persistence
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** READ-001
 
@@ -561,7 +561,7 @@ PDF page / EPUB location移動を保存し復元する。
 ---
 
 ## SEL-001 — Text selection capture
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** READ-002
 
@@ -574,6 +574,9 @@ Reader内選択を安定した内部表現として取得する。
 - EPUB selection captures text and stable range
 - PDF selection captures text and page / geometry source
 - focus movement during menu interaction preserves captured selection
+- EPUB captures section ID plus canonical section-text offsets
+- PDF captures page number plus normalized selected text
+- selection envelopes are validated before reuse
 
 ---
 
@@ -615,7 +618,7 @@ Explain / Translate / Simplify / Ask / Highlightへ到達できるselection menu
 ---
 
 ## CTX-001 — Context builder
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** PARSE-001, DB-002
 
@@ -639,7 +642,7 @@ Explain / Translate / Simplify / Ask / Highlightへ到達できるselection menu
 ---
 
 ## CONV-001 — Conversation storage
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** DB-002, AI-003
 
@@ -656,7 +659,7 @@ Explain / Translate / Simplify / Ask / Highlightへ到達できるselection menu
 ---
 
 ## AIACT-002 — AI answer presentation
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0  
 **Depends on:** AIACT-001, AI-003, CONV-001
 
@@ -984,5 +987,73 @@ YYYY-MM-DD — TASK-ID
 2026-08-22 — EPUB-002
 - Result: Added a versioned EPUB reader data model with first-open behavior, adjacent chapter navigation, reload-safe encoded locations, invalid-location rejection, and proportional character-offset preservation across font-size changes.
 - Verification: lint, typecheck, 15 unit tests including navigation, restoration, boundary behavior, and font-size intent, Chromium E2E, production build.
+
+2026-08-22 — AUTH-001
+- Result: Added scrypt password hashing, SQLite-backed hashed session tokens, HttpOnly login/logout APIs with production Secure cookies, generic authentication errors, and per-client basic rate limiting.
+- Result: Protected the application shell behind a server-side session check and added login and authenticated-reader browser flows.
+- Verification: lint, typecheck, unit tests covering valid sessions, invalid credentials, logout invalidation, and rate limiting; Chromium E2E covering unauthenticated protection and login/logout API flow; production build.
+- Important decision: Store only SHA-256 hashes of random session tokens; raw tokens remain exclusively in HttpOnly cookies.
+
+2026-08-22 — AI-001
+- Result: Extended the provider contract with provider/model configuration types, cancellation signals, timeout orchestration, normalized retryable/cancelled/provider errors, and a mock provider implementation.
+- Verification: lint, typecheck, unit tests covering success, provider failure, timeout, and external cancellation, Chromium E2E, production build.
+- Important decision: Keep provider-specific transport and credentials outside the core `AiProvider` boundary.
+
+2026-08-22 — AI-003
+- Result: Added a centralized Explain / Translate / Simplify / Ask action service with selection-first context construction, extensible language settings, empty-selection validation, and Reader-safe normalized failures.
+- Verification: lint, typecheck, unit tests covering all four mock-provider actions, prompt construction, provider failure isolation, and empty selections; Chromium E2E; production build.
+
+2026-08-22 — UI-001
+- Result: Added a responsive authenticated app shell with a primary Reader pane on mobile and a secondary AI/notes pane on sufficiently wide viewports.
+- Verification: lint, typecheck, unit tests, Chromium E2E covering narrow Reader primacy and wide secondary-pane availability.
+- Follow-up: Re-run production build after resolving the local Turbopack CSS worker port restriction.
+
+2026-08-22 — UI-003
+- Result: Added persistent light/dark theme selection and bounded 80–180% reader font-size controls with mobile-friendly touch targets.
+- Verification: lint, typecheck, unit preference key tests, Chromium E2E covering theme persistence, font-size persistence, narrow Reader primacy, and wide secondary-pane availability.
+- Follow-up: Production build remains blocked by the local Turbopack CSS worker port restriction; TypeScript and browser runtime checks pass.
+
+2026-08-22 — CTX-001
+- Result: Extended context construction with document/section provenance, labeled before/after sources, deterministic token-budget trimming, selection/question priority, and invalid budget rejection.
+- Verification: lint, typecheck, unit tests covering source provenance, oversized-context degradation, selection priority, invalid budgets, and existing behavior; Chromium E2E.
+
+2026-08-22 — CONV-001
+- Result: Added SQLite conversation/message persistence with selected-text and location fields, ordered history loading, and recoverable pending assistant messages that can be completed after a provider failure.
+- Verification: lint, typecheck, unit tests covering selection/location preservation, pending assistant recovery, and ordered history; Chromium E2E.
+
+2026-08-22 — AI-002
+- Result: Added a server-only OpenRouter-compatible chat adapter with normalized request/response handling and a separate credential-gated live smoke script.
+- Verification: lint, typecheck, unit tests using injected fetch for success and provider failures, mock-provider suites, Chromium E2E; live smoke skipped without credentials.
+
+2026-08-22 — UI-002
+- Result: Added an authenticated document API with PDF/EPUB MIME validation, filename fallback title, size limits, and no filesystem path use; added library import controls and a useful empty state.
+- Verification: lint, typecheck, unit suites, Chromium E2E covering import visibility, useful empty state, authentication, responsive shell, and preference persistence.
+- Important decision: Store metadata only in this task; raw file persistence is deferred until the document open route defines storage requirements.
+
+2026-08-22 — AIACT-002
+- Result: Added an authenticated server-side OpenRouter route, browser AI provider transport, desktop secondary pane, mobile Reader-preserving drawer, scrollable response history, retry, and follow-up questions.
+- Verification: lint, typecheck, unit tests, Chromium E2E covering desktop pane and mobile drawer.
+- Important decision: Keep the API key server-only and preserve the core action service as provider-independent.
+- Follow-up: Production builds now use Next.js Webpack mode because Turbopack's PostCSS worker cannot bind its local worker port in the current sandbox; Google font fetching was removed in favor of system fonts.
+
+2026-08-22 — PDF-001
+- Result: Selected Mozilla `pdfjs-dist` 6.2.108 (Apache-2.0), added isolated canvas rendering and normalized page-text extraction, PDF page navigation, selectable text-layer preview, retryable renderer failure state, and Chromium coverage.
+- Verification: lint, typecheck, unit tests, Chromium E2E covering rendered sample page, text layer, and bounded single-page navigation; production Webpack build; production dependency audit reports no vulnerabilities.
+- Important decision: Use the proven PDF.js runtime rather than hand-writing a parser; renderer failures remain local to the PDF section and extraction returns normalized page strings without coupling to the visual pipeline.
+
+2026-08-23 — READ-001
+- Result: Added authenticated library links and document routes, stored-source retrieval, PDF opening through PDF.js, server-side EPUB parsing with section navigation, safe missing/broken document errors, automatic last-opened timestamps, and compatible database migrations.
+- Verification: lint, typecheck, 35 unit tests, 11 Chromium E2E tests with an isolated authenticated database, production Webpack build.
+- Important decision: Keep uploaded source bytes as opaque authenticated data URLs for MVP persistence while preserving parser boundaries; raw bytes are never exposed to unauthenticated requests.
+
+2026-08-23 — READ-002
+- Result: Added authenticated reading-progress APIs, SQLite upsert repository, versioned PDF page locations, versioned EPUB section locations, automatic save on navigation, reload restoration, and a visible retry path for EPUB save failure.
+- Verification: lint, typecheck, 37 unit tests including progress upsert/read coverage, 12 Chromium E2E tests covering authentication, document routes, progress validation, PDF rendering, AI pane, responsive shell, and preferences.
+- Follow-up: Add an authenticated stored multi-page PDF fixture for full browser navigation persistence before E2E-001.
+
+2026-08-23 — SEL-001
+- Result: Added versioned document-selection envelopes with validated locations. EPUB captures stable section IDs and canonical section-text offsets; PDF captures page plus normalized text intent.
+- Verification: lint, typecheck, 44 unit tests including malformed-location rejection and stable EPUB offsets, 13 Chromium E2E tests, production Webpack build.
+- Important decision: Store normalized selected text in the envelope so AI intent remains stable across focus changes; highlight restoration will use the same versioned location contract.
 
 ログを詳細な日記にしない。恒久的な仕様変更は `SPEC.md`、方針変更は `PLAN.md` に反映する。
