@@ -9,6 +9,7 @@ export const AI_ACTIONS = [
   "translate",
   "simplify",
   "ask",
+  "highlight",
 ] as const;
 
 export type AiAction = (typeof AI_ACTIONS)[number];
@@ -24,6 +25,7 @@ export type AiActionInput = {
 
 const ACTION_INSTRUCTIONS: Record<AiAction, string> = {
   explain: "Explain the selected text clearly and concisely.",
+  highlight: "Highlight is persisted locally and is not sent to the provider.",
   translate: "",
   simplify: "Simplify the selected text without losing essential meaning.",
   ask: "Answer the user's question using the provided context when relevant.",
@@ -88,7 +90,7 @@ export async function runAiAction(
   provider: AiProvider,
   input: AiActionInput,
 ): Promise<string> {
-  if (!AI_ACTIONS.includes(input.action)) {
+  if (!AI_ACTIONS.includes(input.action) || input.action === "highlight") {
     throw new AiActionError("invalid_action", "Unsupported AI action.");
   }
 

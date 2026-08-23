@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
-import Link from "next/link";
+import { SelectionAiConnector } from "@/components/selection-ai-connector";
 import { notFound, redirect } from "next/navigation";
 
 import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
+import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
-import { DocumentReader } from "@/components/document-reader";
 import { createAuthService } from "@/server/auth/service";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
@@ -37,10 +37,17 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   );
 
   return (
-    <main className="space-y-6">
-      <Link className="inline-block text-sm" href="/">Back to library</Link>
-      <h1 className="text-3xl font-semibold tracking-tight">{document.title}</h1>
-      <DocumentReader documentId={id} format={document.format} />
-    </main>
+    <SelectionAiConnector
+      documentFormat={document.format}
+      documentId={id}
+      documentTitle={document.title}
+      initialHighlights={(await createSqliteHighlightRepository(
+        createDrizzleFromSqlite(database),
+      ).listByDocument(id, session.userId)).map((highlight) => ({
+        id: highlight.id,
+        note: highlight.note,
+        selectedText: highlight.selectedText,
+      }))}
+    />
   );
 }

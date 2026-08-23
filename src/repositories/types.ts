@@ -37,6 +37,27 @@ export interface ReadingProgressRepository {
   save(input: { documentId: string; userId: string; location: string }): Promise<void>;
 }
 
+export type HighlightRecord = {
+  id: string;
+  documentId: string;
+  location: string;
+  selectedText: string;
+  note?: string;
+  createdAt: Date;
+};
+
+export interface HighlightRepository {
+  listByDocument(documentId: string, userId: string): Promise<readonly HighlightRecord[]>;
+  create(input: {
+    documentId: string;
+    userId: string;
+    location: string;
+    selectedText: string;
+    note?: string;
+  }): Promise<HighlightRecord>;
+  delete(id: string, userId: string): Promise<boolean>;
+}
+
 export type MessageRole = "user" | "assistant";
 
 export type MessageRecord = {

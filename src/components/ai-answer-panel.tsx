@@ -2,12 +2,18 @@
 
 import { useState } from "react";
 
-import { AI_ACTIONS, AiActionError, runAiAction } from "@/core/ai/action-service";
+import {
+  AI_ACTIONS,
+  AiActionError,
+  runAiAction,
+  type AiAction,
+} from "@/core/ai/action-service";
+import type { DocumentSelection } from "@/core/selection/capture";
 import type { AiProvider, AiRequest, AiResponse } from "@/core/ai/provider";
 
 type AiAnswerPanelProps = {
   provider?: AiProvider;
-  selectedText: string;
+  selection: DocumentSelection | null;
 };
 
 const fetchProvider: AiProvider = {
@@ -28,25 +34,26 @@ const fetchProvider: AiProvider = {
 const ACTION_LABELS: Record<(typeof AI_ACTIONS)[number], string> = {
   ask: "Ask",
   explain: "Explain",
+  highlight: "Highlight",
   simplify: "Simplify",
   translate: "Translate",
 };
 
-export function AiAnswerPanel({ provider, selectedText }: AiAnswerPanelProps) {
-  const [action, setAction] = useState<(typeof AI_ACTIONS)[number]>("explain");
+export function AiAnswerPanel({ provider, selection }: AiAnswerPanelProps) {
+  const [action, setAction] = useState<AiAction>("explain");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<{ action: string; text: string }[]>([]);
 
-  async function run(nextAction: (typeof AI_ACTIONS)[number], followUp?: string) {
+  async function run(nextAction: AiAction, followUp?: string) {
     setAction(nextAction);
     setLoading(true);
     setError(null);
     try {
       const response = await runAiAction(provider ?? fetchProvider, {
         action: nextAction,
-        selectedText,
+        selectedText: selection?.text ?? "",
         userQuestion: nextAction === "ask" ? followUp || question : undefined,
       });
       setHistory((current) => [{ action: nextAction, text: response }, ...current]);
@@ -69,9 +76,14 @@ export function AiAnswerPanel({ provider, selectedText }: AiAnswerPanelProps) {
                 ? "border-zinc-900 bg-zinc-900 text-white"
                 : "border-zinc-300 dark:border-zinc-700"
             }`}
-            disabled={loading}
+            disabled={loading || (candidate === "highlight" && !selection)}
             key={candidate}
-            onClick={() => void run(candidate)}
+            onClick={() => {
+              if (candidate === "highlight") {
+                return;
+              }
+              void run(candidate);
+            }}
             type="button"
           >
             {ACTION_LABELS[candidate]}

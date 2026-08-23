@@ -22,12 +22,11 @@ export default async function Home() {
 
   const libraryRepository = createSqliteLibraryRepository(createDrizzleFromSqlite(database));
   const documents = await libraryRepository.list(session.userId);
-
   const selectedText = "";
 
   return (
     <AppShell
-      secondary={selectedText ? <AiAnswerPanel selectedText={selectedText} /> : undefined}
+      secondary={selectedText ? <AiAnswerPanel selection={null} /> : undefined}
       reader={
         <>
           <h1 className="text-3xl font-semibold tracking-tight">AI Reader</h1>
