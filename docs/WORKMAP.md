@@ -581,7 +581,7 @@ Reader内選択を安定した内部表現として取得する。
 ---
 
 ## HILITE-001 — Highlight persistence
-**Status:** MUST  
+**Status:** DONE  
 **Priority:** P0  
 **Depends on:** SEL-001
 
@@ -1055,5 +1055,10 @@ YYYY-MM-DD — TASK-ID
 - Result: Added versioned document-selection envelopes with validated locations. EPUB captures stable section IDs and canonical section-text offsets; PDF captures page plus normalized text intent.
 - Verification: lint, typecheck, 44 unit tests including malformed-location rejection and stable EPUB offsets, 13 Chromium E2E tests, production Webpack build.
 - Important decision: Store normalized selected text in the envelope so AI intent remains stable across focus changes; highlight restoration will use the same versioned location contract.
+
+2026-08-23 — HILITE-001
+- Result: Added an authenticated SQLite highlight repository, validated create/list/delete APIs, owner-scoped restoration, Reader-side EPUB selection persistence, saved-highlight list, and secure deletion.
+- Verification: lint, typecheck, 45 unit tests including owner-scoped persistence/deletion, 15 Chromium E2E tests including reload-safe highlight persistence and cleanup, production Webpack build.
+- Follow-up: PDF visual mapping and reflow-aware EPUB rendering remain part of reader polish; the current persisted intent is reload-stable and owner-scoped.
 
 ログを詳細な日記にしない。恒久的な仕様変更は `SPEC.md`、方針変更は `PLAN.md` に反映する。

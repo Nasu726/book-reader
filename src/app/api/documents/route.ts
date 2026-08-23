@@ -74,5 +74,8 @@ export async function POST(request: Request) {
 
   await repository.updateSource(documentId, session.userId, fileData);
 
-  return Response.json({ ok: true }, { status: 201 });
+  return new Response(null, {
+    headers: { location: "/" },
+    status: 303,
+  });
 }
