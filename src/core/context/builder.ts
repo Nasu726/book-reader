@@ -3,6 +3,11 @@ export type ContextInput = {
   userQuestion?: string;
   documentTitle?: string;
   sectionTitle?: string;
+  paperStructure?: {
+    abstract?: string;
+    sectionTitle?: string;
+    title?: string;
+  };
   surroundingText?: {
     before?: string;
     after?: string;
@@ -23,6 +28,9 @@ export function buildContext(input: ContextInput): string {
   const metadata = [
     input.documentTitle?.trim() && `Document: ${input.documentTitle.trim()}`,
     input.sectionTitle?.trim() && `Section: ${input.sectionTitle.trim()}`,
+    input.paperStructure?.title?.trim() && `Paper title: ${input.paperStructure.title.trim()}`,
+    input.paperStructure?.sectionTitle?.trim() && `Paper section: ${input.paperStructure.sectionTitle.trim()}`,
+    input.paperStructure?.abstract?.trim() && `Abstract: ${input.paperStructure.abstract.trim()}`,
   ].filter(Boolean);
   const before = input.surroundingText?.before?.trim()
     ? `Before source: ${input.surroundingText.before.trim()}`

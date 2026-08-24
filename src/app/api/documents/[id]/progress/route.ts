@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 
+import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { createSqliteReadingProgressRepository } from "@/repositories/sqlite/reading-progress-repository";
 import { createAuthService } from "@/server/auth/service";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
@@ -8,6 +9,16 @@ import { createSqliteDb } from "@/server/db/client";
 
 function repository(database: ReturnType<typeof createSqliteDb>) {
   return createSqliteReadingProgressRepository(createDrizzleFromSqlite(database));
+}
+
+async function requireOwnedDocument(database: ReturnType<typeof createSqliteDb>, documentId: string, userId: string) {
+  const document = await createSqliteDocumentRepository(
+    createDrizzleFromSqlite(database),
+  ).getById(documentId);
+  if (!document || document.userId !== userId) {
+    return Response.json({ error: "Document not found." }, { status: 404 });
+  }
+  return null;
 }
 
 export async function GET(
@@ -21,7 +32,10 @@ export async function GET(
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
   const { id } = await context.params;
-  const progress = await repository(database).getByDocument(id);
+  const notOwned = await requireOwnedDocument(database, id, session.userId);
+  if (notOwned) return notOwned;
+
+  const progress = await repository(database).getByDocument(id, session.userId);
   return Response.json({ location: progress?.location ?? null });
 }
 
@@ -46,6 +60,9 @@ export async function POST(
     return Response.json({ error: "Invalid progress." }, { status: 400 });
   }
   const { id } = await context.params;
+  const notOwned = await requireOwnedDocument(database, id, session.userId);
+  if (notOwned) return notOwned;
+
   await repository(database).save({
     documentId: id,
     userId: session.userId,

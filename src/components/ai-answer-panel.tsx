@@ -12,24 +12,32 @@ import type { DocumentSelection } from "@/core/selection/capture";
 import type { AiProvider, AiRequest, AiResponse } from "@/core/ai/provider";
 
 type AiAnswerPanelProps = {
+  documentId?: string;
+  onHighlightCreated?: (selection: DocumentSelection) => Promise<void> | void;
   provider?: AiProvider;
   selection: DocumentSelection | null;
 };
 
-const fetchProvider: AiProvider = {
-  async generate(request: AiRequest): Promise<AiResponse> {
-    const response = await fetch("/api/ai/action", {
-      body: JSON.stringify({ prompt: request.prompt, context: request.context }),
-      headers: { "content-type": "application/json" },
-      method: "POST",
-      signal: request.signal,
-    });
-    if (!response.ok) {
-      throw new Error("The provider rejected the request.");
-    }
-    return (await response.json()) as AiResponse;
-  },
-};
+function createFetchProvider(documentId?: string): AiProvider {
+  return {
+    async generate(request: AiRequest) {
+      const response = await fetch("/api/ai/action", {
+        body: JSON.stringify({
+          context: request.context,
+          documentId,
+          prompt: request.prompt,
+        }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+        signal: request.signal,
+      });
+      if (!response.ok) {
+        throw new Error("The provider rejected the request.");
+      }
+      return (await response.json()) as AiResponse;
+    },
+  };
+}
 
 const ACTION_LABELS: Record<(typeof AI_ACTIONS)[number], string> = {
   ask: "Ask",
@@ -39,11 +47,26 @@ const ACTION_LABELS: Record<(typeof AI_ACTIONS)[number], string> = {
   translate: "Translate",
 };
 
-export function AiAnswerPanel({ provider, selection }: AiAnswerPanelProps) {
+const TARGET_LANGUAGES = [
+  "English",
+  "French",
+  "Japanese",
+  "Portuguese",
+  "Simplified Chinese",
+  "Spanish",
+] as const;
+
+export function AiAnswerPanel({
+  documentId,
+  onHighlightCreated,
+  provider,
+  selection,
+}: AiAnswerPanelProps) {
   const [action, setAction] = useState<AiAction>("explain");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState("");
+  const [targetLanguage, setTargetLanguage] = useState<string>("Japanese");
   const [history, setHistory] = useState<{ action: string; text: string }[]>([]);
 
   async function run(nextAction: AiAction, followUp?: string) {
@@ -51,9 +74,14 @@ export function AiAnswerPanel({ provider, selection }: AiAnswerPanelProps) {
     setLoading(true);
     setError(null);
     try {
-      const response = await runAiAction(provider ?? fetchProvider, {
+      const response = await runAiAction(provider ?? createFetchProvider(documentId), {
         action: nextAction,
+        documentTitle: selection?.documentTitle,
+        paperStructure: selection?.paperStructure,
+        surroundingText: selection?.surroundingText,
         selectedText: selection?.text ?? "",
+        sourceLanguage: "auto",
+        targetLanguage: targetLanguage,
         userQuestion: nextAction === "ask" ? followUp || question : undefined,
       });
       setHistory((current) => [{ action: nextAction, text: response }, ...current]);
@@ -80,6 +108,7 @@ export function AiAnswerPanel({ provider, selection }: AiAnswerPanelProps) {
             key={candidate}
             onClick={() => {
               if (candidate === "highlight") {
+                if (selection) void onHighlightCreated?.(selection);
                 return;
               }
               void run(candidate);
@@ -89,6 +118,20 @@ export function AiAnswerPanel({ provider, selection }: AiAnswerPanelProps) {
             {ACTION_LABELS[candidate]}
           </button>
         ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="shrink-0 text-sm font-medium" htmlFor="translation-target-language">Translate to</label>
+        <select
+          className="min-h-11 w-full rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          disabled={loading}
+          id="translation-target-language"
+          onChange={(event) => setTargetLanguage(event.target.value)}
+          value={targetLanguage}
+        >
+          {TARGET_LANGUAGES.map((language) => (
+            <option key={language} value={language}>{language}</option>
+          ))}
+        </select>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
         {loading && <p aria-live="polite" className="text-sm">Loading…</p>}

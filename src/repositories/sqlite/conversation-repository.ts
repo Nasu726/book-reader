@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { conversations, messages } from "@/server/db/schema";
 import {
@@ -36,6 +36,19 @@ export function createSqliteConversationRepository(
     return rows.map((row) => toRecord(row));
   }
 
+  async function getByDocument(
+    documentId: string,
+    userId: string,
+  ): Promise<string | null> {
+    const rows = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(and(eq(conversations.documentId, documentId), eq(conversations.userId, userId)))
+      .orderBy(asc(conversations.createdAt))
+      .limit(1);
+    return rows[0]?.id ?? null;
+  }
+
   async function addMessage(message: MessageRecord): Promise<void> {
     await db.insert(messages).values(toValues(message));
   }
@@ -67,12 +80,34 @@ export function createSqliteConversationRepository(
       .where(eq(messages.id, messageId));
   }
 
+  async function recordAssistantResponse(input: {
+    conversationId: string;
+    content: string;
+    selectedText?: string;
+    location?: string;
+  }): Promise<void> {
+    const messageId = crypto.randomUUID();
+    await beginPendingAssistantMessage({
+      id: messageId,
+      conversationId: input.conversationId,
+      role: "assistant",
+      content: "",
+      createdAt: new Date(),
+    });
+    await completePendingAssistantMessage(messageId, input.content, {
+      location: input.location,
+      selectedText: input.selectedText,
+    });
+  }
+
   return {
     create,
+    getByDocument,
     listMessages,
     addMessage,
     beginPendingAssistantMessage,
     completePendingAssistantMessage,
+    recordAssistantResponse,
   };
 }
 

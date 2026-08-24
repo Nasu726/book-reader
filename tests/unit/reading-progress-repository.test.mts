@@ -46,7 +46,7 @@ test("reading progress upserts a stable document location", async () => {
     location: JSON.stringify({ version: 1, sectionId: "section-3" }),
   });
 
-  assert.deepEqual(await repository.getByDocument("progress-doc"), {
+  assert.deepEqual(await repository.getByDocument("progress-doc", "user-1"), {
     documentId: "progress-doc",
     location: JSON.stringify({ version: 1, sectionId: "section-3" }),
   });
@@ -54,5 +54,40 @@ test("reading progress upserts a stable document location", async () => {
 
 test("missing reading progress returns null", async () => {
   const repository = createSqliteReadingProgressRepository(db);
-  assert.equal(await repository.getByDocument("missing-progress"), null);
+  assert.equal(await repository.getByDocument("missing-progress", "user-1"), null);
+});
+
+test("reading progress is scoped to its owner", async () => {
+  const repository = createSqliteReadingProgressRepository(db);
+  assert.equal(await repository.getByDocument("progress-doc", "user-2"), null);
+});
+
+test("progress rows cannot collide across owners", async () => {
+  await db.insert(documents).values({
+    id: "foreign-progress-doc",
+    userId: "owner",
+    title: "Foreign Book",
+    format: "pdf",
+  });
+  const repository = createSqliteReadingProgressRepository(db);
+
+  await repository.save({
+    documentId: "foreign-progress-doc",
+    userId: "owner",
+    location: JSON.stringify({ page: 1, version: 1 }),
+  });
+  await repository.save({
+    documentId: "foreign-progress-doc",
+    userId: "attacker",
+    location: JSON.stringify({ page: 99, version: 1 }),
+  });
+
+  assert.deepEqual(await repository.getByDocument("foreign-progress-doc", "attacker"), {
+    documentId: "foreign-progress-doc",
+    location: JSON.stringify({ page: 99, version: 1 }),
+  });
+  assert.deepEqual(await repository.getByDocument("foreign-progress-doc", "attacker"), {
+    documentId: "foreign-progress-doc",
+    location: JSON.stringify({ page: 99, version: 1 }),
+  });
 });

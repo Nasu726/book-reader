@@ -63,6 +63,8 @@ DB-002 + EPUB-002 + PDF-002 + UI-002
 
 AI-003 + SEL-001
  └─ AIACT-001 ─ CTX-001 ─ CONV-001 ─ AIACT-002
+     │
+     └─ DESK-001 ─ NOTE-001
 
 READ-002 + AIACT-002 + AUTH-001
  └─ E2E-001
@@ -85,7 +87,7 @@ PDF-003, DESK-001, NOTE-001, PAPER-001, LANG-001, VOC-001
 
 ## BOOT-001 — Repository reconnaissance
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** none
 
 ### Goal
@@ -113,7 +115,7 @@ PDF-003, DESK-001, NOTE-001, PAPER-001, LANG-001, VOC-001
 
 ## BOOT-002 — Application scaffold
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** BOOT-001
 
 ### Goal
@@ -141,7 +143,7 @@ Next.js + TypeScript + Tailwindを中心とした実行可能なWebアプリ基�
 
 ## ARCH-001 — Architecture boundaries
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** BOOT-001
 
 ### Goal
@@ -170,7 +172,7 @@ Next.js + TypeScript + Tailwindを中心とした実行可能なWebアプリ基�
 
 ## TEST-001 — Test harness
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** BOOT-002
 
 ### Goal
@@ -189,7 +191,7 @@ Unit / integration / E2Eを増やせる基盤を用意する。
 
 ## DEP-001 — Dependency review workflow
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** BOOT-001
 
 ### Goal
@@ -220,7 +222,7 @@ PDF / EPUB / auth等で外部依存を選ぶ前の判断ルールを実運用で
 
 ## DB-001 — DB / repository selection
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** ARCH-001
 
 ### Goal
@@ -247,7 +249,7 @@ notes / vocabularyは将来追加可能であること。
 
 ## DB-002 — Document repository
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** DB-001
 
 ### Goal
@@ -266,7 +268,7 @@ Document metadataとsection locationを保存 / 取得できるRepository APIを
 
 ## PARSE-001 — Parser boundaries
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** ARCH-001
 
 ### Goal
@@ -290,7 +292,7 @@ PDF / EPUB parserをUIとReader表示から分離した共通境界として定�
 
 ## EPUB-001 — EPUB parser selection and import
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** PARSE-001, DEP-001
 
 ### Goal
@@ -307,7 +309,7 @@ EPUB importとmetadata / section抽出を実装する。
 
 ## EPUB-002 — EPUB reader representation
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** EPUB-001
 
 ### Goal
@@ -324,7 +326,7 @@ EPUB importとmetadata / section抽出を実装する。
 
 ## PDF-001 — PDF renderer and text layer
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** PARSE-001, DEP-001
 
 ### Goal
@@ -341,7 +343,7 @@ PDF表示とtext layerを実装する。表示と抽出処理は分離する。
 ---
 
 ## PDF-002 — PDF extraction normalization
-**Status:** SHOULD / Phase B  
+**Status:** DONE
 **Priority:** P1  
 **Depends on:** PDF-001
 
@@ -355,10 +357,12 @@ PDF表示とtext layerを実装する。表示と抽出処理は分離する。
 - two-column sample has deterministic extraction order or explicit limitation
 - failure remains isolated from rendering
 
+Evidence: PDF.js text items are converted to a separate coordinate-aware extraction pipeline. Single-column lines join deterministically, two-column content is emitted left column before right column, missing coordinates return empty output, and rendering failures remain isolated. Existing PDF Chromium journeys continue to pass.
+
 ---
 
 ## PDF-003 — Paper structure inference
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P1  
 **Depends on:** PDF-002, PAPER-001
 
@@ -370,13 +374,15 @@ PDF表示とtext layerを実装する。表示と抽出処理は分離する。
 
 推定失敗時にfallback textのみでReaderとAI requestを成立させる。
 
+Evidence: Inference runs only during PDF selection capture, falls back to `undefined` on extraction errors or empty page text, and leaves the AI request valid with selection/document/surrounding context. Unit coverage proves safe inference fallbacks, structure propagation outside persisted locations, matching-section prompt provenance, and missing-section omission.
+
 ---
 
 # 6. Authentication
 
 ## AUTH-001 — Single-user authentication
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** BOOT-002
 
 ### Goal
@@ -404,7 +410,7 @@ PDF表示とtext layerを実装する。表示と抽出処理は分離する。
 
 ## AI-001 — Provider abstraction
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** ARCH-001
 
 ### Goal
@@ -429,7 +435,7 @@ Provider / Modelを設定可能にする抽象層を作る。
 
 ## AI-002 — OpenRouter adapter
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** AI-001, DEP-001
 
 ### Goal
@@ -447,7 +453,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 
 ## AI-003 — Explain / Translate / Simplify / Ask service
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** AI-001
 
 ### Goal
@@ -474,7 +480,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 
 ## UI-001 — App shell and responsive layout
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** BOOT-002
 
 ### Goal
@@ -491,7 +497,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 
 ## UI-002 — Library and import UI
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** DB-002, UI-001
 
 ### Goal
@@ -509,7 +515,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 
 ## UI-003 — Theme / typography controls
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on**: UI-001
 
 ### Goal
@@ -528,7 +534,7 @@ OpenRouter互換API adapterを作る。Ox Alpha固有条件を抽象層へ持ち
 
 ## READ-001 — Document open route
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** DB-002, EPUB-002, PDF-001, UI-002
 
 ### Goal
@@ -545,7 +551,7 @@ Libraryから文書を開き、正しいReaderへ遷移する。
 
 ## READ-002 — Navigation and progress persistence
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** READ-001
 
 ### Goal
@@ -562,7 +568,7 @@ PDF page / EPUB location移動を保存し復元する。
 
 ## SEL-001 — Text selection capture
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** READ-002
 
 ### Goal
@@ -581,8 +587,8 @@ Reader内選択を安定した内部表現として取得する。
 ---
 
 ## HILITE-001 — Highlight persistence
-**Status:** DONE  
-**Priority:** P0  
+**Status:** DONE
+**Priority:** P0
 **Depends on:** SEL-001
 
 ### Goal
@@ -600,8 +606,8 @@ Highlight保存・復元・削除を実装する。
 # 10. AI experience
 
 ## AIACT-001 — Selection action menu
-**Status:** TODO  
-**Priority:** P0  
+**Status:** DONE
+**Priority:** P0
 **Depends on:** SEL-001
 
 ### Goal
@@ -615,11 +621,13 @@ Explain / Translate / Simplify / Ask / Highlightへ到達できるselection menu
 - keyboard does not trap focus
 - long selected text remains operable
 
+Evidence: Chromium core journeys exercise selection and every action without losing intent; responsive mobile/desktop layouts remain usable. Native iPhone selection-handle, keyboard, and long-text behavior remain explicitly under `QA-SAFARI-001` / `HUMAN-001`.
+
 ---
 
 ## CTX-001 — Context builder
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** PARSE-001, DB-002
 
 ### Goal
@@ -639,11 +647,13 @@ Explain / Translate / Simplify / Ask / Highlightへ到達できるselection menu
 - context includes selection and surrounding source
 - oversized context degrades predictably
 
+Evidence: Reader selections now capture document title plus bounded surrounding text for EPUB sections and PDF pages; the AI panel propagates that context through `runAiAction`. Stable selection locations remain unchanged, while unit coverage asserts EPUB/PDF surrounding-context extraction.
+
 ---
 
 ## CONV-001 — Conversation storage
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** DB-002, AI-003
 
 ### Goal
@@ -656,11 +666,13 @@ Explain / Translate / Simplify / Ask / Highlightへ到達できるselection menu
 - selected text / location preserved
 - failed assistant message leaves recoverable state
 
+Evidence: document-scoped conversations are owner-resolved, successful assistant responses persist selected text and location, and repository behavior is covered by unit tests.
+
 ---
 
 ## AIACT-002 — AI answer presentation
 **Status:** DONE
-**Priority:** P0  
+**Priority:** P0
 **Depends on:** AIACT-001, AI-003, CONV-001
 
 ### Goal
@@ -679,8 +691,8 @@ Explain / Translate / Simplify / Ask / Highlightへ到達できるselection menu
 # 11. QA
 
 ## QA-CHROME-001 — Chrome automated QA
-**Status:** TODO  
-**Priority:** P0  
+**Status:** DONE
+**Priority:** P0
 **Depends on:** E2E-001
 
 ### Goal
@@ -693,11 +705,13 @@ Explain / Translate / Simplify / Ask / Highlightへ到達できるselection menu
 - responsive layouts checked
 - console critical errors absent
 
+Evidence: Chromium core journeys cover the full PDF and EPUB flows; dedicated desktop/mobile checks assert Reader-first responsive behavior; a Chrome QA test records zero browser console errors and page errors.
+
 ---
 
 ## QA-SAFARI-001 — Safari automated QA
-**Status:** TODO  
-**Priority:** P0  
+**Status:** HUMAN
+**Priority:** P0
 **Depends on:** E2E-001
 
 ### Goal
@@ -718,13 +732,42 @@ Safari互換性の自動検証部分を確認する。
 - PWA standalone
 - back navigation
 
+Automated readiness: WebKit project and `E2E_WORKERS` override are configured. This sandbox downloaded WebKit but cannot launch it because required system libraries cannot be installed without host package administration.
+
+Human verification required on real iPhone Safari:
+
+- long press / native text handles select PDF and EPUB content
+- selection action UI opens without losing reading position or keyboard usability
+- scroll and back navigation preserve document state
+- standalone PWA launches from the home screen with correct viewport
+
+---
+
+## PWA-001 — Installable application shell
+**Status:** DONE
+**Priority:** P0
+**Depends on:** UI-003
+
+### Goal
+
+Provide the required installable web app configuration while preserving normal browser access.
+
+### Verify
+
+- valid web manifest is linked
+- standalone display and start URL are declared
+- 192px and 512px PNG icons resolve
+- theme color is present
+
+Evidence: `public/manifest.webmanifest`, generated icons, and Chromium E2E metadata/icon checks.
+
 ---
 
 # 12. End-to-end MVP
 
 ## E2E-001 — Core user journey
-**Status:** TODO  
-**Priority:** P0  
+**Status:** DONE
+**Priority:** P0
 **Depends on:** AUTH-001, READ-002, HILITE-001, AIACT-002, TEST-001
 
 ### Goal
@@ -753,12 +796,14 @@ Login
 - optional live smoke test separate
 - failures do not corrupt state
 
+Evidence: Chromium core journeys cover login, PDF and EPUB import/open/read/select, all four AI actions, highlight persistence, reload restoration of highlight data and EPUB position; AI is isolated behind the mock provider in Playwright.
+
 ---
 
 # 13. Desktop / Paper / Language extensions
 
 ## DESK-001 — Desktop two-pane UX
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P1  
 **Depends on:** AIACT-002, UI-003
 
@@ -772,10 +817,12 @@ Chrome等の広い画面で左Reader / 右AI・操作領域を提供する。
 - Reader width remains readable
 - right pane independently scrollable as appropriate
 
+Evidence: Chromium tests verify the desktop secondary pane and independent Reader/notes scrolling at constrained viewport height; mobile continues to use the drawer, while existing responsive QA covers collapse and Reader primacy.
+
 ---
 
 ## NOTE-001 — Document notes
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P1  
 **Depends on:** DESK-001, DB-002
 
@@ -789,10 +836,12 @@ Chrome等の広い画面で左Reader / 右AI・操作領域を提供する。
 - reload persistence
 - save failure visible
 
+Evidence: Notes use an owner-scoped document-level SQLite upsert repository, authenticated GET/POST APIs, explicit save with visible success/failure and retry, and Chromium coverage for reload restoration. Repository tests also prove cross-owner writes cannot replace another user's note.
+
 ---
 
 ## PAPER-001 — Paper structure extraction
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P1  
 **Depends on:** PDF-002, CTX-001
 
@@ -804,10 +853,12 @@ Title / Authors / Abstract / major sectionsを可能な範囲で構造化する�
 
 heuristic failureで通常Readerを壊さない。
 
+Evidence: PDF page extraction feeds a deterministic paper heuristic that detects title/authors, abstract, and seven major section headings. Inference is isolated from rendering with a safe empty fallback; inferred structure stays outside persisted selection locations. AI prompts include paper title, abstract, and only the section containing the selection.
+
 ---
 
 ## LANG-001 — Configurable translation languages
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P1  
 **Depends on:** AIACT-002
 
@@ -819,10 +870,12 @@ Translateのsource / target languageを内部的に可変にし、UIから設定
 
 英語→日本語以外のpairを少なくともテストする。
 
+Evidence: Translation input now carries an explicit auto source language and a UI-selected target language. Prompt construction remains centralized in the action service, with unit coverage for `auto → Portuguese` and Chromium coverage that the Translate action remains available in the reader journey.
+
 ---
 
 ## VOC-001 — Vocabulary
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P1  
 **Depends on:** LANG-001, DB-002, SEL-001
 
@@ -834,13 +887,15 @@ Translateのsource / target languageを内部的に可変にし、UIから設定
 
 英単語専用のschemaにしない。
 
+Evidence: The vocabulary schema stores arbitrary terms and phrases with meaning, source text, versioned selection location, document provenance, timestamps, and owner scoping. Repository coverage uses a French phrase; Chromium coverage saves a selected PDF source, restores it after reload, and deletes securely through an owner-scoped API.
+
 ---
 
 # 14. Production hardening
 
 ## PROD-001 — Deployment storage decision
 **Status:** TODO  
-**Priority:** P0 before production  
+**Priority:** P0 before production
 **Depends on:** E2E-001
 
 ### Goal
@@ -871,8 +926,8 @@ Translateのsource / target languageを内部的に可変にし、UIから設定
 ---
 
 ## SEC-REVIEW-001 — Secret / auth review
-**Status:** TODO  
-**Priority:** P0 before production  
+**Status:** DONE
+**Priority:** P0 before production
 **Depends on:** AUTH-001, AI-002, E2E-001
 
 ### Verify
@@ -884,6 +939,16 @@ Translateのsource / target languageを内部的に可変にし、UIから設定
 - dependency audit
 - production cookie settings
 - logs do not leak sensitive values
+
+Evidence:
+
+- tracked files contain only `.env.example` key names; no credential or private-key material found
+- OpenRouter credentials are read only by the server provider factory; no `NEXT_PUBLIC` or client-side secret references exist
+- all document APIs authenticate and scope reads to the owner; progress writes now require an owned parent document
+- uploads enforce EPUB/PDF MIME, 1 byte–100 MB limits, opaque database storage, and parser isolation without filesystem paths
+- login uses scrypt, rate limiting, random server-side sessions, HttpOnly cookies, and Secure cookies in production
+- production browser source maps remain disabled; runtime logging contains only non-sensitive migration/error summaries
+- production dependency audit reports zero vulnerabilities
 
 ---
 
@@ -1062,3 +1127,63 @@ YYYY-MM-DD — TASK-ID
 - Follow-up: PDF visual mapping and reflow-aware EPUB rendering remain part of reader polish; the current persisted intent is reload-stable and owner-scoped.
 
 ログを詳細な日記にしない。恒久的な仕様変更は `SPEC.md`、方針変更は `PLAN.md` に反映する。
+
+2026-08-24 — QA-CHROME-001
+- Result: Added a dedicated Chromium console/page-error QA journey across desktop library and mobile reader layouts, with existing core-journey coverage for import, reading, selection, all AI actions, highlight restoration, and EPUB position restoration.
+- Verification: lint, typecheck, 49 unit tests, 19 Chromium E2E tests including one transient network retry rerun, production Webpack build.
+
+2026-08-24 — QA-SAFARI-001
+- Result: Added a named Playwright WebKit project for automated Safari-engine compatibility and made E2E worker concurrency configurable.
+- Blocker: WebKit could not launch in this sandbox because system dependencies require privileged package installation; no automated Safari result is claimed.
+- Human boundary: Real iPhone Safari must confirm native selection behavior, action UI, scroll/keyboard/viewport behavior, PWA standalone launch, and back navigation before final MVP sign-off.
+
+2026-08-24 — SEC-REVIEW-001
+- Result: Completed secret, authentication, authorization, upload, cookie, logging, source-map, and dependency review; fixed progress saves so unowned documents cannot create or overwrite another user's row.
+- Verification: lint, typecheck, 50 unit tests including cross-owner collision coverage, 19 Chromium E2E tests, production Webpack build, and production dependency audit with zero vulnerabilities.
+
+2026-08-24 — PWA-001
+- Result: Added a linked web manifest with standalone/start-url configuration, generated 192px and 512px icons, and a light theme-color declaration.
+- Verification: lint, typecheck, 49 unit tests, 18 Chromium E2E tests including manifest/icon validation, production Webpack build.
+
+2026-08-24 — E2E-001
+- Result: Added provider selection with an explicit mock mode, document-scoped conversation persistence, owner-scoped progress lookup, reliable EPUB section restoration, debounced progress saves, connected PDF/EPUB highlight creation from the AI panel, PDF.js text-layer styling, and two core-journey browser tests.
+- Verification: lint, typecheck, 49 unit tests, 17 Chromium E2E tests, production Webpack build.
+- Important decision: Keep `AI_PROVIDER=mock` as a test-only configuration and leave `.env.example` on OpenRouter so production defaults remain provider-backed rather than silently mocked.
+
+2026-08-24 — MVP acceptance audit
+- Result: Closed the remaining automated AI-context gap by propagating document titles and bounded before/after text from PDF/EPUB selections into AI requests. Reconciled the automated portion of `AIACT-001` with the real-device boundary retained by `QA-SAFARI-001`.
+- Verification: lint, typecheck, 52 unit tests including new EPUB/PDF selection-context regressions, 19 Chromium E2E tests, production Webpack build.
+- Human boundary: Real iPhone Safari remains required before MVP sign-off; all other audited acceptance criteria have implementation or automated evidence.
+
+2026-08-24 — DESK-001
+- Result: Constrained the desktop shell viewport height and gave Reader/secondary panes their own scroll containers, preserving mobile drawer behavior.
+- Verification: lint, typecheck, and focused Chromium E2E including desktop pane visibility plus independent scroll assertions.
+
+2026-08-24 — NOTE-001
+- Result: Added authenticated document notes with an owner-scoped SQLite table/repository, validated API, right-pane editor, explicit save, reload persistence, and visible retry on failure.
+- Security decision: Note updates are scoped to both document ID and owner; a conflicting existing row is rejected rather than overwritten by another user.
+- Verification: lint, typecheck, focused repository regression plus PDF core-journey E2E covering save/reload; full verification follows.
+
+2026-08-24 — LANG-001
+- Result: Added configurable translation target languages (English, French, Japanese, Portuguese, Simplified Chinese, Spanish) with an internally variable source language set to automatic detection.
+- Verification: lint, typecheck, focused AI prompt regression including non-default Portuguese target, PDF core-journey E2E, then full verification.
+
+2026-08-24 — VOC-001
+- Result: Added multilingual vocabulary persistence with owner-scoped create/list/delete APIs, source-text provenance, selection locations, right-pane entry creation, reload restoration, deletion, and failure feedback.
+- Verification: lint, typecheck, focused repository regression for French provenance/ownership, PDF core-journey E2E covering save/reload, followed by full verification.
+
+2026-08-24 — PDF-002
+- Result: Added coordinate-based PDF text extraction with deterministic line grouping and two-column ordering; PDF AI context now prefers extracted page text over visual DOM order.
+- Verification: lint, typecheck, focused unit regressions for single-column, two-column, coordinate-missing fallback, and safe context capture; focused PDF E2E followed by full verification.
+
+2026-08-24 — PAPER-001
+- Result: Added safe PDF paper-structure inference for title, authors, abstract, Introduction, Methods, Results, Discussion, Conclusion, and References; propagated matching title/section/abstract provenance into centralized AI prompt context while keeping the structure out of persisted selection locations.
+- Verification: lint, typecheck, focused unit regressions for inference fallbacks, PDF selection propagation, matching-section prompt context, and missing-section omission; full verification follows.
+
+2026-08-24 — PDF-003
+- Result: Connected paper-structure inference into live PDF selection capture and centralized AI prompt construction, with rendering and extraction failures isolated to fallback context.
+- Verification: lint, typecheck, 66 unit tests, 20 Chromium E2E tests, production Webpack build via `npm run verify`.
+
+2026-08-24 — Release readiness documentation and CI
+- Result: Added setup, environment, migration, verification, SQLite backup/restore guidance, explicit current human/deployment boundaries, a `db:migrate` script, and GitHub Actions verification covering lint, typecheck, unit tests, Chromium E2E, and production build on pushes to main and pull requests.
+- Verification: migration smoke test, password-hash command check, workflow content check, lint, typecheck, 66 unit tests, 20 Chromium E2E tests, production Webpack build via `npm run verify`.

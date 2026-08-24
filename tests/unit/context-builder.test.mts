@@ -53,3 +53,12 @@ test("buildContext rejects invalid budgets", () => {
     /Token budget/,
   );
 });
+
+test("buildContext omits empty paper structure values", () => {
+  const context = buildContext({
+    paperStructure: {},
+    selectedText: "selection",
+  });
+
+  assert.doesNotMatch(context, /Paper title|Paper section|Abstract/);
+});

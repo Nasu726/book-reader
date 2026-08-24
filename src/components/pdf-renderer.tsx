@@ -9,12 +9,15 @@ import {
 } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 import { capturePdfSelection, type DocumentSelection } from "@/core/selection/capture";
+import { extractPdfText } from "@/core/documents/pdf-extraction";
+import { inferPaperStructure } from "@/core/documents/paper-structure";
 
 GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${version}`;
 
 const SAMPLE_PDF = "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNjEyIDc5Ml0vQ29udGVudHMgNCAwIFIvUmVzb3VyY2VzPDwvRm9udDw8L0YxIDUgMCBSPj4+Pj4+ZW5kb2JqCjQgMCBvYmo8PC9MZW5ndGggNTg+PnN0cmVhbQpCVCAvRjEgMjQgVGYgNzIgNzIwIFRkIChTYW1wbGUgUERGIHRleHQuKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCjUgMCBvYmo8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PmVuZG9iagp0cmFpbGVyPDwvUm9vdCAxIDAgUj4+CiUlRU9G";
 
 type PdfRendererProps = {
+  documentTitle?: string;
   source?: string;
   initialLocation?: string | null;
   onLocationChange?: (location: string) => void;
@@ -22,6 +25,7 @@ type PdfRendererProps = {
 };
 
 export function PdfRenderer({
+  documentTitle = "",
   initialLocation,
   onLocationChange,
   onSelectionChange,
@@ -29,9 +33,10 @@ export function PdfRenderer({
 }: PdfRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
-  const [pageNumber, setPageNumber] = useState(() => {
-    if (typeof initialLocation !== "string") return 1;
+  const [pageNumber, setPageNumber] = useState(1);
+  const parsedInitialPageNumber = (() => {
     try {
+      if (!initialLocation) return 1;
       const location = JSON.parse(initialLocation) as { page?: unknown; version?: unknown };
       return location.version === 1 && Number.isInteger(location.page)
         ? Math.max(1, location.page as number)
@@ -39,7 +44,16 @@ export function PdfRenderer({
     } catch {
       return 1;
     }
-  });
+  })();
+  const [restoredInitialLocation, setRestoredInitialLocation] = useState<string | null | undefined>(undefined);
+  if (
+    initialLocation !== undefined &&
+    restoredInitialLocation !== initialLocation
+  ) {
+    setPageNumber(parsedInitialPageNumber);
+    setRestoredInitialLocation(initialLocation);
+  }
+
   const [pageCount, setPageCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +64,7 @@ export function PdfRenderer({
   const loadingTaskRef = useRef<PdfLoadingTask | null>(null);
   const pageAreaRef = useRef<HTMLDivElement>(null);
   const [documentReady, setDocumentReady] = useState(false);
+  const extractedPageTextRef = useRef("");
 
   useEffect(() => {
     let cancelled = false;
@@ -109,16 +124,27 @@ export function PdfRenderer({
 
       const viewport = page.getViewport({ scale: 1 });
       const textContent = await page.getTextContent();
+      try {
+        extractedPageTextRef.current = extractPdfText(textContent.items as unknown as Parameters<typeof extractPdfText>[0]);
+      } catch {
+        extractedPageTextRef.current = "";
+      }
       layer.replaceChildren();
+      layer.style.setProperty("--scale-factor", String(viewport.scale));
+      layer.style.setProperty("--user-unit", "1");
+      layer.style.setProperty("--total-scale-factor", "calc(var(--scale-factor) * var(--user-unit))");
+      layer.style.setProperty("--scale-round-x", "1px");
+      layer.style.setProperty("--scale-round-y", "1px");
       Object.assign(layer.style, {
         inset: "0",
         position: "absolute",
       } satisfies Partial<CSSStyleDeclaration>);
-      await new TextLayer({
+      const textLayer = new TextLayer({
         container: layer,
         textContentSource: textContent,
         viewport,
-      }).render();
+      });
+      await textLayer.render();
       page.cleanup();
     } catch {
       setError("This PDF page could not be rendered.");
@@ -139,7 +165,18 @@ export function PdfRenderer({
   useEffect(() => {
     const updateSelection = () => {
       const selection = window.getSelection();
-      const captured = selection ? capturePdfSelection(selection, pageNumber) : null;
+      let paperStructure: ReturnType<typeof inferPaperStructure> | undefined;
+      try {
+        const pageText = extractedPageTextRef.current || pageArea?.textContent || "";
+        paperStructure = pageText.trim() ? inferPaperStructure(pageText) : undefined;
+      } catch {
+        paperStructure = undefined;
+      }
+      const captured = selection ? capturePdfSelection(selection, pageNumber, {
+        documentTitle,
+        pageText: extractedPageTextRef.current || pageArea?.textContent || "",
+        paperStructure,
+      }) : null;
       setCapturedSelection(captured);
       onSelectionChange?.(captured);
     };
@@ -150,7 +187,7 @@ export function PdfRenderer({
       pageArea?.removeEventListener("mouseup", updateSelection);
       pageArea?.removeEventListener("touchend", updateSelection);
     };
-  }, [onSelectionChange, pageNumber]);
+  }, [documentTitle, onSelectionChange, pageNumber]);
 
   return (
     <section aria-label="PDF reader" className="space-y-3">
@@ -175,7 +212,7 @@ export function PdfRenderer({
       </div>
       <div className="relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800" ref={pageAreaRef}>
         <canvas ref={canvasRef} />
-        <div ref={textLayerRef} />
+        <div className="textLayer" ref={textLayerRef} />
       </div>
       {error && (
         <div className="space-y-2 rounded-lg border border-red-300 p-3 text-sm" role="alert">

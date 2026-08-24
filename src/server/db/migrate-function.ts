@@ -66,6 +66,26 @@ export function migrate(database: SqliteMigratable) {
     )
   `);
   db.exec(`
+    CREATE TABLE IF NOT EXISTS document_notes (
+      document_id TEXT PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vocabulary (
+      id TEXT PRIMARY KEY,
+      document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      term TEXT NOT NULL,
+      meaning TEXT NOT NULL,
+      source_text TEXT NOT NULL,
+      location TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+  db.exec(`
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,

@@ -33,7 +33,7 @@ export interface DocumentSectionRepository {
 }
 
 export interface ReadingProgressRepository {
-  getByDocument(documentId: string): Promise<{ documentId: string; location: string } | null>;
+  getByDocument(documentId: string, userId: string): Promise<{ documentId: string; location: string } | null>;
   save(input: { documentId: string; userId: string; location: string }): Promise<void>;
 }
 
@@ -55,6 +55,44 @@ export interface HighlightRepository {
     selectedText: string;
     note?: string;
   }): Promise<HighlightRecord>;
+  delete(id: string, userId: string): Promise<boolean>;
+}
+
+export type DocumentNoteRecord = {
+  documentId: string;
+  content: string;
+  updatedAt: Date;
+};
+
+export interface DocumentNoteRepository {
+  getByDocument(documentId: string, userId: string): Promise<DocumentNoteRecord | null>;
+  save(input: {
+    documentId: string;
+    userId: string;
+    content: string;
+  }): Promise<void>;
+}
+
+export type VocabularyRecord = {
+  id: string;
+  documentId: string;
+  term: string;
+  meaning: string;
+  sourceText: string;
+  location: string;
+  createdAt: Date;
+};
+
+export interface VocabularyRepository {
+  listByDocument(documentId: string, userId: string): Promise<readonly VocabularyRecord[]>;
+  create(input: {
+    documentId: string;
+    userId: string;
+    term: string;
+    meaning: string;
+    sourceText: string;
+    location: string;
+  }): Promise<VocabularyRecord>;
   delete(id: string, userId: string): Promise<boolean>;
 }
 
@@ -84,6 +122,7 @@ export interface ConversationRepository {
     documentId: string,
     userId: string,
   ): Promise<void>;
+  getByDocument(documentId: string, userId: string): Promise<string | null>;
   listMessages(conversationId: string): Promise<readonly MessageRecord[]>;
   addMessage(message: MessageRecord): Promise<void>;
   beginPendingAssistantMessage(
@@ -94,6 +133,12 @@ export interface ConversationRepository {
     content: string,
     context?: { selectedText?: string; location?: string },
   ): Promise<void>;
+  recordAssistantResponse(input: {
+    conversationId: string;
+    content: string;
+    selectedText?: string;
+    location?: string;
+  }): Promise<void>;
 }
 
 export interface LibraryRepository {

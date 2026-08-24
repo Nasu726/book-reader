@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
+import { createSqliteVocabularyRepository } from "@/repositories/sqlite/vocabulary-repository";
 import { createAuthService } from "@/server/auth/service";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
@@ -47,6 +48,14 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
         id: highlight.id,
         note: highlight.note,
         selectedText: highlight.selectedText,
+      }))}
+      initialVocabulary={(await createSqliteVocabularyRepository(
+        createDrizzleFromSqlite(database),
+      ).listByDocument(id, session.userId)).map((entry) => ({
+        id: entry.id,
+        meaning: entry.meaning,
+        sourceText: entry.sourceText,
+        term: entry.term,
       }))}
     />
   );

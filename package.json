@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
+    "db:migrate": "node --import tsx ./src/server/db/migrate.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "node --import tsx --test",

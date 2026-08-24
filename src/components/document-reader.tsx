@@ -7,6 +7,7 @@ import { captureEpubSelection, type DocumentSelection } from "@/core/selection/c
 
 type DocumentReaderProps = {
   documentId: string;
+  documentTitle?: string;
   format: "epub" | "pdf";
   onHighlightCreated?: (highlightId: string) => void;
   onHighlightError?: () => void;
@@ -61,6 +62,7 @@ function useDocumentProgress(documentId: string) {
 
 export function DocumentReader({
   documentId,
+  documentTitle = "",
   format,
   onHighlightCreated,
   onHighlightError,
@@ -93,17 +95,41 @@ export function DocumentReader({
     },
     [documentId, onHighlightCreated, onHighlightError],
   );
-  const [sectionIndex, setSectionIndex] = useState(() => {
-    if (typeof initialLocation !== "string") return 0;
+  const initialSectionId = (() => {
+    if (!initialLocation) return null;
     try {
       const parsed = JSON.parse(initialLocation) as { sectionId?: string; version?: number };
-      return parsed.version === 1 && typeof parsed.sectionId === "string"
-        ? Math.max(0, Number(parsed.sectionId.replace(/^section-/, "")) || 0)
-        : 0;
+      return parsed.version === 1 && typeof parsed.sectionId === "string" ? parsed.sectionId : null;
     } catch {
-      return 0;
+      return null;
     }
-  });
+  })();
+  const [hasUserNavigated, setHasUserNavigated] = useState(false);
+  const [sectionIndex, setSectionIndex] = useState(0);
+  const [restoredInitialLocation, setRestoredInitialLocation] = useState<string | null | undefined>(undefined);
+
+  if (
+    initialLocation !== undefined &&
+    restoredInitialLocation !== initialLocation
+  ) {
+    setRestoredInitialLocation(initialLocation);
+    if (!hasUserNavigated && epub) {
+      const restoredSectionIndex = epub.sections.findIndex((section) => section.id === initialSectionId);
+      if (restoredSectionIndex >= 0) setSectionIndex(restoredSectionIndex);
+    }
+  }
+
+  if (
+    format === "epub" &&
+    epub &&
+    !hasUserNavigated &&
+    sectionIndex === 0 &&
+    typeof initialLocation === "string" &&
+    initialSectionId
+  ) {
+    const restoredSectionIndex = epub.sections.findIndex((section) => section.id === initialSectionId);
+    if (restoredSectionIndex > 0) setSectionIndex(restoredSectionIndex);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -143,7 +169,7 @@ export function DocumentReader({
     async function capture() {
       const selection = window.getSelection();
       if (!selection) return;
-      const captured = captureEpubSelection(selection);
+      const captured = captureEpubSelection(selection, document, documentTitle || document.title);
       setCapturedSelection(captured);
       onSelectionChange?.(captured);
       if (captured) void persistHighlight(captured);
@@ -154,15 +180,20 @@ export function DocumentReader({
       document.removeEventListener("mouseup", capture);
       document.removeEventListener("touchend", capture);
     };
-  }, [format, onSelectionChange, persistHighlight]);
+  }, [documentTitle, format, onSelectionChange, persistHighlight]);
 
   useEffect(() => {
-    if (format === "pdf" || !epub?.sections[sectionIndex]) return;
-    void progress.save(JSON.stringify({
-      version: 1,
-      sectionId: epub.sections[sectionIndex].id,
-    }));
-  }, [epub, format, progress, sectionIndex]);
+    if (format === "pdf" || !hasUserNavigated || !epub) return;
+    const section = epub.sections[sectionIndex];
+    if (!section) return;
+    const timer = window.setTimeout(() => {
+      void progress.save(JSON.stringify({
+        version: 1,
+        sectionId: epub.sections[sectionIndex].id,
+      }));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [epub, format, hasUserNavigated, progress, sectionIndex]);
 
   if (error) return <div className="rounded-lg border border-red-300 p-3 text-sm" role="alert">{error}</div>;
   if (format === "epub") {
@@ -172,9 +203,9 @@ export function DocumentReader({
     return (
       <section aria-label="EPUB reader" className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex === 0} onClick={() => setSectionIndex(sectionIndex - 1)} type="button">Previous</button>
+          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex === 0} onClick={() => { setHasUserNavigated(true); setSectionIndex(sectionIndex - 1); }} type="button">Previous</button>
           <span className="text-sm">{sectionIndex + 1} / {epub.sections.length}</span>
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => setSectionIndex(sectionIndex + 1)} type="button">Next</button>
+          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => { setHasUserNavigated(true); setSectionIndex(sectionIndex + 1); }} type="button">Next</button>
         </div>
         <article className="max-w-prose whitespace-pre-wrap rounded-xl border border-zinc-200 p-4 dark:border-zinc-800" data-reader-section={section.id}>
           {section.title && <h2 className="mb-3 text-xl font-semibold">{section.title}</h2>}
@@ -196,6 +227,7 @@ export function DocumentReader({
   if (format === "pdf") {
     return (
       <PdfRenderer
+        documentTitle={documentTitle}
         initialLocation={initialLocation}
         onSelectionChange={(selection) => {
           setCapturedSelection(selection);

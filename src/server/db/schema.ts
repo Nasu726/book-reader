@@ -66,6 +66,32 @@ export const highlights = sqliteTable("highlights", {
     .$defaultFn(() => new Date()),
 });
 
+export const documentNotes = sqliteTable("document_notes", {
+  documentId: text("document_id")
+    .primaryKey()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  content: text("content").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export const vocabulary = sqliteTable("vocabulary", {
+  id: text("id").primaryKey(),
+  documentId: text("document_id")
+    .notNull()
+    .references(() => documents.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  term: text("term").notNull(),
+  meaning: text("meaning").notNull(),
+  sourceText: text("source_text").notNull(),
+  location: text("location").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export const conversations = sqliteTable("conversations", {
   id: text("id").primaryKey(),
   documentId: text("document_id")
