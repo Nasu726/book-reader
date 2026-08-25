@@ -51,6 +51,25 @@ export function createSqliteLibraryRepository(db: Db): LibraryRepository {
       .where(and(eq(documents.id, id), eq(documents.userId, userId)));
   }
 
+  async function updateSourceIfOwned(
+    id: string,
+    expectedUserId: string,
+    data: string,
+  ): Promise<boolean> {
+    const result = await db.update(documents)
+      .set({ fileData: data, updatedAt: new Date() })
+      .where(and(eq(documents.id, id), eq(documents.userId, expectedUserId)))
+      .returning({ id: documents.id });
+    return result.length > 0;
+  }
+
+  async function remove(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(documents)
+      .where(and(eq(documents.id, id), eq(documents.userId, userId)))
+      .returning({ id: documents.id });
+    return result.length > 0;
+  }
+
   async function getSource(id: string, userId: string) {
     const row = await db.select({
       data: documents.fileData,
@@ -62,5 +81,5 @@ export function createSqliteLibraryRepository(db: Db): LibraryRepository {
     return { filename: document.sourceFilename ?? null, format: document.format, data: document.data };
   }
 
-  return { list, create, updateSource, markOpened, getSource };
+  return { list, create, delete: remove, updateSource, updateSourceIfOwned, markOpened, getSource };
 }
