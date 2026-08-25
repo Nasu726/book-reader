@@ -674,24 +674,24 @@ Chrome latest stableで主要フローを検証する。
 
 以下がすべて満たされたとき、Version 0.1 MVPを完成扱いにできる。
 
-- [ ] 認証できる
-- [ ] PDFを取り込んで開ける
-- [ ] EPUBを取り込んで開ける
-- [ ] Readerとして移動できる
-- [ ] 読書位置を復元できる
-- [ ] テキスト選択できる
-- [ ] Highlightを保存 / 復元できる
-- [ ] Explainが動く
-- [ ] Translateが動く
-- [ ] Simplifyが動く
-- [ ] Askが動く
-- [ ] AIは周辺contextを受け取れる
-- [ ] AI失敗後もReaderを継続利用できる
-- [ ] Provider / Modelを設定から変更できる
-- [ ] API keyがclient bundleへ露出しない
+- [x] 認証できる
+- [x] PDFを取り込んで開ける
+- [x] EPUBを取り込んで開ける
+- [x] Readerとして移動できる
+- [x] 読書位置を復元できる
+- [x] テキスト選択できる
+- [x] Highlightを保存 / 復元できる
+- [x] Explainが動く
+- [x] Translateが動く
+- [x] Simplifyが動く
+- [x] Askが動く
+- [x] AIは周辺contextを受け取れる
+- [x] AI失敗後もReaderを継続利用できる
+- [x] Provider / Modelを設定から変更できる
+- [x] API keyがclient bundleへ露出しない
 - [ ] iPhone Safariで主要フローが成立する
-- [ ] Chromeで主要フローが成立する
-- [ ] lint / typecheck / tests / production buildが通る
-- [ ] PWAとして必要な構成が存在する
+- [x] Chromeで主要フローが成立する
+- [x] lint / typecheck / tests / production buildが通る
+- [x] PWAとして必要な構成が存在する
 
 `SEL-005 PDF selection normalization`、高度な論文構造抽出、Vocabulary等は未完でもMVPを成立させられる。

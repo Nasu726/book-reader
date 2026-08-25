@@ -4,25 +4,36 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
+    "db:migrate": "node --import tsx ./src/server/db/migrate.ts",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --import tsx --test",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run lint && npm run typecheck && npm run build"
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run test:e2e && npm run build"
   },
   "dependencies": {
+    "@likecoin/epub-ts": "^0.7.2",
+    "better-sqlite3": "^13.0.3",
+    "linkedom": "^0.18.13",
     "next": "16.3.2",
+    "pdfjs-dist": "^6.2.108",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-orm": "^0.45.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }
