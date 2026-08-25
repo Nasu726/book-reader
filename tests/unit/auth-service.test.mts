@@ -64,7 +64,8 @@ test("rate limiting rejects excessive authentication attempts", async () => {
       password: "correct-password",
       clientKey,
     });
-  }
+}
+
 
   await assert.rejects(
     service.authenticate({
