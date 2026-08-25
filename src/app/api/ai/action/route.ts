@@ -10,6 +10,8 @@ import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_CHARACTERS = 8_000;
+const MAX_PROMPT_CHARACTERS = 20_000;
+const MAX_CONTEXT_CHARACTERS = 40_000;
 
 export async function POST(request: Request) {
   const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
@@ -34,7 +36,13 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
-  if (typeof input.prompt !== "string" || !input.prompt.trim()) {
+  if (
+    typeof input.prompt !== "string" || !input.prompt.trim() ||
+    input.prompt.length > MAX_PROMPT_CHARACTERS ||
+    (typeof input.context === "string" && input.context.length > MAX_CONTEXT_CHARACTERS) ||
+    (typeof input.selectedText === "string" && input.selectedText.length > 100_000) ||
+    (typeof input.location === "string" && input.location.length > 10_000)
+  ) {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
 

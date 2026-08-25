@@ -1,0 +1,17 @@
+.agents
+.codex
+.env
+.env.*
+!.env.example
+.git
+.github
+.next
+*.db
+*.db-shm
+*.db-wal
+Dockerfile
+docker-compose.yml
+node_modules
+playwright-report
+test-results
+tsconfig.tsbuildinfo

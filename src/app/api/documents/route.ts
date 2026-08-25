@@ -38,6 +38,12 @@ export async function POST(request: Request) {
   }
 
   let file: File;
+  let storageError: unknown;
+  const contentLength = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > MAX_UPLOAD_BYTES + 1024 * 1024) {
+    return Response.json({ error: "The file must be between 1 byte and 100 MB." }, { status: 413 });
+  }
+
   try {
     const form = await request.formData();
     const candidate = form.get("file");
@@ -64,15 +70,29 @@ export async function POST(request: Request) {
   const title = file.name.replace(/\.(epub|pdf)$/i, "") || file.name;
   const repository = createSqliteLibraryRepository(createDrizzleFromSqlite(database));
   const documentId = randomUUID();
-  await repository.create({
-    id: documentId,
-    userId: session.userId,
-    title,
-    format,
-    sourceFilename: file.name,
-  });
+  try {
+    await repository.create({
+      id: documentId,
+      userId: session.userId,
+      title,
+      format,
+      sourceFilename: file.name,
+    });
 
-  await repository.updateSource(documentId, session.userId, fileData);
+    const stored = await repository.updateSourceIfOwned(
+      documentId,
+      session.userId,
+      fileData,
+    );
+    if (!stored) {
+      throw new Error("Document disappeared before its source was stored.");
+    }
+  } catch (error) {
+    storageError = error;
+    await repository.delete(documentId, session.userId);
+    console.error(storageError instanceof Error ? storageError.message : storageError);
+    return Response.json({ error: "Failed to store the document." }, { status: 500 });
+  }
 
   return new Response(null, {
     headers: { location: "/" },

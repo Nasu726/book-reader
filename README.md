@@ -74,13 +74,31 @@ WebKit execution depends on host browser dependencies.
 
 The application stores documents, metadata, highlights, conversations, notes, vocabulary, progress, and sessions in one SQLite database configured by `DATABASE_PATH`. It enables WAL mode for concurrent local access.
 
-Back up the complete live set while the server is stopped:
+Create an online snapshot with SQLite's backup API. Stop the server first if you need a point-in-time copy without writes in progress:
 
 ```bash
-sqlite3 "$DATABASE_PATH" ".backup '/secure/backup/book-reader.backup.sqlite'"
+npm run db:backup -- /secure/backup/book-reader.backup.sqlite
 ```
 
-When restoring, replace only the backed-up database file and remove any stale `-wal` or `-shm` files belonging to the previous database.
+Stop the app before restoring. The command validates backup integrity and table presence, then replaces the database and removes stale WAL/SHM files:
+
+```bash
+npm run db:restore -- /secure/backup/book-reader.backup.sqlite --replace
+npm run db:migrate
+```
+
+## Deployment
+
+Use a Node.js host with a persistent volume. The application requires server routes, authenticated uploads, SQLite, and server-side provider access, so static hosting targets are not compatible.
+
+A production container can be built and run with:
+
+```bash
+docker build -t book-reader .
+docker run --rm -p 3000:3000 -v book-reader-data:/data book-reader
+```
+
+Mount `/data` on the host's persistent storage in production. Set `AUTH_USERNAME`, `AUTH_PASSWORD_HASH`, `AI_MODEL`, and `OPENROUTER_API_KEY` as secret environment variables. Set `AI_PROVIDER=mock` only for isolated smoke tests. Startup automatically runs migrations against `/data/book-reader.db`.
 
 ## Current boundaries
 

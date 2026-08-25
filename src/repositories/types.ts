@@ -144,7 +144,13 @@ export interface ConversationRepository {
 export interface LibraryRepository {
   list(userId: string): Promise<readonly LibraryItem[]>;
   create(document: DocumentRecord): Promise<void>;
+  delete(id: string, userId: string): Promise<boolean>;
   updateSource(id: string, userId: string, data: string): Promise<void>;
+  updateSourceIfOwned(
+    id: string,
+    expectedUserId: string,
+    data: string,
+  ): Promise<boolean>;
   markOpened(id: string, userId: string, openedAt?: Date): Promise<void>;
   getSource(
     id: string,

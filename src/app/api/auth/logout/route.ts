@@ -1,7 +1,6 @@
 import { createAuthService } from "@/server/auth/service";
 import { cookies } from "next/headers";
-
-const SESSION_COOKIE_NAME = "book_reader_session";
+import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 
 export async function POST() {
   const { createSqliteDb } = await import("@/server/db/client");

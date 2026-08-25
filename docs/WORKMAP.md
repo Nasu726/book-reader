@@ -732,7 +732,14 @@ Safari互換性の自動検証部分を確認する。
 - PWA standalone
 - back navigation
 
-Automated readiness: WebKit project and `E2E_WORKERS` override are configured. This sandbox downloaded WebKit but cannot launch it because required system libraries cannot be installed without host package administration.
+Automated readiness: WebKit project and `E2E_PROJECTS=webkit` override are configured. On 2026-08-26, Playwright downloaded WebKit 26.5 successfully to a writable browser cache, but launch failed because the host lacks GTK/GStreamer multimedia libraries. Installing those system packages requires host package administration.
+
+Human/host command:
+
+```bash
+sudo npx playwright install-deps webkit
+DATABASE_PATH=/tmp/book-reader-e2e-webkit.db E2E_PROJECTS=webkit npm run test:e2e
+```
 
 Human verification required on real iPhone Safari:
 
@@ -922,13 +929,20 @@ Evidence: The vocabulary schema stores arbitrary terms and phrases with meaning,
 ---
 
 ## PROD-002 — Backup / export
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P1 before production  
 **Depends on:** PROD-001
 
 ### Goal
 
 個人データを失わない最低限のbackup / export方法を用意する。
+
+### Verify
+
+- `npm run db:backup -- <file>` creates a complete SQLite snapshot through the online backup API.
+- `npm run db:restore -- <file> --replace` validates integrity and schema presence before replacing `DATABASE_PATH`.
+- Restore removes stale WAL/SHM files and instructs migration before startup.
+- Regression coverage preserves source usability during online backup and validates restored data.
 
 ---
 
@@ -1013,6 +1027,27 @@ MVP Gateに加え:
 エージェントはTask完了時、必要な場合のみ短く追記する。
 
 形式:
+
+2026-08-26 — Upload ownership hardening
+
+- Result: Added owner-checked conditional source updates, upload failure cleanup, a library repository delete method, and request-size bounds for AI prompts/context/selection metadata. This closes a race where an authenticated upload could attach source bytes to another user's document after ownership checks.
+- Verification: lint; typecheck; 71 unit tests including owner-scoped source update/delete regression; production Webpack build; `git diff --check`.
+- Follow-up review: Replaced the duplicated logout cookie constant with the shared session-store export. No debug leftovers or secret-bearing values were found in runtime source.
+- Follow-up hardening: Added a content-length precheck with 1 MB form overhead allowance so oversized uploads are rejected before buffering the full payload.
+
+2026-08-26 — Production startup smoke
+
+- Result: Verified the production build starts against an isolated SQLite path. Login returned 200, unauthenticated root redirected to login with 307, and the protected AI API returned 401.
+
+2026-08-25 — Deployment packaging
+
+- Result: Added a production Node container using Node.js 24, persistent `/data`, automatic migration at startup, non-root execution, and secret/local-database exclusion. Documented persistent-volume deployment requirements and commands.
+- Verification: lint; typecheck; online backup/restore regressions; production Webpack build.
+
+2026-08-25 — PROD-002
+
+- Result: Added safe online SQLite backup and guarded restore commands with integrity/schema checks, stale WAL/SHM cleanup, README operational guidance, and focused regression coverage.
+- Verification: typecheck; unit regressions for online backup data preservation, same-path rejection, missing-backup rejection, and validated restore.
 
 2026-08-25 — Post-merge review hardening
 
