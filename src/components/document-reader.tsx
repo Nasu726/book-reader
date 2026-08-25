@@ -9,8 +9,6 @@ type DocumentReaderProps = {
   documentId: string;
   documentTitle?: string;
   format: "epub" | "pdf";
-  onHighlightCreated?: (highlightId: string) => void;
-  onHighlightError?: () => void;
   onSelectionChange?: (selection: DocumentSelection | null) => void;
 };
 
@@ -64,8 +62,6 @@ export function DocumentReader({
   documentId,
   documentTitle = "",
   format,
-  onHighlightCreated,
-  onHighlightError,
   onSelectionChange,
 }: DocumentReaderProps) {
   const [source, setSource] = useState<string | null>(null);
@@ -74,27 +70,6 @@ export function DocumentReader({
   const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
   const progress = useDocumentProgress(documentId);
   const initialLocation = progress.initialLocation;
-  const persistHighlight = useCallback(
-    async (captured: DocumentSelection) => {
-      try {
-        const response = await fetch(`/api/documents/${documentId}/highlights`, {
-          body: JSON.stringify({
-            format: captured.format,
-            location: captured.location,
-            selectedText: captured.text,
-          }),
-          headers: { "content-type": "application/json" },
-          method: "POST",
-        });
-        const payload = (await response.json()) as { highlight?: { id: string } };
-        if (!response.ok || !payload.highlight) throw new Error("Save failed.");
-        onHighlightCreated?.(payload.highlight.id);
-      } catch {
-        onHighlightError?.();
-      }
-    },
-    [documentId, onHighlightCreated, onHighlightError],
-  );
   const initialSectionId = (() => {
     if (!initialLocation) return null;
     try {
@@ -172,7 +147,6 @@ export function DocumentReader({
       const captured = captureEpubSelection(selection, document, documentTitle || document.title);
       setCapturedSelection(captured);
       onSelectionChange?.(captured);
-      if (captured) void persistHighlight(captured);
     }
     document.addEventListener("mouseup", capture);
     document.addEventListener("touchend", capture);
@@ -180,7 +154,7 @@ export function DocumentReader({
       document.removeEventListener("mouseup", capture);
       document.removeEventListener("touchend", capture);
     };
-  }, [documentTitle, format, onSelectionChange, persistHighlight]);
+  }, [documentTitle, format, onSelectionChange]);
 
   useEffect(() => {
     if (format === "pdf" || !hasUserNavigated || !epub) return;

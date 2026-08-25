@@ -894,7 +894,7 @@ Evidence: The vocabulary schema stores arbitrary terms and phrases with meaning,
 # 14. Production hardening
 
 ## PROD-001 — Deployment storage decision
-**Status:** TODO  
+**Status:** DONE
 **Priority:** P0 before production
 **Depends on:** E2E-001
 
@@ -911,6 +911,13 @@ Evidence: The vocabulary schema stores arbitrary terms and phrases with meaning,
 のいずれかを根拠付きで選ぶ。
 
 ユーザーがdeploy targetをまだ指定していない場合は、コードを特定環境にロックせず他の非依存Taskを継続する。
+
+### Decision
+
+- Immediate stable dogfooding: a Node.js host with a persistent SQLite volume, running the existing `next build && next start` flow.
+- GitHub Pages is rejected because authenticated dynamic APIs, uploads, SQLite, cookies, and server-side AI proxying are required.
+- Cloudflare Pages static export is rejected for the same reason.
+- A strict free-tier Cloudflare path requires Workers + D1 + R2 and a storage-layer refactor; defer it unless the user explicitly wants that migration.
 
 ---
 
@@ -1006,6 +1013,12 @@ MVP Gateに加え:
 エージェントはTask完了時、必要な場合のみ短く追記する。
 
 形式:
+
+2026-08-25 — Post-merge review hardening
+
+- Result: Removed duplicate automatic EPUB highlight persistence; explicit Highlight remains the sole save path. Moved login attempt tracking to process-wide state so rate limiting survives request-scoped service construction. Added bounded persisted conversation history, restored AI history after reload, sent selection/location metadata to the API, and added an AI cancel control. Corrected PDF column detection with populated-side, crossing-item, line-count, and gutter checks. Document source updates now refresh `updatedAt`.
+- Deployment decision: GitHub Pages is unsuitable; current Cloudflare static deployment is also unsuitable. Stable immediate path is Node hosting with persistent SQLite volume. Strict Cloudflare support would require D1/R2 migration.
+- Verification: lint; typecheck; 67 unit tests; 20 Chromium E2E tests; production Webpack build; `git diff --check`.
 
 ```text
 YYYY-MM-DD — TASK-ID

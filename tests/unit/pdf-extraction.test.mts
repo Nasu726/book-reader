@@ -34,6 +34,19 @@ test("PDF extraction orders two-column content column by column", () => {
   assert.equal(text, "Left top\nLeft bottom\nRight top\nRight bottom");
 });
 
+test("PDF extraction does not split a single-column page at its center", () => {
+  const text = extractPdfText([
+    item("The", 50, 700),
+    item("whole", 80, 700),
+    item("sentence", 130, 700),
+    item("crosses", 180, 700),
+    item("the", 240, 700),
+    item("middle.", 270, 700),
+  ]);
+
+  assert.equal(text, "The whole sentence crosses the middle.");
+});
+
 test("PDF extraction returns empty output when coordinates are unavailable", () => {
   assert.equal(extractPdfText([{ str: "Broken" }]), "");
 });
