@@ -36,11 +36,30 @@ export function extractPdfText(items: readonly PdfTextItem[]): string {
   const pageRight = Math.max(...bounds.map((item) => item.right));
   const pageWidth = pageRight - pageLeft;
   const midpoint = pageLeft + pageWidth / 2;
-  const columnGapCount = bounds.filter((item) => (
-    item.right <= midpoint || item.left >= midpoint
-  )).length;
-  const crossesMidpoint = columnGapCount === bounds.length;
-  const columns = crossesMidpoint ? [
+
+  const orderedBounds = [...bounds].sort((left, right) => right.baseline - left.baseline || left.left - right.left);
+  const adjacentGaps: number[] = [];
+  for (let index = 1; index < orderedBounds.length; index += 1) {
+    const gap = orderedBounds[index].left - orderedBounds[index - 1].right;
+    if (gap > 0) adjacentGaps.push(gap);
+  }
+  const minimumGap = pageWidth * 0.04;
+  const leftItems = bounds.filter((item) => item.right <= midpoint).length;
+  const rightItems = bounds.filter((item) => item.left >= midpoint).length;
+  const crossingItems = bounds.filter((item) => item.left < midpoint && item.right > midpoint).length;
+  const leftLines = new Set(bounds.filter((item) => item.right <= midpoint).map((item) => item.baseline)).size;
+  const rightLines = new Set(bounds.filter((item) => item.left >= midpoint).map((item) => item.baseline)).size;
+  const hasCentralGutter =
+    leftItems >= Math.ceil(bounds.length * 0.25) &&
+    rightItems >= Math.ceil(bounds.length * 0.25) &&
+    leftLines >= 2 &&
+    rightLines >= 2 &&
+    crossingItems === 0 &&
+    [...bounds].sort((left, right) => left.left - right.left).some((item, index) => {
+      if (index === 0) return false;
+      return item.left - orderedBounds[index - 1].right >= minimumGap;
+    });
+  const columns = hasCentralGutter ? [
     { left: pageLeft, right: midpoint },
     { left: midpoint, right: pageRight },
   ] : [{ left: pageLeft, right: pageRight }];

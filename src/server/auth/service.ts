@@ -8,14 +8,14 @@ import {
 } from "./session-store.ts";
 import type { Database } from "better-sqlite3";
 
+const authenticationAttempts = new Map<string, { count: number; resetAt: number }>();
+
 export function createAuthService(database: Database) {
   migrate(database);
   migrateSessions(database);
 
   const username = process.env.AUTH_USERNAME;
   const passwordHash = process.env.AUTH_PASSWORD_HASH;
-  const attempts = new Map<string, { count: number; resetAt: number }>();
-
   async function authenticate(input: {
     username?: unknown;
     password?: unknown;
@@ -42,16 +42,16 @@ export function createAuthService(database: Database) {
       return null;
     }
 
-    attempts.delete(input.clientKey);
+    authenticationAttempts.delete(input.clientKey);
     const session = issueSession(database, username);
     return { ...session, userId: username };
   }
 
   function allowAttempt(clientKey: string): boolean {
     const now = Date.now();
-    const current = attempts.get(clientKey);
+    const current = authenticationAttempts.get(clientKey);
     if (!current || current.resetAt <= now) {
-      attempts.set(clientKey, { count: 1, resetAt: now + 15 * 60 * 1000 });
+      authenticationAttempts.set(clientKey, { count: 1, resetAt: now + 15 * 60 * 1000 });
       return true;
     }
 

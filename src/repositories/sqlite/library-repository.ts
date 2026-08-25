@@ -47,7 +47,7 @@ export function createSqliteLibraryRepository(db: Db): LibraryRepository {
   }
 
   async function updateSource(id: string, userId: string, data: string): Promise<void> {
-    await db.update(documents).set({ fileData: data })
+    await db.update(documents).set({ fileData: data, updatedAt: new Date() })
       .where(and(eq(documents.id, id), eq(documents.userId, userId)));
   }
 

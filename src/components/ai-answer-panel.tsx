@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   AI_ACTIONS,
@@ -18,14 +18,19 @@ type AiAnswerPanelProps = {
   selection: DocumentSelection | null;
 };
 
-function createFetchProvider(documentId?: string): AiProvider {
+function createFetchProvider(
+  documentId?: string,
+  selection?: DocumentSelection | null,
+): AiProvider {
   return {
     async generate(request: AiRequest) {
       const response = await fetch("/api/ai/action", {
         body: JSON.stringify({
           context: request.context,
           documentId,
+          location: selection?.location,
           prompt: request.prompt,
+          selectedText: selection?.text,
         }),
         headers: { "content-type": "application/json" },
         method: "POST",
@@ -68,13 +73,34 @@ export function AiAnswerPanel({
   const [question, setQuestion] = useState("");
   const [targetLanguage, setTargetLanguage] = useState<string>("Japanese");
   const [history, setHistory] = useState<{ action: string; text: string }[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!documentId) return;
+    let cancelled = false;
+    async function loadHistory() {
+      try {
+        const response = await fetch(`/api/ai/action?documentId=${encodeURIComponent(documentId!)}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json() as { messages?: { role: string; content: string }[] };
+        if (cancelled || !payload.messages) return;
+        setHistory(payload.messages.map((message) => ({ action: message.role, text: message.content })));
+      } catch {
+        return;
+      }
+    }
+    void loadHistory();
+    return () => { cancelled = true; };
+  }, [documentId]);
 
   async function run(nextAction: AiAction, followUp?: string) {
     setAction(nextAction);
     setLoading(true);
     setError(null);
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
     try {
-      const response = await runAiAction(provider ?? createFetchProvider(documentId), {
+      const response = await runAiAction(provider ?? createFetchProvider(documentId, selection), {
         action: nextAction,
         documentTitle: selection?.documentTitle,
         paperStructure: selection?.paperStructure,
@@ -86,12 +112,19 @@ export function AiAnswerPanel({
       });
       setHistory((current) => [{ action: nextAction, text: response }, ...current]);
     } catch (cause) {
-      setError(
-        cause instanceof AiActionError ? cause.message : "The AI request could not be completed.",
-      );
+      if (!abortController.signal.aborted) {
+        setError(
+          cause instanceof AiActionError ? cause.message : "The AI request could not be completed.",
+        );
+      }
     } finally {
+      abortControllerRef.current = null;
       setLoading(false);
     }
+  }
+
+  function cancel() {
+    abortControllerRef.current?.abort();
   }
 
   return (
@@ -134,7 +167,18 @@ export function AiAnswerPanel({
         </select>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-        {loading && <p aria-live="polite" className="text-sm">Loading…</p>}
+        {loading && (
+          <div className="flex items-center justify-between gap-3">
+            <p aria-live="polite" className="text-sm">Loading…</p>
+            <button
+              className="min-h-10 shrink-0 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+              onClick={cancel}
+              type="button"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         {error && (
           <div className="space-y-3 rounded-lg border border-red-300 p-3 text-sm" role="alert">
             <p>{error}</p>

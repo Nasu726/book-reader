@@ -115,10 +115,6 @@ export function SelectionAiConnector({
     }
   }
 
-  function handleHighlightError() {
-    setHighlightState("error");
-  }
-
   return (
     <AppShell
       reader={
@@ -129,8 +125,6 @@ export function SelectionAiConnector({
             documentId={documentId}
             documentTitle={documentTitle}
             format={documentFormat}
-            onHighlightCreated={() => undefined}
-            onHighlightError={handleHighlightError}
             onSelectionChange={(captured) => setSelection(captured)}
           />
           {highlightState !== "idle" && (

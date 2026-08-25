@@ -8,6 +8,9 @@ import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createSqliteDb } from "@/server/db/client";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 
+const MAX_HISTORY_MESSAGES = 8;
+const MAX_HISTORY_CHARACTERS = 8_000;
+
 export async function POST(request: Request) {
   const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
   const authService = createAuthService(database);
@@ -53,6 +56,22 @@ export async function POST(request: Request) {
     return createdId;
   }
   const conversationId = await resolveConversation();
+  const previousMessages = conversationId
+    ? await conversationRepository.listMessages(conversationId)
+    : [];
+  const historyContext = formatConversationHistory(previousMessages);
+
+  if (conversationId) {
+    await conversationRepository.addMessage({
+      id: crypto.randomUUID(),
+      conversationId,
+      role: "user",
+      content: input.prompt,
+      selectedText: typeof input.selectedText === "string" ? input.selectedText : undefined,
+      location: typeof input.location === "string" ? input.location : undefined,
+      createdAt: new Date(),
+    });
+  }
 
   let provider: ReturnType<typeof createAiProvider>;
   try {
@@ -63,7 +82,10 @@ export async function POST(request: Request) {
 
   try {
     const response = await provider.generate({
-      context: typeof input.context === "string" ? input.context : undefined,
+      context: [
+        typeof input.context === "string" ? input.context.trim() : "",
+        historyContext,
+      ].filter(Boolean).join("\n\n") || undefined,
       prompt: input.prompt,
       signal: request.signal,
     });
@@ -84,4 +106,60 @@ export async function POST(request: Request) {
       { status: 502 },
     );
   }
+}
+
+export async function GET(request: Request) {
+  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const session = createAuthService(database).getSessionUser(
+    (await cookies()).get(SESSION_COOKIE_NAME)?.value,
+  );
+  if (!session) {
+    return Response.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  const documentId = new URL(request.url).searchParams.get("documentId");
+  if (!documentId) {
+    return Response.json({ error: "Document ID is required." }, { status: 400 });
+  }
+
+  const document = await createSqliteDocumentRepository(
+    createDrizzleFromSqlite(database),
+  ).getById(documentId);
+  if (document?.userId !== session.userId) {
+    return Response.json({ error: "Document not found." }, { status: 404 });
+  }
+
+  const conversationRepository = createSqliteConversationRepository(
+    createDrizzleFromSqlite(database),
+  );
+  const conversationId = await conversationRepository.getByDocument(documentId, session.userId);
+  const messages = conversationId
+    ? (await conversationRepository.listMessages(conversationId)).filter((message) => message.content)
+    : [];
+  return Response.json({ messages });
+}
+
+function formatConversationHistory(messages: readonly {
+  role: "user" | "assistant";
+  content: string;
+}[]): string | undefined {
+  const recentMessages = messages
+    .filter((message) => message.content.trim())
+    .slice(-MAX_HISTORY_MESSAGES)
+    .map((message) => ({
+      role: message.role,
+      content: message.content.length > MAX_HISTORY_CHARACTERS / MAX_HISTORY_MESSAGES
+        ? `${message.content.slice(0, MAX_HISTORY_CHARACTERS / MAX_HISTORY_MESSAGES - 1)}…`
+        : message.content,
+    }));
+  if (recentMessages.length === 0) return undefined;
+
+  let history = recentMessages.map((message) => `${message.role}: ${message.content}`).join("\n\n");
+  while (history.length > MAX_HISTORY_CHARACTERS && recentMessages.length > 1) {
+    recentMessages.shift();
+    history = recentMessages.map((message) => `${message.role}: ${message.content}`).join("\n\n");
+  }
+  return history.length <= MAX_HISTORY_CHARACTERS
+    ? `Previous conversation:\n\n${history}`
+    : undefined;
 }
