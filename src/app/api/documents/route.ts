@@ -4,6 +4,7 @@ import { createAuthService } from "@/server/auth/service";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createSqliteDb } from "@/server/db/client";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
+import { detectFormatFromBytes } from "@/core/documents/file-signature";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { readEpubMetadata } from "@/server/documents/epub";
 import { getDocumentStorage } from "@/server/storage/filesystem-document-storage";
@@ -69,6 +70,13 @@ export async function POST(request: Request) {
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
+  // The declared Content-Type is client-supplied; the bytes have to agree.
+  if (detectFormatFromBytes(bytes) !== format) {
+    return Response.json(
+      { error: "The file contents do not match a PDF or EPUB document." },
+      { status: 415 },
+    );
+  }
   const filenameTitle = file.name.replace(/\.(epub|pdf)$/i, "") || file.name;
   const metadata = format === "epub" ? await readEpubMetadata(bytes, file.name) : null;
   const repository = createSqliteLibraryRepository(createDrizzleFromSqlite(database));

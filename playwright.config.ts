@@ -10,7 +10,7 @@ import {
 export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: /.*\.spec\.ts/,
-  globalSetup: "./tests/e2e/global-setup.ts",
+  globalTeardown: "./tests/e2e/global-teardown.ts",
   use: {
     baseURL: "http://127.0.0.1:3100",
     ...devices["Desktop Chrome"],

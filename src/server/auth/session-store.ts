@@ -4,7 +4,13 @@ import type { Database } from "better-sqlite3";
 export const SESSION_COOKIE_NAME = "book_reader_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
+/** Connections whose session schema is already current; see migrate-function.ts. */
+const migrated = new WeakSet<Database>();
+
 export function migrateSessions(database: Database): void {
+  if (migrated.has(database)) return;
+  migrated.add(database);
+
   // The first schema declared user_id UNIQUE, which allowed only one live
   // session per person: signing in on a phone silently signed out the laptop.
   // Sessions are disposable, so the old table is simply rebuilt.

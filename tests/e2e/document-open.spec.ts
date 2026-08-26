@@ -91,3 +91,22 @@ test("PDF selection highlights persist and can be deleted", async ({ page }) => 
   await savedHighlights.getByRole("button", { name: /Delete highlight/ }).click();
   await expect(savedHighlights.getByText("No saved highlights.")).toBeVisible();
 });
+
+test("uploads whose bytes do not match their declared type are rejected", async ({ page }) => {
+  await login(page);
+
+  const disguised = await page.request.post("/api/documents", {
+    multipart: {
+      file: {
+        buffer: Buffer.from("#!/bin/sh\necho not a document\n"),
+        mimeType: "application/pdf",
+        name: "disguised.pdf",
+      },
+    },
+  });
+  expect(disguised.status()).toBe(415);
+
+  const library = await page.request.get("/api/documents");
+  const { documents } = (await library.json()) as { documents: { sourceFilename?: string }[] };
+  expect(documents.some((document) => document.sourceFilename === "disguised.pdf")).toBe(false);
+});

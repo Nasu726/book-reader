@@ -6,7 +6,7 @@ import { after, before, test } from "node:test";
 
 import { backupDatabase } from "../../src/server/db/backup.ts";
 import { migrate } from "../../src/server/db/migrate-function.ts";
-import { createSqliteDb } from "../../src/server/db/client.ts";
+import { createSqliteDb, openOwnedSqliteDb } from "../../src/server/db/client.ts";
 import { restoreDatabase } from "../../src/server/db/restore.ts";
 
 let directory: string;
@@ -31,7 +31,7 @@ test("online backup preserves schema and data while source remains usable", asyn
   await backupDatabase(databasePath, backupPath);
 
   assert.ok(existsSync(backupPath));
-  const restored = createSqliteDb(backupPath);
+  const restored = openOwnedSqliteDb(backupPath);
   try {
     const row = restored.prepare("SELECT title FROM documents WHERE id = ?").get("doc-1") as
       | { title: string }
