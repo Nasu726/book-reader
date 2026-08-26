@@ -6,6 +6,7 @@ import {
   type ParsedDocument,
   type ParsedDocumentSection,
 } from "./parser.ts";
+import { sanitizeSectionHtml, toReadableText } from "./html-sanitizer.ts";
 
 type TextDocument = {
   body?: { textContent?: string | null };
@@ -56,9 +57,14 @@ export class EpubParser implements DocumentParser {
 
       for (const [index, section] of book.spine.spineItems.entries()) {
         await section.load(archiveRequest);
-        const content = (
-          section.document?.documentElement?.textContent ?? ""
-        ).trim();
+        // Not every DOM implementation exposes `body` for XHTML, so fall back
+        // to the document element. The sanitizer drops <head> and its children,
+        // so chapter text never picks up the document title either way.
+        const root = (section.document?.body ??
+          section.document?.documentElement ??
+          null) as Parameters<typeof sanitizeSectionHtml>[0];
+        const html = sanitizeSectionHtml(root);
+        const content = toReadableText(root);
         const navItem = navigation.find(
           (item) => item.href.split("#")[0] === section.href,
         );
@@ -67,6 +73,7 @@ export class EpubParser implements DocumentParser {
           id: section.idref ?? `section-${index}`,
           title: navItem?.label || undefined,
           content,
+          ...(html && { html }),
           location: `spine:${index}:cfi:${section.cfiBase ?? ""}`,
         });
       }

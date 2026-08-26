@@ -9,7 +9,10 @@ export type StableDocumentLocation = {
 export type ParsedDocumentSection = {
   id: string;
   title?: string;
+  /** Readable plain text, used for AI context and as a rendering fallback. */
   content: string;
+  /** Sanitized structural markup, used to render the section as the author wrote it. */
+  html?: string;
   location?: string;
 };
 

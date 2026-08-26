@@ -14,11 +14,9 @@ import { inferPaperStructure } from "@/core/documents/paper-structure";
 
 GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${version}`;
 
-const SAMPLE_PDF = "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNjEyIDc5Ml0vQ29udGVudHMgNCAwIFIvUmVzb3VyY2VzPDwvRm9udDw8L0YxIDUgMCBSPj4+Pj4+ZW5kb2JqCjQgMCBvYmo8PC9MZW5ndGggNTg+PnN0cmVhbQpCVCAvRjEgMjQgVGYgNzIgNzIwIFRkIChTYW1wbGUgUERGIHRleHQuKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCjUgMCBvYmo8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PmVuZG9iagp0cmFpbGVyPDwvUm9vdCAxIDAgUj4+CiUlRU9G";
-
 type PdfRendererProps = {
   documentTitle?: string;
-  source?: string;
+  source: string;
   initialLocation?: string | null;
   onLocationChange?: (location: string) => void;
   onSelectionChange?: (selection: DocumentSelection | null) => void;
@@ -29,7 +27,7 @@ export function PdfRenderer({
   initialLocation,
   onLocationChange,
   onSelectionChange,
-  source = SAMPLE_PDF,
+  source,
 }: PdfRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
@@ -65,6 +63,7 @@ export function PdfRenderer({
   const pageAreaRef = useRef<HTMLDivElement>(null);
   const [documentReady, setDocumentReady] = useState(false);
   const extractedPageTextRef = useRef("");
+  const renderedWidthRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,18 +110,29 @@ export function PdfRenderer({
     setError(null);
     try {
       const page = await document.getPage(bounded);
-      const deviceViewport = page.getViewport({ scale: window.devicePixelRatio || 1 });
       const context = canvas.getContext("2d");
       if (!context) {
         throw new Error("Canvas rendering is unavailable.");
       }
-      canvas.width = Math.floor(deviceViewport.width);
-      canvas.height = Math.floor(deviceViewport.height);
-      canvas.style.width = "100%";
-      canvas.style.height = "auto";
-      await page.render({ canvas, viewport: deviceViewport }).promise;
 
-      const viewport = page.getViewport({ scale: 1 });
+      // The canvas and the text layer must share one display scale, or the
+      // selectable text drifts away from the glyphs painted on the canvas.
+      const unscaled = page.getViewport({ scale: 1 });
+      const availableWidth = pageAreaRef.current?.clientWidth || unscaled.width;
+      const cssScale = availableWidth / unscaled.width;
+      const viewport = page.getViewport({ scale: cssScale });
+      const devicePixelRatio = window.devicePixelRatio || 1;
+
+      canvas.width = Math.floor(viewport.width * devicePixelRatio);
+      canvas.height = Math.floor(viewport.height * devicePixelRatio);
+      canvas.style.width = `${Math.floor(viewport.width)}px`;
+      canvas.style.height = `${Math.floor(viewport.height)}px`;
+      renderedWidthRef.current = Math.floor(availableWidth);
+      await page.render({
+        canvas,
+        viewport: page.getViewport({ scale: cssScale * devicePixelRatio }),
+      }).promise;
+
       const textContent = await page.getTextContent();
       try {
         extractedPageTextRef.current = extractPdfText(textContent.items as unknown as Parameters<typeof extractPdfText>[0]);
@@ -130,7 +140,7 @@ export function PdfRenderer({
         extractedPageTextRef.current = "";
       }
       layer.replaceChildren();
-      layer.style.setProperty("--scale-factor", String(viewport.scale));
+      layer.style.setProperty("--scale-factor", String(cssScale));
       layer.style.setProperty("--user-unit", "1");
       layer.style.setProperty("--total-scale-factor", "calc(var(--scale-factor) * var(--user-unit))");
       layer.style.setProperty("--scale-round-x", "1px");
@@ -156,6 +166,21 @@ export function PdfRenderer({
       void renderPage(pageNumber);
     }
   }, [documentReady, pageCount, pageNumber, renderPage]);
+
+  // Rotating a phone or changing the reader font size resizes the page area.
+  // Re-render at the new width so the text layer keeps matching the canvas.
+  useEffect(() => {
+    const pageArea = pageAreaRef.current;
+    if (!pageArea || !documentReady) return;
+    const observer = new ResizeObserver(() => {
+      const width = Math.floor(pageArea.clientWidth);
+      if (!width || width === renderedWidthRef.current) return;
+      renderedWidthRef.current = width;
+      void renderPage(pageNumber);
+    });
+    observer.observe(pageArea);
+    return () => observer.disconnect();
+  }, [documentReady, pageNumber, renderPage]);
 
   useEffect(() => {
     if (!documentReady || !onLocationChange) return;

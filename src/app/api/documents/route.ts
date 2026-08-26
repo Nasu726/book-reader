@@ -5,6 +5,8 @@ import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createSqliteDb } from "@/server/db/client";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
+import { readEpubMetadata } from "@/server/documents/epub";
+import { getDocumentStorage } from "@/server/storage/filesystem-document-storage";
 import { cookies } from "next/headers";
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
@@ -66,29 +68,35 @@ export async function POST(request: Request) {
     return Response.json({ error: "The file must be between 1 byte and 100 MB." }, { status: 413 });
   }
 
-  const fileData = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString("base64")}`;
-  const title = file.name.replace(/\.(epub|pdf)$/i, "") || file.name;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const filenameTitle = file.name.replace(/\.(epub|pdf)$/i, "") || file.name;
+  const metadata = format === "epub" ? await readEpubMetadata(bytes, file.name) : null;
   const repository = createSqliteLibraryRepository(createDrizzleFromSqlite(database));
+  const storage = getDocumentStorage();
   const documentId = randomUUID();
+  let storedReference: string | undefined;
   try {
     await repository.create({
       id: documentId,
       userId: session.userId,
-      title,
+      title: metadata?.title?.trim() || filenameTitle,
+      author: metadata?.author?.trim() || undefined,
       format,
       sourceFilename: file.name,
     });
 
+    storedReference = await storage.put(documentId, bytes, file.type);
     const stored = await repository.updateSourceIfOwned(
       documentId,
       session.userId,
-      fileData,
+      storedReference,
     );
     if (!stored) {
       throw new Error("Document disappeared before its source was stored.");
     }
   } catch (error) {
     storageError = error;
+    if (storedReference) await storage.delete(storedReference).catch(() => undefined);
     await repository.delete(documentId, session.userId);
     console.error(storageError instanceof Error ? storageError.message : storageError);
     return Response.json({ error: "Failed to store the document." }, { status: 500 });
