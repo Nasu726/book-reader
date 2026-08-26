@@ -9,7 +9,7 @@ import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { AppShell } from "@/components/app-shell";
 
 export default async function Home() {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const authService = createAuthService(database);
   const session = authService.getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,

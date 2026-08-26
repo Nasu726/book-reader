@@ -17,7 +17,7 @@ const ALLOWED_TYPES: Record<string, "epub" | "pdf"> = {
 };
 
 export async function GET() {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const authService = createAuthService(database);
   const session = authService.getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,
@@ -31,7 +31,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const authService = createAuthService(database);
   const session = authService.getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,

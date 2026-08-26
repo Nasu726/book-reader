@@ -15,7 +15,7 @@ const MAX_PROMPT_CHARACTERS = 20_000;
 const MAX_CONTEXT_CHARACTERS = 40_000;
 
 export async function POST(request: Request) {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const authService = createAuthService(database);
   const session = authService.getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const session = createAuthService(database).getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,
   );

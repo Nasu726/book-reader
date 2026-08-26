@@ -39,7 +39,18 @@ export function createDb(path: string) {
 
 export type Db = ReturnType<typeof createDb>;
 
-export function createSqliteDb(path: string) {
+/**
+ * The one place that decides where the database lives.
+ *
+ * The application and the migration script used to disagree — `book-reader.db`
+ * against `./data/book-reader.db` — so running migrations prepared a file the
+ * server never opened.
+ */
+export function getDatabasePath(): string {
+  return process.env.DATABASE_PATH ?? "./data/book-reader.db";
+}
+
+export function createSqliteDb(path: string = getDatabasePath()) {
   return open(path);
 }
 

@@ -692,6 +692,11 @@ Chrome latest stableで主要フローを検証する。
 - [ ] iPhone Safariで主要フローが成立する
 - [x] Chromeで主要フローが成立する
 - [x] lint / typecheck / tests / production buildが通る
+- [x] PDFのtext layerがcanvasと一致し、選択位置がずれない
+- [x] EPUB本文が見出し・段落構造を保って表示される
+- [x] 複数端末で同時にログインを維持できる
+- [x] AI providerのrate limitがReaderの失敗として露出しない
+- [x] uploadした文書のbyte列がSQLiteの外に置かれる
 - [x] PWAとして必要な構成が存在する
 
 `SEL-005 PDF selection normalization`、高度な論文構造抽出、Vocabulary等は未完でもMVPを成立させられる。
