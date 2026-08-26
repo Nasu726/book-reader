@@ -41,10 +41,18 @@ test("the PDF text layer stays aligned with the rendered canvas", async ({ page 
     const canvasBox = canvas.getBoundingClientRect();
     const layerBox = layer.getBoundingClientRect();
     const spanBox = span.getBoundingClientRect();
+    const spanStyle = getComputedStyle(span);
     return {
       canvas: { width: canvasBox.width, height: canvasBox.height, x: canvasBox.x, y: canvasBox.y },
       layer: { width: layerBox.width, height: layerBox.height, x: layerBox.x, y: layerBox.y },
-      span: { width: spanBox.width, x: spanBox.x, y: spanBox.y },
+      span: {
+        width: spanBox.width,
+        height: spanBox.height,
+        x: spanBox.x,
+        y: spanBox.y,
+        position: spanStyle.position,
+        fontSize: Number.parseFloat(spanStyle.fontSize),
+      },
     };
   });
 
@@ -57,10 +65,17 @@ test("the PDF text layer stays aligned with the rendered canvas", async ({ page 
   expect(Math.abs(layer.x - canvas.x)).toBeLessThanOrEqual(2);
   expect(Math.abs(layer.y - canvas.y)).toBeLessThanOrEqual(2);
 
-  // A text run has to sit inside the page, and be wide enough to have been
-  // laid out at the page's scale rather than at an unscaled 1.0 viewport.
-  expect(span.x).toBeGreaterThanOrEqual(canvas.x - 2);
-  expect(span.y).toBeGreaterThanOrEqual(canvas.y - 2);
+  // Without pdf.js's text layer stylesheet the runs are static inline text that
+  // flows from the corner, which looks like a second copy of the page.
+  expect(span.position).toBe("absolute");
+
+  // The sample page starts its text about 10% in from the left and 6% down.
+  // A run pinned to the corner means the layout never took the page geometry.
+  expect(span.x - canvas.x).toBeGreaterThan(canvas.width * 0.05);
+  expect(span.y - canvas.y).toBeGreaterThan(canvas.height * 0.02);
   expect(span.x).toBeLessThanOrEqual(canvas.x + canvas.width);
-  expect(span.width).toBeGreaterThan(canvas.width * 0.2);
+  expect(span.y).toBeLessThanOrEqual(canvas.y + canvas.height);
+
+  // Font size has to follow the page scale, not fall back to the body default.
+  expect(span.fontSize).toBeGreaterThan(14);
 });

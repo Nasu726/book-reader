@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createSqliteConversationRepository } from "@/repositories/sqlite/conversation-repository";
 import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { createAuthService } from "@/server/auth/service";
+import { AiProviderError, generateWithRetry } from "@/core/ai/provider";
 import { createAiProvider } from "@/server/ai/provider-factory";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createSqliteDb } from "@/server/db/client";
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const response = await provider.generate({
+    const response = await generateWithRetry(provider, {
       context: [
         typeof input.context === "string" ? input.context.trim() : "",
         historyContext,
@@ -108,7 +109,19 @@ export async function POST(request: Request) {
     }
 
     return Response.json(response);
-  } catch {
+  } catch (error) {
+    // The reader only ever sees a generic message; the upstream detail stays in
+    // the server log, where a wrong model id or an exhausted quota is visible.
+    if (error instanceof AiProviderError) {
+      console.error("AI provider failed", {
+        reason: error.reason,
+        retryable: error.retryable,
+        status: error.status,
+        upstream: typeof error.cause === "string" ? error.cause.slice(0, 500) : undefined,
+      });
+    } else {
+      console.error("AI request failed", error);
+    }
     return Response.json(
       { error: "The AI request could not be completed. Please try again." },
       { status: 502 },

@@ -95,3 +95,67 @@ body {
 .reader-prose table { border-collapse: collapse; display: block; overflow-x: auto; }
 .reader-prose th, .reader-prose td { border: 1px solid currentColor; padding: 0.4em 0.6em; }
 .reader-prose th { font-weight: 600; }
+
+/*
+ * PDF text layer geometry.
+ *
+ * pdf.js positions every text run absolutely and sizes it from CSS custom
+ * properties; without these rules the runs flow as ordinary inline text in the
+ * top-left corner and no longer sit over the glyphs painted on the canvas.
+ *
+ * Extracted from pdfjs-dist/web/pdf_viewer.css (pdfjs-dist 6.2.108). The full
+ * viewer stylesheet is 160 KB of toolbar and editor chrome this reader does not
+ * use. Re-check this block when upgrading pdfjs-dist; tests/e2e/pdf.spec.ts
+ * fails if the contract changes.
+ */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer .markedContent {
+  display: contents;
+}
+
+.textLayer span[role="img"] {
+  user-select: none;
+  cursor: default;
+}
+
+.textLayer ::selection {
+  background: color-mix(in srgb, AccentColor 40%, transparent);
+}

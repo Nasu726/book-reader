@@ -12,6 +12,16 @@ export type OpenRouterProviderOptions = {
   fetch?: typeof fetch;
 };
 
+/** Reads Retry-After, which OpenRouter sends in seconds. */
+function readRetryAfterMs(response: Response): number | undefined {
+  const header = response.headers.get("retry-after");
+  if (!header) return undefined;
+  const seconds = Number(header);
+  return Number.isFinite(seconds) && seconds >= 0
+    ? Math.min(seconds, 30) * 1_000
+    : undefined;
+}
+
 export class OpenRouterProvider implements AiProvider {
   readonly #apiKey: string;
   readonly #model: string;
@@ -59,9 +69,17 @@ export class OpenRouterProvider implements AiProvider {
     }
 
     if (!response.ok) {
+      // Free and shared model pools answer 429 routinely; treating it as fatal
+      // makes the reader look broken when a short wait would have worked.
+      const retryable = response.status === 429 || response.status >= 500;
       throw new AiProviderError("The provider rejected the request.", {
         reason: response.status === 400 ? "invalid_request" : "provider_error",
-        retryable: response.status >= 500,
+        retryable,
+        retryAfterMs: retryable ? readRetryAfterMs(response) : undefined,
+        // Server-side only: the upstream text never reaches the reader, but
+        // without it a misconfigured model or key is undiagnosable.
+        cause: await response.text().catch(() => undefined),
+        status: response.status,
       });
     }
 
