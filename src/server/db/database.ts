@@ -1,3 +1,4 @@
+import { isCloudflareWorker } from "@/server/runtime";
 import { drizzle as drizzleD1 } from "drizzle-orm/d1";
 import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 
@@ -57,9 +58,36 @@ export function setLocalDatabase(database: Db): void {
  */
 export async function getDatabase(): Promise<Db> {
   if (configured) return configured;
+
+  const binding = await readCloudflareBinding();
+  if (binding) {
+    setD1Database(binding);
+    return configured!;
+  }
+
   const { createDb, getDatabasePath } = await import("./client");
   configured = createDb(getDatabasePath());
   return configured;
+}
+
+/**
+ * The D1 binding, when this is running on Cloudflare.
+ *
+ * A Worker receives bindings per request rather than through the environment,
+ * so they come from the request context rather than from process.env. Absent
+ * everywhere else, which is how the local driver gets chosen.
+ */
+async function readCloudflareBinding(): Promise<D1Binding | null> {
+  if (!isCloudflareWorker()) return null;
+  try {
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+    const env = (await getCloudflareContext({ async: true })).env as
+      Record<string, unknown>;
+    const binding = env.DB;
+    return binding ? (binding as D1Binding) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** True once an entry point has supplied a driver. */

@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   // and a 3 MiB bundle to work with.
   const filenameTitle = file.name.replace(/\.(epub|pdf)$/i, "") || file.name;
   const repository = createSqliteLibraryRepository(database);
-  const storage = getDocumentStorage();
+  const storage = await getDocumentStorage();
   const documentId = randomUUID();
   let storedReference: string | undefined;
   try {

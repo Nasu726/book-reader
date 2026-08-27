@@ -110,12 +110,12 @@ test("the filesystem backend round-trips a document", async () => {
 });
 
 test("the selector uses the filesystem until an R2 bucket is supplied", async () => {
-  const filesystemReference = await getDocumentStorage().put("doc-3", SAMPLE, "application/pdf");
+  const filesystemReference = await (await getDocumentStorage()).put("doc-3", SAMPLE, "application/pdf");
   assert.match(filesystemReference, /^file:/);
 
   const bucket = fakeBucket();
   setR2DocumentStorage(bucket);
-  const r2Reference = await getDocumentStorage().put("doc-4", SAMPLE, "application/pdf");
+  const r2Reference = await (await getDocumentStorage()).put("doc-4", SAMPLE, "application/pdf");
   assert.match(r2Reference, /^r2:/);
   assert.ok(bucket.objects.has("doc-4"));
 });

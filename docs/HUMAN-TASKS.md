@@ -16,12 +16,16 @@
 | Cloudflareアカウント | 済 |
 | R2の有効化 | 済 |
 | 独自ドメイン保有 | 済 |
-| `wrangler` ログイン | **未** |
-| D1データベース作成 | 未（wranglerログイン待ち） |
-| R2バケット作成 | 未（wranglerログイン待ち） |
-| Cloudflare Access設定 | 未 |
+| `wrangler` ログイン | 済（2026-08-27） |
+| D1データベース作成 | 済（エージェントが実行） |
+| R2バケット作成 | 済（エージェントが実行） |
+| **Cloudflare Access設定** | **未 — 次にやること** |
 | Worker secrets登録 | 未 |
+| ドメイン割り当て | 未 |
 | iPhone実機確認 | 未（HUMAN-001） |
+
+`wrangler login` が済んだ時点で、エージェントは認証済みCLIとしてD1・R2の作成やデプロイを実行できる。
+ブラウザのダッシュボード操作と、秘密情報の入力だけが人間に残る。
 
 ---
 
@@ -50,32 +54,18 @@ npx wrangler whoami
 
 ---
 
-## H-2. D1 データベースの作成
+## H-2 / H-3. D1 と R2 — 完了（人間の作業は不要だった）
 
-**なぜ人間が必要か**
-H-1の認可が前提。エージェントの実行環境からはCloudflareアカウントに触れない。
+`wrangler login` 後はエージェントが実行できたため、こちらで作成済み。
 
-**手順**
+| 種別 | 名前 | 識別子 | binding |
+|---|---|---|---|
+| D1 | `book-reader` | `c0ed3894-0dbf-4de3-b151-2bf35396d577`（APAC） | `DB` |
+| R2 | `book-reader-documents` | — | `DOCUMENTS` |
 
-```bash
-npx wrangler d1 create book-reader
-```
+`wrangler.jsonc` に記載済み。スキーマは `migrations/0001_initial_schema.sql` を remote と local の両方へ適用済み（8テーブル）。
 
-出力される `database_id` を控える。
-
-**伝えること**: `database_id` の値（これは秘密情報ではない。`wrangler.toml` にコミットされる）。
-
----
-
-## H-3. R2 バケットの作成
-
-**手順**
-
-```bash
-npx wrangler r2 bucket create book-reader-documents
-```
-
-**伝えること**: 作成できたこと。バケット名を変えた場合はその名前。
+既存の `quiz-db` と `mypage-images` は別プロジェクトのものなので触っていない。
 
 ---
 

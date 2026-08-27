@@ -27,7 +27,7 @@ export async function GET(
     return Response.json({ error: "Document not found." }, { status: 404 });
   }
 
-  const stored = await getDocumentStorage().get(source.data);
+  const stored = await (await getDocumentStorage()).get(source.data);
   if (!stored) {
     return Response.json({ error: "Document not found." }, { status: 404 });
   }

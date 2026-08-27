@@ -6,7 +6,9 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
-    ignores: ["public/pdf.worker.min.mjs"],
+    // Vendored or generated, and not ours to lint: the pdf.js worker is a
+    // published build, and .open-next is what the Cloudflare adapter emits.
+    ignores: ["public/pdf.worker.min.mjs", ".open-next/**", ".wrangler/**"],
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
@@ -15,6 +17,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    ".open-next/**",
+    ".wrangler/**",
   ]),
 ]);
 

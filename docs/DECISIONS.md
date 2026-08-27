@@ -188,3 +188,59 @@ E2E に `if (await locator.isVisible())` を書かない。
 
 **現時点の影響度**
 単一ユーザー構成では他人の文書が存在せず、外部キー違反で 500 になるだけ。ただしスキーマもリポジトリも全て `user_id` スコープ設計であり、2人目が増えた瞬間に他人の文書へ書き込める。Access 導入で userId がメールアドレスになるため、複数ユーザーは現実的な話になった。
+
+---
+
+## D-11. Cloudflare のバインディングは実行環境で判定して掴む
+
+**判断**
+D1 と R2 は `navigator.userAgent === "Cloudflare-Workers"` を確認してから `getCloudflareContext()` で解決する。そうでなければローカルの SQLite ファイルとファイルシステムを使う。
+
+**理由**
+最初は「バインディングが取れたら Cloudflare」という判定にしていた。ところが `getCloudflareContext()` は `next dev` でも解決してしまい、ローカルのリーダーが**空のローカルD1**を掴んだ。症状は全ページの `D1_ERROR: no such table: documents`。E2Eが用意したSQLiteファイルは一切使われていなかった。
+
+`initOpenNextCloudflareForDev()` を外しても解決したので、これは開発用フックの有無ではなくコンテキスト解決そのものの挙動である。実行環境を直接聞くのが正しい。
+
+**同じ理由で `next dev` にバインディングを渡さない**
+`initOpenNextCloudflareForDev()` は `USE_CLOUDFLARE_BINDINGS=1` のときだけ有効にする。ローカル開発とE2Eは SQLite とファイルシステムを前提に組み立てられており、そこへD1とR2を差し込むと全部壊れる。Cloudflare経路の検証は `npm run cf:preview`（実Workerランタイム + 実バインディング）で行う。
+
+**これを覆す条件**
+E2E自体をCloudflare経路に対して走らせたくなった場合。その時は `cf:preview` に対する別プロジェクトを足す。
+
+---
+
+## D-12. instrumentation.ts に状態を持たせない
+
+**判断**
+データベースとドキュメントストアは初回使用時に解決する。`instrumentation.ts` は起動時の設定チェックだけを行う。
+
+**理由**
+当初は `register()` でドライバを注入する設計にした。Next.js のドキュメントは「サーバインスタンス起動時に一度だけ呼ばれ、リクエスト受付前に完了する」と保証しており、注入場所として妥当に見えた。
+
+実際には全リクエストが `No database is configured` で失敗した。**Next.js は instrumentation.ts とルートハンドラが同じモジュールインスタンスを共有することを保証していない。** モジュールレベルのシングルトンは両者の間で共有されない。
+
+**残したもの**
+起動時に「サインイン手段が何も設定されていない」場合だけ警告する。これは状態ではなく検査なので、共有されなくても害がない。
+
+---
+
+## D-13. Worker では password ログインを無効化し、案内を出す
+
+**判断**
+Cloudflare Workers 上で Access が未設定の場合、`getLocalAuthDatabase()` は null を返し、`/login` は設定手順を案内する。
+
+**理由**
+password 経路は better-sqlite3 を必要とする。Worker はネイティブaddonを読み込めないため、そこへ到達すると例外になる。プレビューで実際に確認したところ、全ページが 500、ログインPOSTも 500、ブラウザには React error #441 だけが出た。**何が悪いのか読み取れない。**
+
+デプロイしたのに Access を設定し忘れる、というのは十分あり得る手順ミスなので、そのときに「何を設定すればよいか」が画面に出る方がよい。
+
+---
+
+## D-14. 増分キャッシュを構成しない
+
+**判断**
+`open-next.config.ts` は `defineCloudflareConfig({})`。R2 増分キャッシュのオーバーライドは使わない。
+
+**理由**
+このリーダーは全ルートが認証付きの動的レンダリングで、ビルド出力上の静的ページは `/login` と `/_not-found` だけ。ISRキャッシュに入るものが無い。
+`r2IncrementalCache` を設定すると `NEXT_INC_CACHE_R2_BUCKET` という専用バインディングを要求され、プレビューはそれが無いと起動すらしない。使わないキャッシュのためにバインディングを増やす理由がない。

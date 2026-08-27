@@ -1,3 +1,4 @@
+import { isCloudflareWorker } from "@/server/runtime";
 import type { DocumentStorage } from "@/core/documents/storage";
 
 import { createFilesystemDocumentStorage } from "./filesystem-document-storage";
@@ -26,13 +27,33 @@ export function setR2DocumentStorage(bucket: R2BucketLike): void {
   shared = undefined;
 }
 
-export function getDocumentStorage(): DocumentStorage {
-  if (!shared) {
-    shared = injectedBucket
-      ? createR2DocumentStorage(injectedBucket)
-      : createFilesystemDocumentStorage();
-  }
+export async function getDocumentStorage(): Promise<DocumentStorage> {
+  if (shared) return shared;
+
+  const bucket = injectedBucket ?? await readCloudflareBucket();
+  shared = bucket
+    ? createR2DocumentStorage(bucket)
+    : createFilesystemDocumentStorage();
   return shared;
+}
+
+/**
+ * The R2 binding, when this is running on Cloudflare.
+ *
+ * A Worker receives bindings per request rather than through the environment.
+ * Absent everywhere else, which is how the filesystem store gets chosen.
+ */
+async function readCloudflareBucket(): Promise<R2BucketLike | null> {
+  if (!isCloudflareWorker()) return null;
+  try {
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+    const env = (await getCloudflareContext({ async: true })).env as
+      Record<string, unknown>;
+    const bucket = env.DOCUMENTS;
+    return bucket ? (bucket as R2BucketLike) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Exposed for tests, which need each case to start from a clean selection. */

@@ -3,6 +3,7 @@ import type { Database } from "better-sqlite3";
 
 import { createAuthService } from "./service";
 import { SESSION_COOKIE_NAME } from "./session-store";
+import { isCloudflareWorker } from "@/server/runtime";
 import {
   ACCESS_JWT_HEADER,
   readAccessConfig,
@@ -34,6 +35,9 @@ export function setLocalAuthDatabase(database: Database): void {
  */
 export async function getLocalAuthDatabase(): Promise<Database | null> {
   if (readAccessConfig()) return null;
+  // better-sqlite3 is a native addon; a Worker cannot load it. Reaching for it
+  // there turned every page into a 500 instead of a signed-out reader.
+  if (isCloudflareWorker()) return null;
   if (!localAuthDatabase) {
     const { createSqliteDb, getDatabasePath } = await import("@/server/db/client");
     localAuthDatabase = createSqliteDb(getDatabasePath());

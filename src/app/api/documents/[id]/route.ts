@@ -63,7 +63,7 @@ export async function DELETE(
     return documentNotFound();
   }
   if (source) {
-    await getDocumentStorage().delete(source.data).catch(() => undefined);
+    await (await getDocumentStorage()).delete(source.data).catch(() => undefined);
   }
 
   return new Response(null, { status: 204 });
