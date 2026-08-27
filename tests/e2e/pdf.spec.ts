@@ -79,3 +79,57 @@ test("the PDF text layer stays aligned with the rendered canvas", async ({ page 
   // Font size has to follow the page scale, not fall back to the body default.
   expect(span.fontSize).toBeGreaterThan(14);
 });
+
+test("arrow keys turn pages and the zoom control resizes the page", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  const documentId = await importDocument(page, "keyboard.pdf", MULTIPAGE_PDF, "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+
+  const reader = page.getByRole("region", { name: "PDF reader" });
+  await expect(reader.getByText("Page 1 / 2")).toBeVisible({ timeout: 10_000 });
+
+  await page.keyboard.press("ArrowRight");
+  await expect(reader.getByText("Page 2 / 2")).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await expect(reader.getByText("Page 1 / 2")).toBeVisible();
+
+  const widthAt = async () =>
+    (await reader.locator("canvas").boundingBox())!.width;
+  const fitWidth = await widthAt();
+
+  const zoom = reader.getByRole("group", { name: "Page zoom" });
+  await zoom.getByRole("button", { name: "Zoom in" }).click();
+  await expect(zoom.getByText("125%")).toBeVisible();
+  await expect.poll(widthAt).toBeGreaterThan(fitWidth * 1.2);
+
+  // Resetting returns to fit width, and the text layer must follow the canvas.
+  await zoom.getByRole("button", { name: /Reset to fit width/ }).click();
+  await expect(zoom.getByText("100%")).toBeVisible();
+  await expect.poll(widthAt).toBeCloseTo(fitWidth, 0);
+
+  const aligned = await reader.evaluate((section) => {
+    const canvas = section.querySelector("canvas")!.getBoundingClientRect();
+    const layer = section.querySelector(".textLayer")!.getBoundingClientRect();
+    return Math.abs(canvas.width - layer.width) <= 2 && Math.abs(canvas.height - layer.height) <= 2;
+  });
+  expect(aligned).toBe(true);
+});
+
+test("typing a follow-up question never turns the page", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  const documentId = await importDocument(page, "typing.pdf", MULTIPAGE_PDF, "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+
+  const reader = page.getByRole("region", { name: "PDF reader" });
+  await expect(reader.getByText("Page 1 / 2")).toBeVisible({ timeout: 10_000 });
+
+  const question = page.getByLabel("Follow-up question");
+  await question.fill("Why does this matter");
+  await question.press("ArrowLeft");
+  await question.press("ArrowRight");
+
+  await expect(reader.getByText("Page 1 / 2")).toBeVisible();
+  await expect(question).toHaveValue("Why does this matter");
+});

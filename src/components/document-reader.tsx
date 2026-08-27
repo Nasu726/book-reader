@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { PdfRenderer } from "./pdf-renderer";
 import { captureEpubSelection, type DocumentSelection } from "@/core/selection/capture";
+import { usePageShortcuts } from "./use-page-shortcuts";
 
 type DocumentReaderProps = {
   documentId: string;
@@ -110,6 +111,19 @@ export function DocumentReader({
   // to fetch here; a missing document surfaces as the renderer's own error.
   const source = `/api/documents/${documentId}/source`;
 
+  const sectionCount = epub?.sections.length ?? 0;
+  function goToSection(nextIndex: number) {
+    if (nextIndex < 0 || nextIndex >= sectionCount) return;
+    setHasUserNavigated(true);
+    setSectionIndex(nextIndex);
+  }
+  // PDF pages are turned by the PDF renderer's own shortcuts.
+  usePageShortcuts({
+    enabled: format === "epub" && sectionCount > 0,
+    onNext: () => goToSection(sectionIndex + 1),
+    onPrevious: () => goToSection(sectionIndex - 1),
+  });
+
   useEffect(() => {
     if (format !== "epub") return;
     let cancelled = false;
@@ -165,9 +179,9 @@ export function DocumentReader({
     return (
       <section aria-label="EPUB reader" className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex === 0} onClick={() => { setHasUserNavigated(true); setSectionIndex(sectionIndex - 1); }} type="button">Previous</button>
+          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex === 0} onClick={() => goToSection(sectionIndex - 1)} type="button">Previous</button>
           <span className="text-sm">{sectionIndex + 1} / {epub.sections.length}</span>
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => { setHasUserNavigated(true); setSectionIndex(sectionIndex + 1); }} type="button">Next</button>
+          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => goToSection(sectionIndex + 1)} type="button">Next</button>
         </div>
         <article className="reader-prose max-w-prose rounded-xl border border-zinc-200 p-4 dark:border-zinc-800" data-reader-section={section.id}>
           {/* The nav label is only shown when the chapter body carries no heading of its own. */}

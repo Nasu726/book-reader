@@ -152,6 +152,7 @@ export interface LibraryRepository {
     data: string,
   ): Promise<boolean>;
   markOpened(id: string, userId: string, openedAt?: Date): Promise<void>;
+  rename(id: string, userId: string, title: string): Promise<boolean>;
   getSource(
     id: string,
     userId: string,

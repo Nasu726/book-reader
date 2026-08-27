@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+/* Tailwind v4 drives `dark:` from prefers-color-scheme by default, so the
+   reader's own theme toggle set a `.dark` class that nothing responded to.
+   Bind the variant to the class, and keep the system preference as the
+   starting point for anyone who has not chosen yet. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Set by the reader's font size control. It scales the book text only, so
+     buttons and spacing keep their size at every setting. */
+  --reader-font-scale: 1;
 }
 
 @theme inline {
@@ -12,11 +22,17 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Chosen theme first, system preference when nothing is chosen. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+:root.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {
@@ -28,6 +44,7 @@ body {
 /* EPUB chapters arrive as sanitized author markup; Tailwind's reset strips the
    structural styling, so the reader restores just enough of it to be readable. */
 .reader-prose {
+  font-size: calc(1rem * var(--reader-font-scale));
   line-height: 1.75;
 }
 

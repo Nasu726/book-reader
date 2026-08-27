@@ -11,8 +11,13 @@ import {
 import { capturePdfSelection, type DocumentSelection } from "@/core/selection/capture";
 import { extractPdfText } from "@/core/documents/pdf-extraction";
 import { inferPaperStructure } from "@/core/documents/paper-structure";
+import { usePageShortcuts } from "./use-page-shortcuts";
 
 GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${version}`;
+
+/** Fit-width is 1; the range covers small print and large-format scans. */
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
 
 type PdfRendererProps = {
   documentTitle?: string;
@@ -64,6 +69,8 @@ export function PdfRenderer({
   const [documentReady, setDocumentReady] = useState(false);
   const extractedPageTextRef = useRef("");
   const renderedWidthRef = useRef(0);
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,7 +126,7 @@ export function PdfRenderer({
       // selectable text drifts away from the glyphs painted on the canvas.
       const unscaled = page.getViewport({ scale: 1 });
       const availableWidth = pageAreaRef.current?.clientWidth || unscaled.width;
-      const cssScale = availableWidth / unscaled.width;
+      const cssScale = (availableWidth / unscaled.width) * zoomRef.current;
       const viewport = page.getViewport({ scale: cssScale });
       const devicePixelRatio = window.devicePixelRatio || 1;
 
@@ -162,10 +169,20 @@ export function PdfRenderer({
   }, [pageCount]);
 
   useEffect(() => {
+    zoomRef.current = zoom;
     if (documentReady && pageCount > 0) {
+      // The resize observer only reacts to container width, so a zoom change
+      // has to ask for the re-render itself.
+      renderedWidthRef.current = 0;
       void renderPage(pageNumber);
     }
-  }, [documentReady, pageCount, pageNumber, renderPage]);
+  }, [documentReady, pageCount, pageNumber, renderPage, zoom]);
+
+  usePageShortcuts({
+    enabled: documentReady && pageCount > 0,
+    onNext: () => void renderPage(pageNumber + 1),
+    onPrevious: () => void renderPage(pageNumber - 1),
+  });
 
   // Rotating a phone or changing the reader font size resizes the page area.
   // Re-render at the new width so the text layer keeps matching the canvas.
@@ -226,6 +243,35 @@ export function PdfRenderer({
           Previous
         </button>
         <span aria-live="polite" className="text-sm">Page {pageNumber}{pageCount ? ` / ${pageCount}` : ""}</span>
+        <div aria-label="Page zoom" className="flex items-center gap-1" role="group">
+          <button
+            aria-label="Zoom out"
+            className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            disabled={loading || zoom <= MIN_ZOOM}
+            onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Math.round((current - 0.25) * 100) / 100))}
+            type="button"
+          >
+            −
+          </button>
+          <button
+            aria-label={`Zoom, currently ${Math.round(zoom * 100)} percent. Reset to fit width`}
+            className="min-h-11 rounded-lg border border-zinc-300 px-2 text-sm tabular-nums dark:border-zinc-700"
+            disabled={loading}
+            onClick={() => setZoom(1)}
+            type="button"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            aria-label="Zoom in"
+            className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            disabled={loading || zoom >= MAX_ZOOM}
+            onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Math.round((current + 0.25) * 100) / 100))}
+            type="button"
+          >
+            +
+          </button>
+        </div>
         <button
           className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
           disabled={loading || pageNumber >= pageCount}
@@ -235,7 +281,7 @@ export function PdfRenderer({
           Next
         </button>
       </div>
-      <div className="relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800" ref={pageAreaRef}>
+      <div className="relative overflow-auto rounded-xl border border-zinc-200 dark:border-zinc-800" ref={pageAreaRef}>
         <canvas ref={canvasRef} />
         <div className="textLayer" ref={textLayerRef} />
       </div>

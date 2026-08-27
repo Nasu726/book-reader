@@ -1,46 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
-export type ReaderTheme = "light" | "dark";
-export const FONT_SIZE_STORAGE_KEY = "book-reader-font-size";
-export const THEME_STORAGE_KEY = "book-reader-theme";
+import {
+  applyFontScaleToDocument,
+  applyThemeToDocument,
+  FONT_SIZE_STEP,
+  getStoredFontSize,
+  getStoredTheme,
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
+  serverFontSize,
+  serverTheme,
+  setStoredFontSize,
+  setStoredTheme,
+  subscribe,
+  type ReaderTheme,
+} from "./reader-preferences";
 
-function normalizeFontSize(value: string | null): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return 100;
-  }
-  return Math.min(180, Math.max(80, Math.round(parsed)));
-}
+export {
+  FONT_SIZE_STORAGE_KEY,
+  normalizeFontSize,
+  THEME_STORAGE_KEY,
+  type ReaderTheme,
+} from "./reader-preferences";
 
 export function ReaderControls() {
-  const [theme, setTheme] = useState<ReaderTheme>("light");
-  const [fontSize, setFontSize] = useState(100);
+  const theme = useSyncExternalStore(subscribe, getStoredTheme, serverTheme);
+  const fontSize = useSyncExternalStore(subscribe, getStoredFontSize, serverFontSize);
+
+  // Push the stored preferences onto the document. Reading them into state
+  // from an effect would fight React; applying them to the DOM is exactly what
+  // an effect is for, and it also restores a saved theme after a reload, which
+  // the previous version forgot to do.
+  useEffect(() => {
+    applyThemeToDocument(theme);
+  }, [theme]);
 
   useEffect(() => {
-    const storedTheme =
-      localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
-    queueMicrotask(() => {
-      setTheme(storedTheme);
-      setFontSize(
-        normalizeFontSize(localStorage.getItem(FONT_SIZE_STORAGE_KEY)),
-      );
-    });
-  }, []);
+    applyFontScaleToDocument(fontSize);
+  }, [fontSize]);
 
-  function applyTheme(nextTheme: ReaderTheme) {
-    setTheme(nextTheme);
-    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-    document.documentElement.classList.toggle("dark", nextTheme === "dark");
-    document.documentElement.style.colorScheme = nextTheme;
-  }
-
-  function applyFontSize(nextSize: number) {
-    const bounded = Math.min(180, Math.max(80, nextSize));
-    setFontSize(bounded);
-    localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(bounded));
-    document.documentElement.style.fontSize = `${bounded}%`;
+  function stepFontSize(delta: number) {
+    setStoredFontSize(
+      Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fontSize + delta)),
+    );
   }
 
   return (
@@ -48,23 +52,27 @@ export function ReaderControls() {
       <button
         aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
         className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-medium dark:border-zinc-700"
-        onClick={() => applyTheme(theme === "dark" ? "light" : "dark")}
+        onClick={() => setStoredTheme(theme === "dark" ? "light" : "dark" satisfies ReaderTheme)}
         type="button"
       >
         {theme === "dark" ? "Light" : "Dark"}
       </button>
       <div aria-label="Font size" className="flex items-center gap-2" role="group">
         <button
+          aria-label="Decrease text size"
           className="h-11 w-11 rounded-lg border border-zinc-300 text-lg dark:border-zinc-700"
-          onClick={() => applyFontSize(fontSize - 10)}
+          disabled={fontSize <= MIN_FONT_SIZE}
+          onClick={() => stepFontSize(-FONT_SIZE_STEP)}
           type="button"
         >
           -
         </button>
-        <span className="w-14 text-center text-sm">{fontSize}%</span>
+        <span aria-live="polite" className="w-14 text-center text-sm">{fontSize}%</span>
         <button
+          aria-label="Increase text size"
           className="h-11 w-11 rounded-lg border border-zinc-300 text-lg dark:border-zinc-700"
-          onClick={() => applyFontSize(fontSize + 10)}
+          disabled={fontSize >= MAX_FONT_SIZE}
+          onClick={() => stepFontSize(FONT_SIZE_STEP)}
           type="button"
         >
           +

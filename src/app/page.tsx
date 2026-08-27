@@ -7,6 +7,7 @@ import { createSqliteDb } from "@/server/db/client";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { AppShell } from "@/components/app-shell";
+import { LibraryList } from "@/components/library-list";
 
 export default async function Home() {
   const database = createSqliteDb();
@@ -33,28 +34,17 @@ export default async function Home() {
           </form>
           <section aria-label="Library" className="mt-8 space-y-4">
             <h2 className="text-xl font-semibold">Library</h2>
-            {documents.length === 0 ? (
-              <p className="max-w-prose text-zinc-600 dark:text-zinc-400">
-                No documents yet. Import a PDF or EPUB to start reading.
-              </p>
-            ) : (
-              <ul className="space-y-3">
-                {documents.map((document) => (
-                  <li key={document.id}>
-                    <a
-                      className="block rounded-xl border border-zinc-200 p-4 transition hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
-                      href={`/documents/${document.id}`}
-                    >
-                      <span className="font-medium">{document.title}</span>
-                      <span className="ml-2 text-sm uppercase text-zinc-500">{document.format}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <LibraryList
+              documents={documents.map((document) => ({
+                id: document.id,
+                title: document.title,
+                format: document.format,
+                lastOpenedAt: document.lastOpenedAt?.toISOString(),
+              }))}
+            />
           </section>
           <form action="/api/auth/logout" method="post">
-            <button className="mt-8 rounded-lg bg-zinc-900 px-4 py-2 text-white" type="submit">
+            <button className="mt-8 min-h-11 rounded-lg bg-zinc-900 px-4 py-2 text-white dark:bg-zinc-100 dark:text-zinc-900" type="submit">
               Log out
             </button>
           </form>
