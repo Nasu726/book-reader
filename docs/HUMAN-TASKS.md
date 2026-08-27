@@ -24,7 +24,8 @@
 | Worker secrets登録 | 済（2026-08-27） |
 | 独自ドメイン割り当て | 済 `book-reader.nasu.uk` |
 | **Access ログイン画面の組織名** | **未 — H-4b** |
-| **Access ポリシーの選択** | **未 — H-4c（`Cloudflare account` 推奨）** |
+| Access ポリシー | 済（フルUIで作成しWorkerへ適用） |
+| **本番の動作確認** | **未 — H-6b。ここから先は本人にしかできない** |
 | iPhone実機確認 | 未（HUMAN-001） |
 
 `wrangler login` が済んだ時点で、エージェントは認証済みCLIとしてD1・R2の作成やデプロイを実行できる。
@@ -144,7 +145,21 @@ Zero Trust → Access controls → Applications → book-reader の Configure
   → Policies → Include → Emails → 自分のメールアドレス（完全なアドレス）
 ```
 
-**AUD tag はアプリを削除・再作成しない限り変わらない。** ポリシーをどう変更しても `wrangler.jsonc` の設定は有効なままで、再デプロイは不要。
+### AUD tag は予告なく変わることがある
+
+ドキュメントには「アプリケーションを削除・再作成しない限り変わらない」とあるが、**実際に変わった**。フルUIで作ったポリシーを Worker 側へ適用した直後、`74063d23…` から `86696c70…` になっていた（作り直した意識は無かった）。
+
+**症状が分かりにくい。** Access は正常に認証し、アサーションもアプリに届く。アプリ側は audience が一致しないので黙って拒否する。結果は「サインインしてもログイン画面に戻り続ける」だけで、どこが悪いのか手がかりが無い。
+
+**検出方法**
+
+```bash
+npm run check:access
+```
+
+Access が発行している audience と `wrangler.jsonc` の値を突き合わせる。ズレていたら、出力された値を `wrangler.jsonc` に入れて `npx wrangler deploy`。
+
+Access の設定を触った後は、これを実行してから動作確認すること。
 
 ### One-time PIN が届かない場合（メール認証を使うときだけ）
 
