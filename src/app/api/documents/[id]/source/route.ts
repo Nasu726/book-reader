@@ -1,9 +1,8 @@
 
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
-import { createSqliteDb } from "@/server/db/client";
 import { getCurrentUser } from "@/server/auth/current-session";
-import { getDocumentStorage } from "@/server/storage/filesystem-document-storage";
+import { getDatabase } from "@/server/db/database";
+import { getDocumentStorage } from "@/server/storage";
 
 const CONTENT_TYPES = {
   epub: "application/epub+zip",
@@ -14,15 +13,15 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb();
-  const session = await getCurrentUser(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
 
   const { id } = await context.params;
   const source = await createSqliteLibraryRepository(
-    createDrizzleFromSqlite(database),
+    database,
   ).getSource(id, session.userId);
   if (!source) {
     return Response.json({ error: "Document not found." }, { status: 404 });

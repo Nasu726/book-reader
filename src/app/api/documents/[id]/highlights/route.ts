@@ -1,21 +1,20 @@
 
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
 import { parseSelectionLocation } from "@/core/selection/capture";
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
-import { createSqliteDb } from "@/server/db/client";
 import { getCurrentUser } from "@/server/auth/current-session";
+import { getDatabase, type Db } from "@/server/db/database";
 import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 
-function repository(database: ReturnType<typeof createSqliteDb>) {
-  return createSqliteHighlightRepository(createDrizzleFromSqlite(database));
+function repository(database: Db) {
+  return createSqliteHighlightRepository(database);
 }
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb();
-  const session = await getCurrentUser(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
@@ -34,8 +33,8 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb();
-  const session = await getCurrentUser(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }

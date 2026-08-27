@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { createSqliteDb } from "@/server/db/client";
 import { getCurrentUser } from "@/server/auth/current-session";
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
+import { getDatabase } from "@/server/db/database";
 import { detectFormatFromBytes } from "@/core/documents/file-signature";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
-import { getDocumentStorage } from "@/server/storage/filesystem-document-storage";
+import { getDocumentStorage } from "@/server/storage";
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const ALLOWED_TYPES: Record<string, "epub" | "pdf"> = {
@@ -14,19 +13,19 @@ const ALLOWED_TYPES: Record<string, "epub" | "pdf"> = {
 };
 
 export async function GET() {
-  const database = createSqliteDb();
-  const session = await getCurrentUser(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
 
-  const repository = createSqliteLibraryRepository(createDrizzleFromSqlite(database));
+  const repository = createSqliteLibraryRepository(database);
   return Response.json({ documents: await repository.list(session.userId) });
 }
 
 export async function POST(request: Request) {
-  const database = createSqliteDb();
-  const session = await getCurrentUser(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
@@ -73,7 +72,7 @@ export async function POST(request: Request) {
   // pull epub-ts and a server DOM into a Cloudflare Worker that has 10ms of CPU
   // and a 3 MiB bundle to work with.
   const filenameTitle = file.name.replace(/\.(epub|pdf)$/i, "") || file.name;
-  const repository = createSqliteLibraryRepository(createDrizzleFromSqlite(database));
+  const repository = createSqliteLibraryRepository(database);
   const storage = getDocumentStorage();
   const documentId = randomUUID();
   let storedReference: string | undefined;

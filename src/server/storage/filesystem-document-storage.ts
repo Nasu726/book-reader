@@ -86,10 +86,3 @@ export function createFilesystemDocumentStorage(
 
   return { put, get, delete: remove };
 }
-
-let shared: DocumentStorage | undefined;
-
-export function getDocumentStorage(): DocumentStorage {
-  shared ??= createFilesystemDocumentStorage();
-  return shared;
-}

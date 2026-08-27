@@ -1,20 +1,19 @@
 import { redirect } from "next/navigation";
 
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
-import { createSqliteDb } from "@/server/db/client";
 import { getCurrentUser } from "@/server/auth/current-session";
+import { getDatabase } from "@/server/db/database";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { AppShell } from "@/components/app-shell";
 import { LibraryList } from "@/components/library-list";
 
 export default async function Home() {
-  const database = createSqliteDb();
-  const session = await getCurrentUser(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     redirect("/login");
   }
 
-  const libraryRepository = createSqliteLibraryRepository(createDrizzleFromSqlite(database));
+  const libraryRepository = createSqliteLibraryRepository(database);
   const documents = await libraryRepository.list(session.userId);
 
   return (

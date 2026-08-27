@@ -5,29 +5,28 @@ import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-r
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { createSqliteVocabularyRepository } from "@/repositories/sqlite/vocabulary-repository";
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
-import { createSqliteDb } from "@/server/db/client";
 import { getCurrentUser } from "@/server/auth/current-session";
+import { getDatabase } from "@/server/db/database";
 
 type DocumentPageProps = {
   params: Promise<{ id: string }>;
 };
 
 export default async function DocumentPage({ params }: DocumentPageProps) {
-  const database = createSqliteDb();
-  const session = await getCurrentUser(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     redirect("/login");
   }
 
   const { id } = await params;
-  const repository = createSqliteDocumentRepository(createDrizzleFromSqlite(database));
+  const repository = createSqliteDocumentRepository(database);
   const document = await repository.getById(id);
   if (!document || document.userId !== session.userId) {
     notFound();
   }
 
-  await createSqliteLibraryRepository(createDrizzleFromSqlite(database)).markOpened(
+  await createSqliteLibraryRepository(database).markOpened(
     id,
     session.userId,
   );
@@ -39,14 +38,14 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
       documentTitle={document.title}
       documentSourceFilename={document.sourceFilename ?? undefined}
       initialHighlights={(await createSqliteHighlightRepository(
-        createDrizzleFromSqlite(database),
+        database,
       ).listByDocument(id, session.userId)).map((highlight) => ({
         id: highlight.id,
         note: highlight.note,
         selectedText: highlight.selectedText,
       }))}
       initialVocabulary={(await createSqliteVocabularyRepository(
-        createDrizzleFromSqlite(database),
+        database,
       ).listByDocument(id, session.userId)).map((entry) => ({
         id: entry.id,
         meaning: entry.meaning,

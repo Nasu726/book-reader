@@ -33,11 +33,17 @@ function open(path: string) {
   return sqlite;
 }
 
-export function createDb(path: string) {
-  return drizzle(open(path), { schema });
+export function createDb(path: string): Db {
+  // Cast to the shared shape: drizzle's better-sqlite3 builders are promises
+  // like D1's, and the repositories only use the awaited API. See database.ts.
+  return drizzle(open(path), { schema }) as unknown as Db;
 }
 
-export type Db = ReturnType<typeof createDb>;
+// Re-exported so repositories keep importing Db from one place while the
+// definition widens to cover D1; see database.ts.
+import type { Db } from "./database";
+
+export type { Db };
 
 /**
  * The one place that decides where the database lives.

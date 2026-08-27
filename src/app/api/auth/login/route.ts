@@ -1,10 +1,14 @@
 import { createAuthService } from "@/server/auth/service";
+import { getLocalAuthDatabase } from "@/server/auth/current-session";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
-  const { createSqliteDb } = await import("@/server/db/client");
-  const database = createSqliteDb();
+  const database = await getLocalAuthDatabase();
+  if (!database) {
+    // Sign-in is handled ahead of the application by Cloudflare Access.
+    return Response.json({ error: "Not available." }, { status: 404 });
+  }
   const authService = createAuthService(database);
   let credentials: Record<string, FormDataEntryValue>;
   try {

@@ -1,7 +1,6 @@
 import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import type { DocumentRecord } from "@/repositories/types";
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
-import type { createSqliteDb } from "@/server/db/client";
+import type { Db } from "@/server/db/database";
 
 /**
  * The document behind a `/api/documents/[id]/...` route, or null when it does
@@ -13,13 +12,11 @@ import type { createSqliteDb } from "@/server/db/client";
  * against any document id at all.
  */
 export async function requireOwnedDocument(
-  database: ReturnType<typeof createSqliteDb>,
+  database: Db,
   documentId: string,
   userId: string,
 ): Promise<DocumentRecord | null> {
-  const document = await createSqliteDocumentRepository(
-    createDrizzleFromSqlite(database),
-  ).getById(documentId);
+  const document = await createSqliteDocumentRepository(database).getById(documentId);
   return document?.userId === userId ? document : null;
 }
 

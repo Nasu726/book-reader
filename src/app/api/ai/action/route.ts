@@ -3,9 +3,8 @@ import { createSqliteConversationRepository } from "@/repositories/sqlite/conver
 import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { AiProviderError, generateWithRetry } from "@/core/ai/provider";
 import { createAiProvider } from "@/server/ai/provider-factory";
-import { createSqliteDb } from "@/server/db/client";
 import { getCurrentUser } from "@/server/auth/current-session";
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
+import { getDatabase } from "@/server/db/database";
 
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_CHARACTERS = 8_000;
@@ -13,8 +12,8 @@ const MAX_PROMPT_CHARACTERS = 20_000;
 const MAX_CONTEXT_CHARACTERS = 40_000;
 
 export async function POST(request: Request) {
-  const database = createSqliteDb();
-  const session = await getCurrentUser(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
@@ -43,11 +42,11 @@ export async function POST(request: Request) {
   }
 
   const conversationRepository = createSqliteConversationRepository(
-    createDrizzleFromSqlite(database),
+    database,
   );
   const documentId = typeof input.documentId === "string" ? input.documentId : null;
   const document = documentId
-    ? await createSqliteDocumentRepository(createDrizzleFromSqlite(database)).getById(documentId)
+    ? await createSqliteDocumentRepository(database).getById(documentId)
     : null;
   const ownedDocument = document?.userId === session.userId ? document : null;
 
@@ -125,8 +124,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const database = createSqliteDb();
-  const session = await getCurrentUser(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
@@ -137,14 +136,14 @@ export async function GET(request: Request) {
   }
 
   const document = await createSqliteDocumentRepository(
-    createDrizzleFromSqlite(database),
+    database,
   ).getById(documentId);
   if (document?.userId !== session.userId) {
     return Response.json({ error: "Document not found." }, { status: 404 });
   }
 
   const conversationRepository = createSqliteConversationRepository(
-    createDrizzleFromSqlite(database),
+    database,
   );
   const conversationId = await conversationRepository.getByDocument(documentId, session.userId);
   const messages = conversationId
