@@ -6,12 +6,10 @@ import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { createSqliteDb } from "@/server/db/client";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
-import { AiAnswerPanel } from "@/components/ai-answer-panel";
 import { AppShell } from "@/components/app-shell";
-import { PdfRenderer } from "@/components/pdf-renderer";
 
 export default async function Home() {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const authService = createAuthService(database);
   const session = authService.getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,
@@ -22,17 +20,12 @@ export default async function Home() {
 
   const libraryRepository = createSqliteLibraryRepository(createDrizzleFromSqlite(database));
   const documents = await libraryRepository.list(session.userId);
-  const selectedText = "";
 
   return (
     <AppShell
-      secondary={selectedText ? <AiAnswerPanel selection={null} /> : undefined}
       reader={
         <>
           <h1 className="text-3xl font-semibold tracking-tight">AI Reader</h1>
-          <div className="mt-6">
-            <PdfRenderer />
-          </div>
           <form action="/api/documents" className="mt-6 space-y-3" encType="multipart/form-data" method="post">
             <label className="block text-sm font-medium" htmlFor="document-file">Import PDF or EPUB</label>
             <input accept=".epub,.pdf,application/epub+zip,application/pdf" className="w-full" id="document-file" name="file" required type="file" />

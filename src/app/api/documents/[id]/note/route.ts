@@ -29,7 +29,7 @@ export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const session = await authenticate(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
@@ -47,7 +47,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const session = await authenticate(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });

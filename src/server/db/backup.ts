@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-import { createSqliteDb } from "./client";
+import { openOwnedSqliteDb } from "./client";
 
 export async function backupDatabase(databasePath: string, backupPath: string): Promise<void> {
   const resolvedDatabasePath = resolve(databasePath);
@@ -11,7 +11,7 @@ export async function backupDatabase(databasePath: string, backupPath: string): 
   }
 
   await mkdir(dirname(resolvedBackupPath), { recursive: true });
-  const database = createSqliteDb(resolvedDatabasePath);
+  const database = openOwnedSqliteDb(resolvedDatabasePath);
   try {
     await database.backup(resolvedBackupPath);
   } finally {

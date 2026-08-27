@@ -3,10 +3,20 @@ import type { Db } from "./client.js";
 
 type SqliteMigratable = Database | Db;
 
+/**
+ * Connections whose schema is already current.
+ *
+ * Every route handler calls migrate() through createAuthService, so without
+ * this the whole schema was re-declared on every single request.
+ */
+const migrated = new WeakSet<Database>();
+
 export function migrate(database: SqliteMigratable) {
   const db = (
     "$client" in database ? database.$client : database
   ) as Database;
+  if (migrated.has(db)) return;
+  migrated.add(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY,

@@ -18,6 +18,7 @@ type ParsedEpub = {
     id: string;
     title?: string;
     content: string;
+    html?: string;
   }[];
 };
 
@@ -64,7 +65,6 @@ export function DocumentReader({
   format,
   onSelectionChange,
 }: DocumentReaderProps) {
-  const [source, setSource] = useState<string | null>(null);
   const [epub, setEpub] = useState<ParsedEpub | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
@@ -106,21 +106,9 @@ export function DocumentReader({
     if (restoredSectionIndex > 0) setSectionIndex(restoredSectionIndex);
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    async function open() {
-      try {
-        const response = await fetch(`/api/documents/${documentId}/source`, { cache: "no-store" });
-        if (!response.ok) throw new Error("The document could not be opened.");
-        const payload = (await response.json()) as { data: string };
-        if (!cancelled) setSource(payload.data);
-      } catch {
-        if (!cancelled) setError("The document could not be opened.");
-      }
-    }
-    void open();
-    return () => { cancelled = true; };
-  }, [documentId]);
+  // The renderer streams the bytes straight from this URL, so there is nothing
+  // to fetch here; a missing document surfaces as the renderer's own error.
+  const source = `/api/documents/${documentId}/source`;
 
   useEffect(() => {
     if (format !== "epub") return;
@@ -181,9 +169,14 @@ export function DocumentReader({
           <span className="text-sm">{sectionIndex + 1} / {epub.sections.length}</span>
           <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => { setHasUserNavigated(true); setSectionIndex(sectionIndex + 1); }} type="button">Next</button>
         </div>
-        <article className="max-w-prose whitespace-pre-wrap rounded-xl border border-zinc-200 p-4 dark:border-zinc-800" data-reader-section={section.id}>
-          {section.title && <h2 className="mb-3 text-xl font-semibold">{section.title}</h2>}
-          {section.content}
+        <article className="reader-prose max-w-prose rounded-xl border border-zinc-200 p-4 dark:border-zinc-800" data-reader-section={section.id}>
+          {/* The nav label is only shown when the chapter body carries no heading of its own. */}
+          {section.title && !/<h[1-6]>/.test(section.html ?? "") && (
+            <h2 className="mb-3 text-xl font-semibold">{section.title}</h2>
+          )}
+          {section.html
+            ? <div dangerouslySetInnerHTML={{ __html: section.html }} />
+            : <div className="whitespace-pre-wrap">{section.content}</div>}
         </article>
         {progress.saveError && (
           <div className="flex items-center justify-between gap-3 rounded-lg border border-red-300 p-3 text-sm" role="alert">
@@ -197,7 +190,7 @@ export function DocumentReader({
       </section>
     );
   }
-  if (!source) return <p aria-live="polite">Opening…</p>;
+
   if (format === "pdf") {
     return (
       <PdfRenderer
