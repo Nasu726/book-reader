@@ -5,6 +5,7 @@ import {
   issueSession,
   migrateSessions,
   revokeAllSessions,
+  revokeSession,
 } from "./session-store.ts";
 import type { Database } from "better-sqlite3";
 
@@ -64,7 +65,12 @@ export function createAuthService(database: Database) {
     getSessionUser(token: string | undefined) {
       return getSessionUser(database, token);
     },
-    logout(userId: string) {
+    /** Signs out the device holding this token. */
+    logout(token: string | undefined) {
+      revokeSession(database, token);
+    },
+    /** Signs out every device, for use when a credential is believed compromised. */
+    logoutEverywhere(userId: string) {
       revokeAllSessions(database, userId);
     },
   };

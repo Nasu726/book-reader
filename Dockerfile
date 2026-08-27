@@ -15,6 +15,7 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     DATABASE_PATH=/data/book-reader.db \
+    DOCUMENT_STORAGE_DIR=/data/documents \
     PORT=3000
 RUN mkdir -p /data && chown node:node /data
 COPY --from=dependencies /app/node_modules ./node_modules

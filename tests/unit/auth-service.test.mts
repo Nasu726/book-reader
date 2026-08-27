@@ -77,14 +77,61 @@ test("rate limiting rejects excessive authentication attempts", async () => {
   );
 });
 
-test("logout invalidates all sessions for the single user", async () => {
-  const session = await service.authenticate({
+test("logout ends only the device that signed out", async () => {
+  const phone = await service.authenticate({
     username: "reader",
     password: "correct-password",
     clientKey: "logout-client",
   });
-  assert.ok(session);
-  service.logout(session.userId);
+  const laptop = await service.authenticate({
+    username: "reader",
+    password: "correct-password",
+    clientKey: "logout-client",
+  });
+  assert.ok(phone);
+  assert.ok(laptop);
+  assert.notEqual(phone.token, laptop.token);
 
-  assert.equal(service.getSessionUser(session.token), null);
+  service.logout(phone.token);
+
+  assert.equal(service.getSessionUser(phone.token), null);
+  assert.deepEqual(service.getSessionUser(laptop.token), { userId: "reader" });
+});
+
+test("signing in on a second device keeps the first one signed in", async () => {
+  const first = await service.authenticate({
+    username: "reader",
+    password: "correct-password",
+    clientKey: "multi-device-client",
+  });
+  assert.ok(first);
+  const second = await service.authenticate({
+    username: "reader",
+    password: "correct-password",
+    clientKey: "multi-device-client",
+  });
+  assert.ok(second);
+
+  assert.deepEqual(service.getSessionUser(first.token), { userId: "reader" });
+  assert.deepEqual(service.getSessionUser(second.token), { userId: "reader" });
+});
+
+test("logoutEverywhere revokes every device for the user", async () => {
+  const phone = await service.authenticate({
+    username: "reader",
+    password: "correct-password",
+    clientKey: "revoke-all-client",
+  });
+  const laptop = await service.authenticate({
+    username: "reader",
+    password: "correct-password",
+    clientKey: "revoke-all-client",
+  });
+  assert.ok(phone);
+  assert.ok(laptop);
+
+  service.logoutEverywhere("reader");
+
+  assert.equal(service.getSessionUser(phone.token), null);
+  assert.equal(service.getSessionUser(laptop.token), null);
 });

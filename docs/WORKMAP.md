@@ -339,6 +339,9 @@ PDF表示とtext layerを実装する。表示と抽出処理は分離する。
 - page navigation works
 - text selection produces normalized candidate string
 - renderer failure does not corrupt extraction pipeline
+- canvas and text layer share one display scale
+- pdf.js text layer stylesheet is loaded, so text runs are positioned
+- `tests/e2e/pdf.spec.ts` asserts the two geometries agree
 
 ---
 
@@ -922,6 +925,8 @@ Evidence: The vocabulary schema stores arbitrary terms and phrases with meaning,
 ### Decision
 
 - Immediate stable dogfooding: a Node.js host with a persistent SQLite volume, running the existing `next build && next start` flow.
+- Document bytes live on disk behind the `DocumentStorage` boundary (`DOCUMENT_STORAGE_DIR`, default `./data/documents`), not inside SQLite. The database holds only an opaque reference, so the store can be swapped for object storage without touching repositories, routes, or the UI. Documents imported before this change are still readable: references beginning with `data:` are decoded in place.
+- `npm run db:backup` covers the database only. The document directory must be backed up alongside it.
 - GitHub Pages is rejected because authenticated dynamic APIs, uploads, SQLite, cookies, and server-side AI proxying are required.
 - Cloudflare Pages static export is rejected for the same reason.
 - A strict free-tier Cloudflare path requires Workers + D1 + R2 and a storage-layer refactor; defer it unless the user explicitly wants that migration.
@@ -974,6 +979,39 @@ Evidence:
 ---
 
 # 15. Human acceptance
+
+## QUALITY-001 — Reader defects found on handover
+**Status:** DONE
+**Priority:** P0
+**Depends on:** E2E-001
+
+### Goal
+
+引き継ぎ時に実機起動で発見された、自動検証を素通りしていた欠陥を修正する。
+
+### Findings
+
+すべて lint / typecheck / unit / E2E / build が緑の状態で存在していた。
+
+- PDFのtext layerがcanvasと別スケールで配置され、さらにpdf.jsのtext layer CSSが未読込だった。本文が二重に見え、選択位置が一致しない
+- ライブラリ画面が`PdfRenderer`のdefault propに埋め込まれたサンプルPDFを表示していた
+- EPUB本文を`documentElement.textContent`で平坦化し、`<head><title>`混入と段落境界の消失が起きていた
+- EPUBのメタデータtitle / creatorを取得済みなのに破棄し、常にファイル名を採用していた
+- login画面の入力欄に可視ラベルが無かった
+- `auth_sessions.user_id`がUNIQUEで、端末を1台しか維持できなかった。logoutは全端末を破棄していた
+- AIパネルがsidebarとmobile drawerで二重描画され、全element idが重複していた
+- OpenRouterアダプタがHTTP 429をretryable判定していなかった
+- 全routeが毎リクエストでSQLite接続を開き直しmigrationを再実行していた
+- uploadのformat判定がclient申告のMIMEのみだった
+- `pdf.spec.ts` / `ai-answer.spec.ts`の全assertionが`if (await locator.isVisible())`の内側にあり、対象が消えると何も検証せず緑になった
+
+### Done when
+
+- 上記すべてが修正されている
+- 各修正に、その欠陥が再発したとき赤くなる自動テストがある
+- text layer幾何とowner scopingはmutation testで検出を確認済み
+
+---
 
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
@@ -1235,3 +1273,9 @@ YYYY-MM-DD — TASK-ID
 2026-08-24 — Release readiness documentation and CI
 - Result: Added setup, environment, migration, verification, SQLite backup/restore guidance, explicit current human/deployment boundaries, a `db:migrate` script, and GitHub Actions verification covering lint, typecheck, unit tests, Chromium E2E, and production build on pushes to main and pull requests.
 - Verification: migration smoke test, password-hash command check, workflow content check, lint, typecheck, 66 unit tests, 20 Chromium E2E tests, production Webpack build via `npm run verify`.
+
+2026-08-27 — QUALITY-001
+- Result: Fixed the reader defects found by running the application at handover. PDF now shares one display scale between canvas and text layer and loads pdf.js's text layer stylesheet; the sample PDF is gone from the library page; EPUB chapters are sanitized through an allowlist and rendered as authored structure, with the EPUB's own title and author used at import; login inputs have visible labels; sessions are per device; the AI panel is rendered once; HTTP 429 is retryable with backoff; documents live behind a filesystem-backed `DocumentStorage` boundary and stream as bytes; uploads are verified against their leading bytes; connections and migrations are shared per database path.
+- Verification: lint, typecheck, 97 unit tests, 26 Chromium E2E tests, production Webpack build. Live smoke test passed against OpenRouter `nvidia/nemotron-3-super-120b-a12b:free`.
+- Important decision: every one of these shipped with a fully green suite. `pdf.spec.ts` and `ai-answer.spec.ts` had wrapped all assertions in `if (await locator.isVisible())`, which passes when the element is absent. Assertions are now unconditional, and the text-layer geometry check and owner scoping were confirmed by mutation — reintroducing each defect turns the corresponding test red.
+- Follow-up: iPhone Safari verification remains HUMAN-001. Streaming AI responses and EPUB image rendering are still unimplemented.

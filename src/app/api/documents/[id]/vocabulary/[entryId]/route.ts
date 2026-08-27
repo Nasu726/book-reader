@@ -10,7 +10,7 @@ export async function DELETE(
   _request: Request,
   context: { params: Promise<{ id: string; entryId: string }> },
 ) {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const session = createAuthService(database).getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,
   );

@@ -16,7 +16,7 @@ type DocumentPageProps = {
 };
 
 export default async function DocumentPage({ params }: DocumentPageProps) {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const authService = createAuthService(database);
   const session = authService.getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,

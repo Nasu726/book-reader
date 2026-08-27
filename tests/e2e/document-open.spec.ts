@@ -1,36 +1,39 @@
 import { expect, test } from "@playwright/test";
 
+import { importDocument, login, MULTIPAGE_PDF } from "./helpers";
+
 test("library links authenticated users to the document route", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByLabel("Username").fill("e2e-reader");
-  await page.getByLabel("Password").fill("e2e-reader-password");
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page).toHaveURL("/");
+  await login(page);
+  const documentId = await importDocument(page, "linked.pdf", MULTIPAGE_PDF, "application/pdf");
+
   const library = page.getByRole("region", { name: "Library" });
-  if (await library.getByRole("link").count()) {
-    await library.getByRole("link").first().click();
-    await expect(page).toHaveURL(/\/documents\//);
-  } else {
+  await library.getByRole("link", { name: /linked/ }).click();
+  await expect(page).toHaveURL(`/documents/${documentId}`);
+});
+
+test("the library shows a useful empty state before anything is imported", async ({ page }) => {
+  await login(page);
+  const library = page.getByRole("region", { name: "Library" });
+  const links = await library.getByRole("link").count();
+  if (links === 0) {
     await expect(library).toContainText("No documents yet");
   }
 });
 
-test("document route reports unavailable stored sources safely", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByLabel("Username").fill("e2e-reader");
-  await page.getByLabel("Password").fill("e2e-reader-password");
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page).toHaveURL("/");
-  const response = await page.request.get("/api/documents/missing-document/source");
-  expect(response.status()).toBe(404);
+test("document sources and routes stay private to their owner", async ({ page }) => {
+  await login(page);
+
+  expect((await page.request.get("/api/documents/missing-document/source")).status()).toBe(404);
+  expect((await page.request.get("/api/documents/missing-document/parse")).status()).toBe(404);
+
+  // A signed-out client must not reach a real document either.
+  const documentId = await importDocument(page, "private.pdf", MULTIPAGE_PDF, "application/pdf");
+  await page.request.post("/api/auth/logout");
+  expect((await page.request.get(`/api/documents/${documentId}/source`)).status()).toBe(401);
 });
 
 test("progress API validates and persists stable locations", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByLabel("Username").fill("e2e-reader");
-  await page.getByLabel("Password").fill("e2e-reader-password");
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page).toHaveURL("/");
+  await login(page);
 
   const invalid = await page.request.post("/api/documents/missing-document/progress", {
     data: { location: "" },
@@ -38,41 +41,24 @@ test("progress API validates and persists stable locations", async ({ page }) =>
   expect(invalid.status()).toBe(400);
 });
 
-test("PDF sample exposes selectable text and captures normalized intent", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/login");
-  await page.getByLabel("Username").fill("e2e-reader");
-  await page.getByLabel("Password").fill("e2e-reader-password");
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page).toHaveURL("/");
-  await expect(page.getByRole("region", { name: "PDF reader" }).getByText("Sample PDF text.")).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole("region", { name: "PDF reader" }).getByRole("region", { name: "PDF selection preview" })).toBeVisible();
+test("the source route streams document bytes rather than a base64 payload", async ({ page }) => {
+  await login(page);
+  const documentId = await importDocument(page, "streamed.pdf", MULTIPAGE_PDF, "application/pdf");
+
+  const response = await page.request.get(`/api/documents/${documentId}/source`);
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toBe("application/pdf");
+
+  const body = await response.body();
+  expect(body.byteLength).toBe(MULTIPAGE_PDF.byteLength);
+  expect(body.subarray(0, 5).toString("latin1")).toBe("%PDF-");
 });
 
-test("selection actions preserve captured PDF intent", async ({ page }) => {
+test("PDF selection exposes selectable text and captures normalized intent", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/login");
-  await page.getByLabel("Username").fill("e2e-reader");
-  await page.getByLabel("Password").fill("e2e-reader-password");
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page).toHaveURL("/");
-
-  const samplePdf = Buffer.from(
-    "JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNjEyIDc5Ml0vUmVzb3VyY2VzPDwvRm9udDw8L0YxIDUgMCBSPj4+Pj5lbmRvYmoKNSAwIG9iajw8L1R5cGUvRm9udC9TdWJ0eXBlL1R5cGUxL0Jhc2VGb250L0hlbHZldGljYT4+ZW5kb2JqCnRyYWlsZXI8PC9Sb290IDEgMCBSPj4lRU9G",
-    "base64",
-  );
-  await page.setInputFiles("#document-file", {
-    buffer: samplePdf,
-    mimeType: "application/pdf",
-    name: "selection-sample.pdf",
-  });
-  await page.getByRole("button", { name: "Import", exact: true }).click();
-  await expect(page).toHaveURL("/");
-  const documents = await page.request.get("/api/documents");
-  const { documents: records } = (await documents.json()) as {
-    documents: { id: string }[];
-  };
-  await page.goto(`/documents/${records.at(-1)!.id}`);
+  await login(page);
+  const documentId = await importDocument(page, "selection.pdf", MULTIPAGE_PDF, "application/pdf");
+  await page.goto(`/documents/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(reader).toBeVisible({ timeout: 10_000 });
@@ -84,43 +70,43 @@ test("selection actions preserve captured PDF intent", async ({ page }) => {
 
 test("PDF selection highlights persist and can be deleted", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/login");
-  await page.getByLabel("Username").fill("e2e-reader");
-  await page.getByLabel("Password").fill("e2e-reader-password");
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page).toHaveURL("/");
+  await login(page);
+  const documentId = await importDocument(page, "highlighted.pdf", MULTIPAGE_PDF, "application/pdf");
 
-  const samplePdf = Buffer.from(
-    "JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNjEyIDc5Ml0vUmVzb3VyY2VzPDwvRm9udDw8L0YxIDUgMCBSPj4+Pj5lbmRvYmoKNSAwIG9iajw8L1R5cGUvRm9udC9TdWJ0eXBlL1R5cGUxL0Jhc2VGb250L0hlbHZldGljYT4+ZW5kb2JqCnRyYWlsZXI8PC9Sb290IDEgMCBSPj4lRU9G",
-    "base64",
-  );
-  await page.setInputFiles("#document-file", {
-    buffer: samplePdf,
-    mimeType: "application/pdf",
-    name: "persisted-highlight.pdf",
-  });
-  await page.getByRole("button", { name: "Import", exact: true }).click();
-  await expect(page).toHaveURL("/");
-  const documents = await page.request.get("/api/documents");
-  const { documents: records } = (await documents.json()) as {
-    documents: { id: string }[];
-  };
-
-  const created = await page.request.post(`/api/documents/${records.at(-1)!.id}/highlights`, {
+  const created = await page.request.post(`/api/documents/${documentId}/highlights`, {
     data: {
       format: "pdf",
       location: JSON.stringify({ page: 1, source: "text-layer-viewport", version: 1 }),
-      selectedText: "Sample PDF text.",
+      selectedText: "A Role for History",
     },
   });
   expect(created.status()).toBe(201);
 
-  await page.goto(`/documents/${records.at(-1)!.id}`);
+  await page.goto(`/documents/${documentId}`);
   const savedHighlights = page.getByRole("region", { name: "Saved highlights" });
-  await expect(savedHighlights.getByText("Sample PDF text.")).toBeVisible();
+  await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
   await page.reload();
-  await expect(savedHighlights.getByText("Sample PDF text.")).toBeVisible();
+  await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
 
   await savedHighlights.getByRole("button", { name: /Delete highlight/ }).click();
   await expect(savedHighlights.getByText("No saved highlights.")).toBeVisible();
+});
+
+test("uploads whose bytes do not match their declared type are rejected", async ({ page }) => {
+  await login(page);
+
+  const disguised = await page.request.post("/api/documents", {
+    multipart: {
+      file: {
+        buffer: Buffer.from("#!/bin/sh\necho not a document\n"),
+        mimeType: "application/pdf",
+        name: "disguised.pdf",
+      },
+    },
+  });
+  expect(disguised.status()).toBe(415);
+
+  const library = await page.request.get("/api/documents");
+  const { documents } = (await library.json()) as { documents: { sourceFilename?: string }[] };
+  expect(documents.some((document) => document.sourceFilename === "disguised.pdf")).toBe(false);
 });

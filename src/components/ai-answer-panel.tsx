@@ -9,6 +9,7 @@ import {
   type AiAction,
 } from "@/core/ai/action-service";
 import type { DocumentSelection } from "@/core/selection/capture";
+import { AnswerText } from "./answer-text";
 import type { AiProvider, AiRequest, AiResponse } from "@/core/ai/provider";
 
 type AiAnswerPanelProps = {
@@ -191,8 +192,8 @@ export function AiAnswerPanel({
           history.length > 0 ? (
             <div className="space-y-4">
               {history.map((entry, index) => (
-                <section aria-label="AI response" className="whitespace-pre-wrap" key={`${entry.action}-${index}`}>
-                  {entry.text}
+                <section aria-label="AI response" key={`${entry.action}-${index}`}>
+                  <AnswerText>{entry.text}</AnswerText>
                 </section>
               ))}
             </div>

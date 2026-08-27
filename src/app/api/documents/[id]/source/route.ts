@@ -5,12 +5,18 @@ import { createAuthService } from "@/server/auth/service";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { createSqliteDb } from "@/server/db/client";
+import { getDocumentStorage } from "@/server/storage/filesystem-document-storage";
+
+const CONTENT_TYPES = {
+  epub: "application/epub+zip",
+  pdf: "application/pdf",
+} as const;
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const authService = createAuthService(database);
   const session = authService.getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,
@@ -20,11 +26,26 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const source = await createSqliteLibraryRepository(createDrizzleFromSqlite(database)).getSource(id, session.userId);
+  const source = await createSqliteLibraryRepository(
+    createDrizzleFromSqlite(database),
+  ).getSource(id, session.userId);
   if (!source) {
     return Response.json({ error: "Document not found." }, { status: 404 });
   }
-  return Response.json(source, {
-    headers: { "cache-control": "private, no-store" },
+
+  const stored = await getDocumentStorage().get(source.data);
+  if (!stored) {
+    return Response.json({ error: "Document not found." }, { status: 404 });
+  }
+
+  // Streamed as bytes: a base64 payload would cost a third more transfer and
+  // force the whole document through memory on both ends.
+  return new Response(stored.stream, {
+    headers: {
+      "cache-control": "private, no-store",
+      "content-length": String(stored.size),
+      "content-type": CONTENT_TYPES[source.format] ?? stored.contentType,
+      "x-content-type-options": "nosniff",
+    },
   });
 }

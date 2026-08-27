@@ -1,70 +1,88 @@
 import { expect, test } from "@playwright/test";
-import assert from "node:assert/strict";
+
+import { buildEpub, importDocument, login } from "./helpers";
+
+async function openEpub(page: import("@playwright/test").Page) {
+  await login(page);
+  const documentId = await importDocument(
+    page,
+    "ai-answer.epub",
+    await buildEpub(),
+    "application/epub+zip",
+  );
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible({ timeout: 10_000 });
+}
 
 test("AI actions render in the desktop secondary pane", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await openEpub(page);
 
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
-  if (await secondary.isVisible()) {
-    await expect(secondary.getByRole("group", { name: "AI actions" })).toBeVisible();
-    const box = await secondary.boundingBox();
-    assert.ok(box);
-    assert.equal(
-      await secondary.evaluate((element) => {
-        const style = getComputedStyle(element);
-        return element.scrollHeight > element.clientHeight && style.overflowY === "auto";
-      }),
-      false,
-    );
+  await expect(secondary).toBeVisible();
+  const actions = secondary.getByRole("group", { name: "AI actions" });
+  await expect(actions).toBeVisible();
+  for (const action of ["Explain", "Translate", "Simplify", "Ask", "Highlight"]) {
+    await expect(actions.getByRole("button", { name: action, exact: true })).toBeVisible();
   }
+});
+
+test("the AI panel exists exactly once, so its labels stay wired to its own inputs", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openEpub(page);
+  await page.getByRole("button", { name: "AI", exact: true }).click();
+
+  // Duplicated ids silently break every label association on the page.
+  const duplicates = await page.evaluate(() => {
+    const seen = new Map<string, number>();
+    for (const element of document.querySelectorAll("[id]")) {
+      seen.set(element.id, (seen.get(element.id) ?? 0) + 1);
+    }
+    return [...seen].filter(([, count]) => count > 1).map(([id]) => id);
+  });
+  expect(duplicates).toEqual([]);
 });
 
 test("desktop panes scroll independently", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 700 });
-  await page.goto("/login");
+  await openEpub(page);
 
-  const reader = page.getByRole("region", { name: "Reader" });
+  const reader = page.getByRole("region", { name: "Reader", exact: true });
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
-  if (await reader.isVisible()) {
-    await reader.evaluate((element) => {
-      for (let index = 0; index < 80; index += 1) {
-        const paragraph = document.createElement("p");
-        paragraph.textContent = `Reader filler ${index}`;
-        element.append(paragraph);
-      }
-    });
-  }
-  if (await secondary.isVisible()) {
-    await secondary.evaluate((element) => {
-      for (let index = 0; index < 40; index += 1) {
-        const paragraph = document.createElement("p");
-        paragraph.textContent = `Notes filler ${index}`;
-        element.append(paragraph);
-      }
-    });
+  await expect(reader).toBeVisible();
+  await expect(secondary).toBeVisible();
+
+  // Both panes must own their scrolling, so a long AI answer never pushes the
+  // book text off screen.
+  for (const pane of [reader, secondary]) {
+    expect(
+      await pane.evaluate((element) => getComputedStyle(element).overflowY),
+    ).toBe("auto");
   }
 
-  if (await secondary.isVisible()) {
-    await expect(async () => {
-      const boxes = await Promise.all([
-        page.getByRole("region", { name: "Reader" }).boundingBox(),
-        secondary.boundingBox(),
-      ]);
-      assert.ok(boxes[0]);
-      assert.ok(boxes[1]);
-      assert.ok(Math.abs((boxes[0]?.y ?? 0) - (boxes[1]?.y ?? 0)) < 2);
-    }).toPass();
-  }
+  const boxes = await Promise.all([reader.boundingBox(), secondary.boundingBox()]);
+  expect(boxes[0]).not.toBeNull();
+  expect(boxes[1]).not.toBeNull();
+  expect(Math.abs((boxes[0]!.y ?? 0) - (boxes[1]!.y ?? 0))).toBeLessThan(2);
 });
 
 test("mobile drawer preserves a scrollable AI response and returns to the Reader", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  const drawer = page.getByRole("dialog", { name: "AI drawer" });
+  await openEpub(page);
 
-  if (await drawer.isVisible()) {
-    await expect(drawer.getByLabel("Follow-up question")).toBeVisible();
-    await expect(drawer.getByRole("button", { name: "Back to Reader" })).toBeVisible();
-  }
+  // The secondary pane is hidden on narrow viewports; the drawer is the only
+  // way to reach the AI actions without losing the reading position.
+  await expect(page.getByRole("complementary", { name: "AI and notes" })).toBeHidden();
+  await page.getByRole("button", { name: "AI", exact: true }).click();
+
+  const drawer = page.getByRole("dialog", { name: "AI drawer" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByLabel("Follow-up question")).toBeVisible();
+  await expect(
+    drawer.getByRole("group", { name: "AI actions" }).getByRole("button", { name: "Explain" }),
+  ).toBeVisible();
+
+  await drawer.getByRole("button", { name: "Back to Reader" }).click();
+  await expect(drawer).toBeHidden();
+  await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible();
 });

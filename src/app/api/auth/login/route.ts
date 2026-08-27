@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
   const { createSqliteDb } = await import("@/server/db/client");
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const authService = createAuthService(database);
   let credentials: Record<string, FormDataEntryValue>;
   try {

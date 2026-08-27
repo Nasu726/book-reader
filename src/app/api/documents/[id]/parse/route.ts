@@ -1,24 +1,18 @@
-import { parseHTML } from "linkedom";
-
-import { EpubParser } from "@/core/documents/epub-parser";
+import { readStoredBytes } from "@/core/documents/storage";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { createAuthService } from "@/server/auth/service";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { createSqliteDb } from "@/server/db/client";
+import { parseEpub } from "@/server/documents/epub";
+import { getDocumentStorage } from "@/server/storage/filesystem-document-storage";
 import { cookies } from "next/headers";
-
-class LinkedomTextParser {
-  parseFromString(markup: string) {
-    return parseHTML(markup).document;
-  }
-}
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb(process.env.DATABASE_PATH ?? "book-reader.db");
+  const database = createSqliteDb();
   const authService = createAuthService(database);
   const session = authService.getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,
@@ -39,10 +33,12 @@ export async function GET(
   }
 
   try {
-    const response = await fetch(source.data);
-    const data = await response.arrayBuffer();
-    const parsed = await new EpubParser(LinkedomTextParser).parse(
-      data,
+    const stored = await getDocumentStorage().get(source.data);
+    if (!stored) {
+      return Response.json({ error: "Document not found." }, { status: 404 });
+    }
+    const parsed = await parseEpub(
+      await readStoredBytes(stored),
       source.filename ?? "document.epub",
     );
     return Response.json(parsed, {
