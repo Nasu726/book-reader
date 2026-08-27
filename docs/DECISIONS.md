@@ -299,7 +299,10 @@ One-time PIN は **Access ポリシーで許可されたアドレスにしか送
 ## D-17. Access ポリシーはアドレス単位で書く。ドメイン単位は使わない
 
 **判断**
-`Include → Emails`（API上は `email`）に完全なメールアドレスを列挙する。`Emails ending in`（`email_domain`）は使わない。
+許可は「自分ひとり」に絞る。Worker の Access タブなら `Cloudflare account`、Zero Trust のフルUIなら `Include → Emails`（API上は `email`）にアドレスを列挙する。**ドメインセレクタ（`email_domain`）は使わない。**
+
+**UIによって選択肢が違う**
+Worker の Access タブは簡易版で `Cloudflare account` と `Email domain` しか選べない。アドレス単位の `Emails` はフルUI（`Zero Trust → Access controls → Applications → Configure → Policies`）にしかない。個人アカウントなら `Cloudflare account` がメンバー＝自分1人を意味するので、簡易版のままで目的を達成でき、One-time PIN も不要になる。
 
 **理由**
 ドメインセレクタは「自組織のドメインに属する全員を許可する」ための機能で、`@example.co.jp` のような**自分が所有するドメイン**を前提にしている。`@gmail.com` を入れると、世界中の Gmail アカウント保持者がこのリーダーに入れる。公開メールプロバイダのアドレスで運用する個人アプリでは、ドメイン単位の許可は「認証を掛けていない」のとほぼ同義になる。

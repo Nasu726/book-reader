@@ -24,7 +24,7 @@
 | Worker secrets登録 | 済（2026-08-27） |
 | 独自ドメイン割り当て | 済 `book-reader.nasu.uk` |
 | **Access ログイン画面の組織名** | **未 — H-4b** |
-| **One-time PIN が届かない** | **調査中 — H-4c** |
+| **Access ポリシーの選択** | **未 — H-4c（`Cloudflare account` 推奨）** |
 | iPhone実機確認 | 未（HUMAN-001） |
 
 `wrangler login` が済んだ時点で、エージェントは認証済みCLIとしてD1・R2の作成やデプロイを実行できる。
@@ -109,32 +109,49 @@ Zero Trust → Custom pages → Team name and domain
 
 ---
 
-## H-4c. Access ポリシーの設定（One-time PIN が届かない件）
+## H-4c. Access ポリシーの設定
 
-### 最重要: ドメインセレクタを公開メールプロバイダに使わない
+### UIが2つあり、選択肢が違う
 
-Access のメール関連セレクタは2つあり、意味がまったく違う。
+同じ「Accessのポリシー」でも、どこから触るかで選べるものが変わる。
 
-| セレクタ | API名 | マッチ対象 |
-|---|---|---|
-| **Emails** | `email` | 列挙した**そのアドレスだけ** |
-| **Emails ending in** | `email_domain` | **そのドメインの全アカウント** |
+| 入口 | 選べるポリシー |
+|---|---|
+| **Workers & Pages → book-reader → Access タブ**（簡易版） | `Cloudflare account` / `Email domain` の2つだけ |
+| **Zero Trust → Access controls → Applications → Configure → Policies**（フル版） | `Include → Emails`（アドレス単位）を含む全セレクタ |
 
-`Emails ending in` に `@gmail.com` を入れると、**世界中の Gmail アカウントがこのリーダーに入れる**。ドメインセレクタは自分の組織が所有するドメイン（`@example.co.jp` など）専用の機能であり、`gmail.com` / `outlook.com` / `icloud.com` のような公開プロバイダには使ってはいけない。
+`Include → Emails` はフル版の用語。Worker の Access タブには**存在しない**。
 
-**正しい設定**
+### 推奨: `Cloudflare account` を選ぶ
+
+Worker の Access タブで `Cloudflare account` を選ぶと、**この Cloudflare アカウントのメンバーだけ**が入れる。個人アカウントならメンバーは自分1人なので、これが実質「自分だけ」になる。
+
+利点:
+
+- 公開メールドメインを許可してしまう事故が起きない
+- **One-time PIN が不要になる**。Cloudflare のログインで認証するため、OTPメールが届かない問題そのものが消える
+
+### 使ってはいけない設定
+
+`Email domain` に `gmail.com` を入れると、**世界中の Gmail アカウント保持者がこのリーダーに入れる**。ドメインセレクタは自分の組織が所有するドメイン（`@example.co.jp` など）専用の機能。`gmail.com` / `outlook.com` / `icloud.com` のような公開プロバイダに使ってはいけない。
+
+### アドレス単位で許可したい場合
+
+Worker の Access タブでアプリを作った後、Zero Trust 側で編集する。
 
 ```
-Include → Emails → 自分のメールアドレス（完全なアドレス）
-Emails ending in → 空のまま
+Zero Trust → Access controls → Applications → book-reader の Configure
+  → Policies → Include → Emails → 自分のメールアドレス（完全なアドレス）
 ```
 
-### OTP が届かないときの原因
+**AUD tag はアプリを削除・再作成しない限り変わらない。** ポリシーをどう変更しても `wrangler.jsonc` の設定は有効なままで、再デプロイは不要。
+
+### One-time PIN が届かない場合（メール認証を使うときだけ）
 
 1. **入力したアドレスがポリシーに含まれていない**（最有力）
-   Cloudflare は **ポリシーで許可されたアドレスにしかコードを送らない**。許可されていない場合でも画面には「コードを送信しました」と出るため、症状からは配送障害と区別できない。
+   Cloudflare は **許可されたアドレスにしかコードを送らない**。許可されていない場合でも画面には「コードを送信しました」と出るため、症状からは配送障害と区別できない。
 
-   実例: ドメイン欄（`Emails ending in`）に完全なメールアドレスを入れていた。この欄は `@gmail.com` の形を期待するので何にもマッチせず、結果として誰も許可されていなかった。
+   実例: ドメイン欄に完全なメールアドレスを入れていた。この欄は `@gmail.com` の形を期待するので何にもマッチせず、誰も許可されていなかった。
 
 2. **One-time PIN が identity provider として有効になっていない**
 
@@ -142,21 +159,18 @@ Emails ending in → 空のまま
    Zero Trust → Integrations → Identity providers → Add new → One-time PIN
    ```
 
-   > 以前この手順書には `Settings → Authentication` と書いていたが誤り。現在は **Integrations → Identity providers**。
+3. **迷惑メール / メールフィルタ**。送信元は `noreply@notify.cloudflare.com`
 
-3. **迷惑メール / メールフィルタ**
-   送信元は `noreply@notify.cloudflare.com`。企業のメールセキュリティ製品がリンクを自動走査すると、届く前にコードが使用済みになることがある。
-
-4. **コードは1回限り**。新しいコードを要求すると前のコードは無効になる。
+4. **コードは1回限り**。新しいコードを要求すると前のコードは無効になる
 
 ### 設定後に必ずやる確認
 
 エージェントは Access のポリシーを読めない（`wrangler` のトークンに Zero Trust スコープが無い）し、サインインもできない。**「意図した1人だけが入れる」ことの確認は本人にしかできない。**
 
-- [ ] 自分のアドレスでサインインできる
-- [ ] **別のメールアドレス**（サブ垢など手元にあるもの）でサインインを試し、**入れないことを確認する**
+- [ ] 自分でサインインできる
+- [ ] **許可していない別のアカウント / メールアドレス**でサインインを試し、**入れないことを確認する**
 
-2つ目を飛ばすと、ポリシーが広すぎても気づけない。
+2つ目を飛ばすと、ポリシーが広すぎても気づけない。設定が狭すぎれば「入れない」とすぐ分かるが、広すぎる場合は**何の症状も出ない**。
 
 ---
 
