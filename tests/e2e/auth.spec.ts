@@ -62,11 +62,14 @@ test("theme and font size preferences persist across a reload", async ({ page })
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
 
-  const lightReaderBackground = await page.evaluate(() => {
+  // Polled: the dev server injects the stylesheet after the document is
+  // interactive, and an unstyled pane reports a transparent background.
+  const readerBackground = async () => page.evaluate(() => {
     const reader = document.querySelector('[aria-label="Reader"]');
     return reader ? getComputedStyle(reader).backgroundColor : null;
   });
-  expect(lightReaderBackground).toBe("rgb(255, 255, 255)");
+  await expect.poll(readerBackground, { timeout: 10_000 }).toBe("rgb(255, 255, 255)");
+  const lightReaderBackground = await readerBackground();
 
   // These are server-rendered before React attaches its handlers, so an early
   // click lands on nothing.
@@ -90,10 +93,7 @@ test("theme and font size preferences persist across a reload", async ({ page })
   // painted by Tailwind's `dark:` variant rather than by a plain CSS rule, so
   // this also proves the variant follows the theme class instead of the
   // operating system preference.
-  await expect.poll(async () => page.evaluate(() => {
-    const reader = document.querySelector('[aria-label="Reader"]');
-    return reader ? getComputedStyle(reader).backgroundColor : null;
-  }), { timeout: 10_000 }).not.toBe(lightReaderBackground);
+  await expect.poll(readerBackground, { timeout: 10_000 }).not.toBe(lightReaderBackground);
 
   const darkReaderBackground = await page.evaluate(() => {
     const reader = document.querySelector('[aria-label="Reader"]');

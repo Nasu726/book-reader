@@ -10,6 +10,8 @@ import { parseHTML } from "linkedom";
 import JSZip from "jszip";
 
 import { EpubParser } from "../../src/core/documents/epub-parser.ts";
+import { Book } from "@likecoin/epub-ts/node";
+
 import { DocumentParseError } from "../../src/core/documents/parser.ts";
 
 class LinkedomTextParser {
@@ -32,7 +34,7 @@ test("malformed EPUB returns DocumentParseError", async () => {
   });
   process.setMaxListeners(0);
 
-  const parser = new EpubParser(LinkedomTextParser);
+  const parser = new EpubParser(LinkedomTextParser, Book as never);
 
   try {
     await parser.parse(new ArrayBuffer(0), "book.epub");
@@ -90,7 +92,7 @@ test("valid EPUB extracts metadata and stable section order", async () => {
     data.byteOffset + data.byteLength,
   );
 
-  const result = await new EpubParser(LinkedomTextParser).parse(
+  const result = await new EpubParser(LinkedomTextParser, Book as never).parse(
     source,
     samplePath,
   );
@@ -104,5 +106,14 @@ test("valid EPUB extracts metadata and stable section order", async () => {
       ["First", "Alpha text"],
       ["Second", "Beta text"],
     ],
+  );
+});
+
+test("the parser refuses to run without a Book implementation", () => {
+  // The implementation is injected so the browser and the server can share
+  // this logic; forgetting it must fail loudly rather than at parse time.
+  assert.throws(
+    () => new EpubParser(LinkedomTextParser),
+    DocumentParseError,
   );
 });

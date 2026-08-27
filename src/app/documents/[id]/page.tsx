@@ -42,6 +42,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
       documentFormat={document.format}
       documentId={id}
       documentTitle={document.title}
+      documentSourceFilename={document.sourceFilename ?? undefined}
       initialHighlights={(await createSqliteHighlightRepository(
         createDrizzleFromSqlite(database),
       ).listByDocument(id, session.userId)).map((highlight) => ({

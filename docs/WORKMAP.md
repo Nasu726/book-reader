@@ -933,6 +933,51 @@ Evidence: The vocabulary schema stores arbitrary terms and phrases with meaning,
 
 ---
 
+## PROD-CF-001 — Cloudflare deployment target
+**Status:** IN_PROGRESS
+**Priority:** P0 before production
+**Depends on:** PROD-001
+
+### Decision
+
+2026-08-27: ユーザーがdeploy先をCloudflareに指定。Workers + D1 + R2、無料枠の範囲で運用する。PROD-001で「ユーザーが明示的に望むまで保留」としたstorage層移行を実施する。
+
+### 一次情報で確認した無料枠制約
+
+| 項目 | Workers Free |
+|---|---|
+| CPU時間 | 10ms / invocation |
+| Workerバンドル | 3 MiB (gzip後) |
+| リクエスト | 100,000 / 日 |
+| メモリ | 128 MB |
+| D1 | 5 GB、読み 5,000,000行/日、書き 100,000行/日 |
+| R2 | 10 GB、egress無料、Class A 1,000,000/月、Class B 10,000,000/月 |
+
+Next.js 16は `@opennextjs/cloudflare` が対応済み。`node:crypto` は `nodejs_compat` で全API利用可能（argon2、ed448、x448、DSA/DHのgenerateKeyPairを除く）。したがってscrypt認証は移行不要。
+
+### 移行が必要な箇所
+
+- `better-sqlite3` はネイティブaddonでWorkersでは動かない → D1 (`drizzle-orm/d1`)
+- `session-store.ts` が同期SQLite APIを直接使用 → D1は非同期なので認証経路を非同期化
+- filesystem `DocumentStorage` → R2 adapter（境界は実装済みなので差し替えのみ）
+- EPUBのサーバ側パース → ブラウザへ移す。10ms CPUで書籍1冊のパースは成立しない。同時にlinkedomとepub-tsがWorkerバンドルから外れ3 MiB制約も緩和される
+
+### Done when
+
+- Workers上で認証、import、PDF表示、EPUB表示、AI action、highlight、note、vocabulary、progressが動作する
+- 文書のbyte列がR2にあり、メタデータがD1にある
+- 無料枠の制約内で主要フローが完了する
+- ローカル開発（better-sqlite3 + filesystem）も引き続き動作する
+
+### Subtasks
+
+- PROD-CF-002 — EPUBパースをブラウザへ移す
+- PROD-CF-003 — R2 document storage adapter
+- PROD-CF-004 — D1 repositories と非同期認証
+- PROD-CF-005 — OpenNext adapter、wrangler設定、deploy
+
+---
+
 ## PROD-002 — Backup / export
 **Status:** DONE
 **Priority:** P1 before production  

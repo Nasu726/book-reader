@@ -6,7 +6,6 @@ import { createSqliteDb } from "@/server/db/client";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { detectFormatFromBytes } from "@/core/documents/file-signature";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
-import { readEpubMetadata } from "@/server/documents/epub";
 import { getDocumentStorage } from "@/server/storage/filesystem-document-storage";
 import { cookies } from "next/headers";
 
@@ -77,8 +76,11 @@ export async function POST(request: Request) {
       { status: 415 },
     );
   }
+  // The title starts as the filename. For EPUBs the reader replaces it with the
+  // book's own title once it parses the file in the browser: parsing here would
+  // pull epub-ts and a server DOM into a Cloudflare Worker that has 10ms of CPU
+  // and a 3 MiB bundle to work with.
   const filenameTitle = file.name.replace(/\.(epub|pdf)$/i, "") || file.name;
-  const metadata = format === "epub" ? await readEpubMetadata(bytes, file.name) : null;
   const repository = createSqliteLibraryRepository(createDrizzleFromSqlite(database));
   const storage = getDocumentStorage();
   const documentId = randomUUID();
@@ -87,8 +89,7 @@ export async function POST(request: Request) {
     await repository.create({
       id: documentId,
       userId: session.userId,
-      title: metadata?.title?.trim() || filenameTitle,
-      author: metadata?.author?.trim() || undefined,
+      title: filenameTitle,
       format,
       sourceFilename: file.name,
     });

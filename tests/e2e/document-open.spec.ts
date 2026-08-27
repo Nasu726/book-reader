@@ -24,7 +24,6 @@ test("document sources and routes stay private to their owner", async ({ page })
   await login(page);
 
   expect((await page.request.get("/api/documents/missing-document/source")).status()).toBe(404);
-  expect((await page.request.get("/api/documents/missing-document/parse")).status()).toBe(404);
 
   // A signed-out client must not reach a real document either.
   const documentId = await importDocument(page, "private.pdf", MULTIPAGE_PDF, "application/pdf");

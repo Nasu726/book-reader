@@ -100,12 +100,16 @@ test("EPUB journey renders authored structure and restores the stored position",
     "application/epub+zip",
   );
 
-  // The EPUB's own metadata title wins over the uploaded filename.
-  await expect(page.getByRole("region", { name: "Library" }))
-    .toContainText("Notes on Thinking Machines");
-
   await page.goto(`/documents/${documentId}`);
   const reader = page.getByRole("region", { name: "EPUB reader" });
+  await expect(reader.getByText("Alpha journey text.")).toBeVisible({ timeout: 10_000 });
+
+  // The book's own title replaces the uploaded filename once the browser has
+  // parsed it; the server never opens the file.
+  await page.goto("/");
+  await expect(page.getByRole("region", { name: "Library" }))
+    .toContainText("Notes on Thinking Machines");
+  await page.goto(`/documents/${documentId}`);
   await expect(reader.getByText("Alpha journey text.")).toBeVisible({ timeout: 10_000 });
 
   // Authored structure must survive the import: a real heading element, real

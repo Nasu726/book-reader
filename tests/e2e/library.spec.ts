@@ -63,6 +63,6 @@ test("rename rejects an empty title", async ({ page }) => {
 
   const library = await page.request.get("/api/documents");
   const { documents } = (await library.json()) as { documents: { id: string; title: string }[] };
-  expect(documents.find((document) => document.id === documentId)?.title)
-    .toBe("Notes on Thinking Machines");
+  // Never opened in the reader, so it still carries the filename stem.
+  expect(documents.find((document) => document.id === documentId)?.title).toBe("titled");
 });

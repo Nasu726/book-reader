@@ -9,6 +9,8 @@ import { usePageShortcuts } from "./use-page-shortcuts";
 type DocumentReaderProps = {
   documentId: string;
   documentTitle?: string;
+  /** The uploaded filename, used to tell an untouched title from a rename. */
+  documentSourceFilename?: string;
   format: "epub" | "pdf";
   onSelectionChange?: (selection: DocumentSelection | null) => void;
 };
@@ -22,6 +24,34 @@ type ParsedEpub = {
     html?: string;
   }[];
 };
+
+/**
+ * Replaces the filename the import route stored with the book's own title.
+ *
+ * Only when the stored title is still exactly the filename stem: a title the
+ * reader chose by hand must survive every reopen.
+ */
+async function adoptBookTitle(
+  documentId: string,
+  bookTitle: string | undefined,
+  currentTitle: string,
+  sourceFilename: string | undefined,
+): Promise<void> {
+  const title = bookTitle?.trim();
+  const untouched = sourceFilename?.replace(/\.(epub|pdf)$/i, "");
+  if (!title || !untouched || currentTitle !== untouched || title === currentTitle) {
+    return;
+  }
+  try {
+    await fetch(`/api/documents/${documentId}`, {
+      body: JSON.stringify({ title }),
+      headers: { "content-type": "application/json" },
+      method: "PATCH",
+    });
+  } catch {
+    // The reader still works with the filename as its title.
+  }
+}
 
 function useDocumentProgress(documentId: string) {
   const [initialLocation, setInitialLocation] = useState<string | null | undefined>();
@@ -63,6 +93,7 @@ function useDocumentProgress(documentId: string) {
 export function DocumentReader({
   documentId,
   documentTitle = "",
+  documentSourceFilename,
   format,
   onSelectionChange,
 }: DocumentReaderProps) {
@@ -129,17 +160,24 @@ export function DocumentReader({
     let cancelled = false;
     async function parse() {
       try {
-        const response = await fetch(`/api/documents/${documentId}/parse`, { cache: "no-store" });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error);
-        if (!cancelled) setEpub(payload as ParsedEpub);
+        // Parsed here rather than on the server: a whole book does not fit in
+        // a Cloudflare Worker's 10ms CPU budget, and the browser has to build
+        // this DOM anyway to reflow the text.
+        const response = await fetch(source, { cache: "no-store" });
+        if (!response.ok) throw new Error("The document could not be opened.");
+        const bytes = await response.arrayBuffer();
+        const { parseEpubInBrowser } = await import("./epub-browser-parser");
+        const parsed = await parseEpubInBrowser(bytes, documentTitle || "document.epub");
+        if (cancelled) return;
+        setEpub(parsed as ParsedEpub);
+        void adoptBookTitle(documentId, parsed.title, documentTitle, documentSourceFilename);
       } catch {
         if (!cancelled) setError("The document could not be opened.");
       }
     }
     void parse();
     return () => { cancelled = true; };
-  }, [documentId, format]);
+  }, [documentId, documentSourceFilename, documentTitle, format, source]);
 
   useEffect(() => {
     if (format !== "epub") return;

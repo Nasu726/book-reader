@@ -13,6 +13,7 @@ type SelectionAiConnectorProps = {
   documentId: string;
   documentFormat: "epub" | "pdf";
   documentTitle: string;
+  documentSourceFilename?: string;
   initialHighlights: readonly {
     id: string;
     note?: string;
@@ -30,6 +31,7 @@ export function SelectionAiConnector({
   documentId,
   documentFormat,
   documentTitle,
+  documentSourceFilename,
   initialHighlights,
   initialVocabulary,
 }: SelectionAiConnectorProps) {
@@ -123,6 +125,7 @@ export function SelectionAiConnector({
           <h1 className="text-3xl font-semibold tracking-tight">{documentTitle}</h1>
           <DocumentReader
             documentId={documentId}
+            documentSourceFilename={documentSourceFilename}
             documentTitle={documentTitle}
             format={documentFormat}
             onSelectionChange={(captured) => setSelection(captured)}
