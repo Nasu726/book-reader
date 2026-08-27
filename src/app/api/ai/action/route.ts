@@ -1,12 +1,10 @@
-import { cookies } from "next/headers";
 
 import { createSqliteConversationRepository } from "@/repositories/sqlite/conversation-repository";
 import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
-import { createAuthService } from "@/server/auth/service";
 import { AiProviderError, generateWithRetry } from "@/core/ai/provider";
 import { createAiProvider } from "@/server/ai/provider-factory";
-import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createSqliteDb } from "@/server/db/client";
+import { getCurrentUser } from "@/server/auth/current-session";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 
 const MAX_HISTORY_MESSAGES = 8;
@@ -16,10 +14,7 @@ const MAX_CONTEXT_CHARACTERS = 40_000;
 
 export async function POST(request: Request) {
   const database = createSqliteDb();
-  const authService = createAuthService(database);
-  const session = authService.getSessionUser(
-    (await cookies()).get(SESSION_COOKIE_NAME)?.value,
-  );
+  const session = await getCurrentUser(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
@@ -131,9 +126,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   const database = createSqliteDb();
-  const session = createAuthService(database).getSessionUser(
-    (await cookies()).get(SESSION_COOKIE_NAME)?.value,
-  );
+  const session = await getCurrentUser(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }

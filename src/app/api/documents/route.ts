@@ -1,13 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import { createAuthService } from "@/server/auth/service";
-import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createSqliteDb } from "@/server/db/client";
+import { getCurrentUser } from "@/server/auth/current-session";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { detectFormatFromBytes } from "@/core/documents/file-signature";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { getDocumentStorage } from "@/server/storage/filesystem-document-storage";
-import { cookies } from "next/headers";
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const ALLOWED_TYPES: Record<string, "epub" | "pdf"> = {
@@ -17,10 +15,7 @@ const ALLOWED_TYPES: Record<string, "epub" | "pdf"> = {
 
 export async function GET() {
   const database = createSqliteDb();
-  const authService = createAuthService(database);
-  const session = authService.getSessionUser(
-    (await cookies()).get(SESSION_COOKIE_NAME)?.value,
-  );
+  const session = await getCurrentUser(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
@@ -31,10 +26,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const database = createSqliteDb();
-  const authService = createAuthService(database);
-  const session = authService.getSessionUser(
-    (await cookies()).get(SESSION_COOKIE_NAME)?.value,
-  );
+  const session = await getCurrentUser(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }

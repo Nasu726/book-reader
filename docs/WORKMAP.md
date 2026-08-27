@@ -971,10 +971,13 @@ Next.js 16は `@opennextjs/cloudflare` が対応済み。`node:crypto` は `node
 
 ### Subtasks
 
-- PROD-CF-002 — EPUBパースをブラウザへ移す
-- PROD-CF-003 — R2 document storage adapter
-- PROD-CF-004 — D1 repositories と非同期認証
-- PROD-CF-005 — OpenNext adapter、wrangler設定、deploy
+- PROD-CF-002 — EPUBパースをブラウザへ移す — **DONE**
+- PROD-CF-003 — Cloudflare Access認証（scryptの51〜79ms CPUを排除）
+- PROD-CF-004 — R2 document storage adapter
+- PROD-CF-005 — D1 repositories
+- PROD-CF-006 — OpenNext adapter、wrangler設定、deploy
+
+人間側の待ち行列は `docs/HUMAN-TASKS.md` を参照。
 
 ---
 

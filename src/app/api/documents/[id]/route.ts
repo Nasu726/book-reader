@@ -1,27 +1,19 @@
-import { cookies } from "next/headers";
 
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
-import { createAuthService } from "@/server/auth/service";
-import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { createSqliteDb } from "@/server/db/client";
+import { getCurrentUser } from "@/server/auth/current-session";
 import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 import { getDocumentStorage } from "@/server/storage/filesystem-document-storage";
 
 const MAX_TITLE_LENGTH = 300;
-
-async function authenticate(database: ReturnType<typeof createSqliteDb>) {
-  return createAuthService(database).getSessionUser(
-    (await cookies()).get(SESSION_COOKIE_NAME)?.value,
-  );
-}
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const database = createSqliteDb();
-  const session = await authenticate(database);
+  const session = await getCurrentUser(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
@@ -53,7 +45,7 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> },
 ) {
   const database = createSqliteDb();
-  const session = await authenticate(database);
+  const session = await getCurrentUser(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }

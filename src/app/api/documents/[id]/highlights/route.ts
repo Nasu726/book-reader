@@ -1,11 +1,9 @@
-import { cookies } from "next/headers";
 
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
 import { parseSelectionLocation } from "@/core/selection/capture";
-import { createAuthService } from "@/server/auth/service";
-import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { createSqliteDb } from "@/server/db/client";
+import { getCurrentUser } from "@/server/auth/current-session";
 import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 
 function repository(database: ReturnType<typeof createSqliteDb>) {
@@ -17,8 +15,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   const database = createSqliteDb();
-  const authService = createAuthService(database);
-  const session = authService.getSessionUser((await cookies()).get(SESSION_COOKIE_NAME)?.value);
+  const session = await getCurrentUser(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
@@ -38,8 +35,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   const database = createSqliteDb();
-  const authService = createAuthService(database);
-  const session = authService.getSessionUser((await cookies()).get(SESSION_COOKIE_NAME)?.value);
+  const session = await getCurrentUser(database);
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }

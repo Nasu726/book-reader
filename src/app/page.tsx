@@ -1,20 +1,15 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { createAuthService } from "@/server/auth/service";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { createSqliteDb } from "@/server/db/client";
+import { getCurrentUser } from "@/server/auth/current-session";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
-import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { AppShell } from "@/components/app-shell";
 import { LibraryList } from "@/components/library-list";
 
 export default async function Home() {
   const database = createSqliteDb();
-  const authService = createAuthService(database);
-  const session = authService.getSessionUser(
-    (await cookies()).get(SESSION_COOKIE_NAME)?.value,
-  );
+  const session = await getCurrentUser(database);
   if (!session) {
     redirect("/login");
   }
