@@ -1,24 +1,17 @@
 import { cookies } from "next/headers";
 
-import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { createAuthService } from "@/server/auth/service";
 import { createSqliteDocumentNoteRepository } from "@/repositories/sqlite/document-note-repository";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { createSqliteDb } from "@/server/db/client";
+import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 
 async function authenticate(database: ReturnType<typeof createSqliteDb>) {
   const authService = createAuthService(database);
   return authService.getSessionUser(
     (await cookies()).get(SESSION_COOKIE_NAME)?.value,
   );
-}
-
-async function documentForUser(database: ReturnType<typeof createSqliteDb>, id: string, userId: string) {
-  const document = await createSqliteDocumentRepository(
-    createDrizzleFromSqlite(database),
-  ).getById(id);
-  return document?.userId === userId ? document : null;
 }
 
 function repository(database: ReturnType<typeof createSqliteDb>) {
@@ -36,9 +29,9 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const document = await documentForUser(database, id, session.userId);
+  const document = await requireOwnedDocument(database, id, session.userId);
   if (!document) {
-    return Response.json({ error: "Document not found." }, { status: 404 });
+    return documentNotFound();
   }
   return Response.json({ note: await repository(database).getByDocument(id, session.userId) });
 }
@@ -64,9 +57,9 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const document = await documentForUser(database, id, session.userId);
+  const document = await requireOwnedDocument(database, id, session.userId);
   if (!document) {
-    return Response.json({ error: "Document not found." }, { status: 404 });
+    return documentNotFound();
   }
 
   try {

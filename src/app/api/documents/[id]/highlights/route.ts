@@ -1,12 +1,12 @@
 import { cookies } from "next/headers";
 
-import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
 import { parseSelectionLocation } from "@/core/selection/capture";
 import { createAuthService } from "@/server/auth/service";
 import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
 import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
 import { createSqliteDb } from "@/server/db/client";
+import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 
 function repository(database: ReturnType<typeof createSqliteDb>) {
   return createSqliteHighlightRepository(createDrizzleFromSqlite(database));
@@ -24,11 +24,8 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const document = await createSqliteDocumentRepository(
-    createDrizzleFromSqlite(database),
-  ).getById(id);
-  if (!document || document.userId !== session.userId) {
-    return Response.json({ error: "Document not found." }, { status: 404 });
+  if (!await requireOwnedDocument(database, id, session.userId)) {
+    return documentNotFound();
   }
 
   return Response.json({
@@ -75,6 +72,10 @@ export async function POST(
   }
 
   const { id } = await context.params;
+  if (!await requireOwnedDocument(database, id, session.userId)) {
+    return documentNotFound();
+  }
+
   try {
     const highlight = await repository(database).create({
       documentId: id,

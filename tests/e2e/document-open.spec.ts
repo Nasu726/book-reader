@@ -110,3 +110,46 @@ test("uploads whose bytes do not match their declared type are rejected", async 
   const { documents } = (await library.json()) as { documents: { sourceFilename?: string }[] };
   expect(documents.some((document) => document.sourceFilename === "disguised.pdf")).toBe(false);
 });
+
+test("writes attached to a document require owning that document", async ({ page }) => {
+  await login(page);
+
+  // Each of these attaches a record to a document id. None may be accepted for
+  // a document the caller does not own — an unowned id must never reach a
+  // repository write.
+  const highlight = await page.request.post("/api/documents/not-my-document/highlights", {
+    data: {
+      format: "pdf",
+      location: JSON.stringify({ page: 1, source: "text-layer-viewport", version: 1 }),
+      selectedText: "Someone else's sentence.",
+    },
+  });
+  expect(highlight.status()).toBe(404);
+
+  const note = await page.request.post("/api/documents/not-my-document/note", {
+    data: { content: "Someone else's note." },
+  });
+  expect(note.status()).toBe(404);
+
+  const vocabulary = await page.request.post("/api/documents/not-my-document/vocabulary", {
+    data: {
+      format: "pdf",
+      location: JSON.stringify({ page: 1, source: "text-layer-viewport", version: 1 }),
+      meaning: "unauthorized",
+      selectedText: "Someone else's sentence.",
+      term: "unauthorized",
+    },
+  });
+  expect(vocabulary.status()).toBe(404);
+
+  const progress = await page.request.post("/api/documents/not-my-document/progress", {
+    data: { location: JSON.stringify({ page: 2, version: 1 }) },
+  });
+  expect(progress.status()).toBe(404);
+
+  // Nothing may have been written behind the rejected requests.
+  const documentId = await importDocument(page, "owned.pdf", MULTIPAGE_PDF, "application/pdf");
+  const highlights = await page.request.get(`/api/documents/${documentId}/highlights`);
+  const payload = (await highlights.json()) as { highlights: { selectedText: string }[] };
+  expect(payload.highlights).toEqual([]);
+});
