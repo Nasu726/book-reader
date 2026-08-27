@@ -975,7 +975,7 @@ Next.js 16は `@opennextjs/cloudflare` が対応済み。`node:crypto` は `node
 - PROD-CF-003 — Cloudflare Access認証（scryptの51〜79ms CPUを排除）— **DONE**
 - PROD-CF-004 — R2 document storage adapter — **DONE**
 - PROD-CF-005 — D1 repositories — **DONE**
-- PROD-CF-006 — OpenNext adapter、wrangler設定 — **DONE**（deployはAccess設定待ち）
+- PROD-CF-006 — OpenNext adapter、wrangler設定、deploy — **DONE**
 
 ### 実測値
 
@@ -986,6 +986,12 @@ Next.js 16は `@opennextjs/cloudflare` が対応済み。`node:crypto` は `node
 | scrypt検証（参考・不採用） | CPU 10ms | 51〜79 ms |
 
 SSRのCPU実測はデプロイ後に取る。
+
+### デプロイ状況
+
+- URL: https://book-reader.e9gp1ant-1729.workers.dev
+- Cloudflare Access で Worker 単位に保護済み。未認証は Access のログインへ302され、アプリまで到達しない
+- 残り: `OPENROUTER_API_KEY` のsecret登録（未登録のためAIアクションは503）と、本人による本番動作確認
 
 人間側の待ち行列は `docs/HUMAN-TASKS.md` を参照。
 
@@ -1337,3 +1343,9 @@ YYYY-MM-DD — TASK-ID
 - Verification: lint, typecheck, 97 unit tests, 26 Chromium E2E tests, production Webpack build. Live smoke test passed against OpenRouter `nvidia/nemotron-3-super-120b-a12b:free`.
 - Important decision: every one of these shipped with a fully green suite. `pdf.spec.ts` and `ai-answer.spec.ts` had wrapped all assertions in `if (await locator.isVisible())`, which passes when the element is absent. Assertions are now unconditional, and the text-layer geometry check and owner scoping were confirmed by mutation — reintroducing each defect turns the corresponding test red.
 - Follow-up: iPhone Safari verification remains HUMAN-001. Streaming AI responses and EPUB image rendering are still unimplemented.
+
+2026-08-27 — PROD-CF-001 〜 PROD-CF-006
+- Result: Cloudflare へデプロイした。EPUBパースをブラウザへ移し、Access認証・R2ストレージ・D1リポジトリの各境界を実装し、OpenNextでWorkerとして公開した。
+- Verification: lint, typecheck, 119 unit tests, 39 Chromium E2E tests, production build。Worker preview で実バインディング動作を確認。デプロイ後の実URLに対し、未認証で `/` と `/api/documents` が Access のログインへ302されアプリに到達しないことを確認。
+- Important decision: 無料枠の CPU 10ms は I/O 待ちを含まないため AI 応答の遅さは問題にならないが、scrypt検証は実測51〜79msで収まらない。認証を Access へ委譲し、JWT検証の実測は中央値1.25ms。Workerバンドルは gzip 1360 KiB で上限3 MiBに収まった。判断理由は `docs/DECISIONS.md` D-1〜D-15。
+- Follow-up: `OPENROUTER_API_KEY` の secret 登録（H-5）と本人による本番動作確認（H-6b）。SSRのCPU実測は本番アクセス後に取る。

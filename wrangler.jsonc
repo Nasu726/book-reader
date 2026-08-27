@@ -29,14 +29,15 @@
     }
   ],
   "vars": {
-    // The team domain is known; the audience tag appears once the Worker is
-    // protected behind Access. See docs/HUMAN-TASKS.md H-4.
+    // Cloudflare Access authenticates before a request reaches this Worker and
+    // forwards a signed assertion; these two values are what the assertion is
+    // checked against. Neither is secret — the audience tag identifies the
+    // application, it does not authorise anything on its own.
     //
-    // While CF_ACCESS_AUD is empty the deployed reader cannot sign anyone in —
-    // the password login needs a SQLite file a Worker does not have — so every
-    // route answers 401 and /login explains what is missing.
+    // The tag never changes unless the Access application is deleted and
+    // recreated.
     "CF_ACCESS_TEAM_DOMAIN": "https://nasu726.cloudflareaccess.com",
-    "CF_ACCESS_AUD": "",
+    "CF_ACCESS_AUD": "74063d235af924b5ca56f5e3bd9464b34da01abc5423406a31e0fb3f64f29930",
     "AI_PROVIDER": "openrouter",
     "AI_MODEL": "nvidia/nemotron-3-super-120b-a12b:free"
   }

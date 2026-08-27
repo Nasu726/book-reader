@@ -20,8 +20,8 @@
 | D1データベース作成 | 済（エージェントが実行） |
 | R2バケット作成 | 済（エージェントが実行） |
 | Workerのデプロイ | 済（エージェントが実行） |
-| **Cloudflare Access設定** | **未 — 次にやること（H-4）** |
-| Worker secrets登録 | 未（H-5） |
+| Cloudflare Access設定 | 済（2026-08-27） |
+| **Worker secrets登録** | **未 — 次にやること（H-5）** |
 | ドメイン割り当て | 未（任意。H-6） |
 | iPhone実機確認 | 未（HUMAN-001） |
 
@@ -70,50 +70,19 @@ npx wrangler whoami
 
 ---
 
-## H-4. Cloudflare Access で Worker を保護する
+## H-4. Cloudflare Access で Worker を保護する — 完了
 
-**なぜ人間が必要か**
-Zero Trustダッシュボードでの操作。`wrangler` のOAuthトークンにZero Trust/Accessのスコープが含まれていないため、エージェントからは実行できない（`wrangler whoami` のscope一覧で確認済み）。IdPの選択も本人の判断。
+2026-08-27 に設定済み。
 
-**背景**
-現在の認証はscryptパスワードハッシュを使う。実測で検証1回あたり **51〜79ms CPU** を消費し、Workers無料枠の **10ms/リクエスト** を超えるため、Worker上ではログインが成立しない。加えてscryptの実装はbetter-sqlite3のセッションテーブルに依存しており、これはネイティブaddonなのでWorkerでは読み込めない。
-Cloudflare Accessはアプリの手前で認証を済ませ、JWTを付けて通す。アプリ側はRS256の署名検証（実測 中央値1.25ms）だけで済む。Zero Trust無料枠は50ユーザー。
+| 項目 | 値 |
+|---|---|
+| team domain | `https://nasu726.cloudflareaccess.com` |
+| AUD tag | `74063d23…f29930` |
+| 保護対象 | Worker 単位（workers.dev・カスタムドメイン・ルート・プレビューを包含） |
 
-**現状**
-- Zero Trust 開始済み。team name は `nasu726` → **team domain は `nasu726.cloudflareaccess.com`**
-- Worker はデプロイ済み: https://book-reader.e9gp1ant-1729.workers.dev
-- 未認証で `/` は `/login` へ、APIは全て401。データも無い。つまり**今は誰にも使えない状態で公開されている**
+`wrangler.jsonc` に反映してデプロイ済み。未認証アクセスは Access のログイン画面へ 302 され、アプリまで到達しない（`/` と `/api/documents` で確認）。
 
-**手順**
-
-ホスト名ごとにアプリを作るのではなく、**Worker単位で保護する**方が簡単。workers.dev・カスタムドメイン・ルート・プレビューがまとめて対象になる。
-
-1. Cloudflareダッシュボード → **Workers & Pages** → **book-reader** を開く
-2. **Access** タブ → **Protect this Worker behind Access**
-3. **All traffic** を選ぶ（Previews only ではリーダー本体が保護されない）
-4. **Authentication policy** で許可条件を作る
-   - Action: `Allow`
-   - Include → **Emails** → 自分のメールアドレス
-   - 認証方法が未設定なら、先に Zero Trust → **Settings → Authentication** で追加する。**One-time PIN**（メールに届くコード）が最も手軽
-5. Session Duration は任意。読書アプリなので `1 month` 程度が快適
-6. **Apply Access**
-
-**AUD tag の取得**
-
-```
-Zero Trust → Access controls → Applications → 作成されたアプリの Configure
-  → Additional settings → Application Audience (AUD) Tag
-```
-
-> ダッシュボードのメニュー構成は変わる。2026-08時点では `Access` ではなく **`Access controls`** 配下にある。見つからない場合は現行ドキュメントを確認すること。
-
-**伝えること**
-- **AUD tag**（64文字の16進文字列）
-
-team domain（`nasu726.cloudflareaccess.com`）は既に判明しているので不要。どちらも秘密情報ではなく、設定ファイルにコミットする。
-
-**この後エージェントがやること**
-`wrangler.jsonc` の `CF_ACCESS_TEAM_DOMAIN` と `CF_ACCESS_AUD` を埋めて再デプロイし、実際にAccess経由でサインインできることを確認する。
+> ダッシュボードの構成は変わる。2026-08時点で Applications は `Access` ではなく **`Access controls`** 配下、AUD tag は `Configure → Additional settings`。手順が実物と食い違ったら、記憶ではなく現行ドキュメントを確認すること。
 
 ---
 
@@ -136,7 +105,10 @@ npx wrangler secret list
 
 **伝えること**: 登録できたこと。キーの値は不要。
 
-> ローカルの `.env.local` には既に設定済み。Worker側は別管理になる。
+> ローカルの `.env.local` には既に設定済み。Worker側は別管理で、現時点で登録済みのsecretは**ゼロ**（`wrangler secret list` が `[]`）。
+> このため、いま本番でAIアクションを押すと 503 が返る。Reader自体（取り込み・表示・ハイライト・ノート・単語帳・読書位置）は影響を受けない。
+
+登録後、モデルを変えたい場合は `wrangler.jsonc` の `AI_MODEL` を編集して再デプロイする。現在は `nvidia/nemotron-3-super-120b-a12b:free`。
 
 ---
 
@@ -150,6 +122,31 @@ Cloudflareダッシュボード → Workers & Pages → **book-reader** → **Se
 Worker単位のAccess保護は追加したドメインにも自動的に適用されるので、Access側の再設定は不要。
 
 **伝えること**: 割り当てたホスト名。
+
+---
+
+## H-6b. 本番の動作確認（Accessでサインインできるのは本人だけ）
+
+**なぜ人間が必要か**
+Access のポリシーがあなたのメールアドレスだけを許可しているため、エージェントは本番にサインインできない。ここから先の end-to-end 確認は本人にしか実行できない。
+
+**URL**: https://book-reader.e9gp1ant-1729.workers.dev
+
+**確認項目**
+
+- [ ] Access のログイン画面が出て、One-time PIN 等でサインインできる
+- [ ] ライブラリ画面が表示される（最初は空）
+- [ ] PDF を取り込める
+- [ ] EPUB を取り込める
+- [ ] PDF が表示され、本文が二重に見えない。選択した箇所と実際の文字が一致する
+- [ ] EPUB が見出し・段落を保って表示される
+- [ ] ←/→ でページが送れる
+- [ ] リロードしても読書位置が戻る
+- [ ] ハイライト・ノート・単語帳が保存され、リロード後も残る
+- [ ] テーマとフォントサイズがリロード後も残る
+- [ ] AI アクション（H-5 のsecret登録後）
+
+**伝えること**: 動かなかった項目と、可能ならスクリーンショット。エージェントは `npx wrangler tail` でサーバ側のログを見られる。
 
 ---
 
