@@ -244,3 +244,21 @@ password 経路は better-sqlite3 を必要とする。Worker はネイティブ
 **理由**
 このリーダーは全ルートが認証付きの動的レンダリングで、ビルド出力上の静的ページは `/login` と `/_not-found` だけ。ISRキャッシュに入るものが無い。
 `r2IncrementalCache` を設定すると `NEXT_INC_CACHE_R2_BUCKET` という専用バインディングを要求され、プレビューはそれが無いと起動すらしない。使わないキャッシュのためにバインディングを増やす理由がない。
+
+---
+
+## D-15. Access は Worker 単位で掛ける
+
+**判断**
+Cloudflare Access は「ホスト名ごとのアプリケーション」ではなく「Worker を保護する」形で設定する（Workers & Pages → 対象Worker → Access タブ）。
+
+**理由**
+Worker 単位の保護は workers.dev ホスト名、カスタムドメイン、ルート、プレビューを**まとめて**対象にする。ホスト名単位だとそのURLしか守られず、`*.workers.dev` を晒したまま独自ドメインだけ保護する、という取りこぼしが起きうる。
+
+副次的に、独自ドメインの割り当てが Access 設定の前提でなくなる。デプロイ → Access 保護 → （必要なら）ドメイン割り当て、の順に進められる。
+
+**手順が古びる前提で書く**
+Zero Trust のダッシュボード構成は変わる。2026-08時点で Applications は `Access` ではなく `Access controls` 配下にあり、AUD tag は `Configure → Additional settings` にある。`docs/HUMAN-TASKS.md` の手順が実物と食い違ったら、記憶ではなく現行ドキュメントを確認してから直すこと。
+
+**エージェントが代行できない理由**
+`wrangler` の OAuth トークンには Zero Trust / Access のスコープが無い（`wrangler whoami` の scope 一覧で確認済み。workers・d1・pages 等はあるが access は無い）。API トークンを別途発行すれば可能だが、ダッシュボードで数クリックする方が早い。

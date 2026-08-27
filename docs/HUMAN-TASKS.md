@@ -5,7 +5,7 @@
 各項目は「なぜ人間が必要か」「手順」「終わったらエージェントに何を伝えるか」で構成する。
 **上から順に、エージェントの作業を止めている度合いが高い。**
 
-最終更新: 2026-08-27
+最終更新: 2026-08-27（Zero Trustのダッシュボード構成を現行UIに合わせて修正）
 
 ---
 
@@ -19,9 +19,10 @@
 | `wrangler` ログイン | 済（2026-08-27） |
 | D1データベース作成 | 済（エージェントが実行） |
 | R2バケット作成 | 済（エージェントが実行） |
-| **Cloudflare Access設定** | **未 — 次にやること** |
-| Worker secrets登録 | 未 |
-| ドメイン割り当て | 未 |
+| Workerのデプロイ | 済（エージェントが実行） |
+| **Cloudflare Access設定** | **未 — 次にやること（H-4）** |
+| Worker secrets登録 | 未（H-5） |
+| ドメイン割り当て | 未（任意。H-6） |
 | iPhone実機確認 | 未（HUMAN-001） |
 
 `wrangler login` が済んだ時点で、エージェントは認証済みCLIとしてD1・R2の作成やデプロイを実行できる。
@@ -69,36 +70,50 @@ npx wrangler whoami
 
 ---
 
-## H-4. Cloudflare Access の設定
+## H-4. Cloudflare Access で Worker を保護する
 
 **なぜ人間が必要か**
-Zero Trustダッシュボードでのアプリケーション登録とポリシー作成。ブラウザ操作であり、IdPの選択は本人の判断。
+Zero Trustダッシュボードでの操作。`wrangler` のOAuthトークンにZero Trust/Accessのスコープが含まれていないため、エージェントからは実行できない（`wrangler whoami` のscope一覧で確認済み）。IdPの選択も本人の判断。
 
 **背景**
-現在の認証はscryptパスワードハッシュを使う。実測で検証1回あたり **51〜79ms CPU** を消費し、Workers無料枠の **10ms/リクエスト** を大幅に超えるため、そのままではログインが必ず失敗する。
-Cloudflare Accessはアプリの手前で認証を済ませ、JWTを付けて通す。アプリ側はRS256の署名検証（1ms未満）だけで済む。Zero Trust無料枠は50ユーザー。
+現在の認証はscryptパスワードハッシュを使う。実測で検証1回あたり **51〜79ms CPU** を消費し、Workers無料枠の **10ms/リクエスト** を超えるため、Worker上ではログインが成立しない。加えてscryptの実装はbetter-sqlite3のセッションテーブルに依存しており、これはネイティブaddonなのでWorkerでは読み込めない。
+Cloudflare Accessはアプリの手前で認証を済ませ、JWTを付けて通す。アプリ側はRS256の署名検証（実測 中央値1.25ms）だけで済む。Zero Trust無料枠は50ユーザー。
+
+**現状**
+- Zero Trust 開始済み。team name は `nasu726` → **team domain は `nasu726.cloudflareaccess.com`**
+- Worker はデプロイ済み: https://book-reader.e9gp1ant-1729.workers.dev
+- 未認証で `/` は `/login` へ、APIは全て401。データも無い。つまり**今は誰にも使えない状態で公開されている**
 
 **手順**
 
-1. Cloudflareダッシュボード → **Zero Trust** を開く。初回はチーム名（team domain）の設定を求められる。決めた名前を控える
-   例: `nasu` → team domain は `nasu.cloudflareaccess.com`
-2. **Settings → Authentication** で認証方法を追加する。最も手軽なのは **One-time PIN**（メールに届くコード）。Google や GitHub でもよい
-3. **Access → Applications → Add an application → Self-hosted** を選ぶ
-   - Application name: `AI Reader`
-   - Session Duration: 任意（`1 month` 推奨。読書アプリなので頻繁な再認証は邪魔）
-   - Application domain: デプロイ先のホスト名（例 `reader.example.com`）
-4. ポリシーを作る
-   - Policy name: `owner`
+ホスト名ごとにアプリを作るのではなく、**Worker単位で保護する**方が簡単。workers.dev・カスタムドメイン・ルート・プレビューがまとめて対象になる。
+
+1. Cloudflareダッシュボード → **Workers & Pages** → **book-reader** を開く
+2. **Access** タブ → **Protect this Worker behind Access**
+3. **All traffic** を選ぶ（Previews only ではリーダー本体が保護されない）
+4. **Authentication policy** で許可条件を作る
    - Action: `Allow`
    - Include → **Emails** → 自分のメールアドレス
-5. 作成後、アプリケーションの **Overview** に表示される **Application Audience (AUD) Tag** を控える
+   - 認証方法が未設定なら、先に Zero Trust → **Settings → Authentication** で追加する。**One-time PIN**（メールに届くコード）が最も手軽
+5. Session Duration は任意。読書アプリなので `1 month` 程度が快適
+6. **Apply Access**
+
+**AUD tag の取得**
+
+```
+Zero Trust → Access controls → Applications → 作成されたアプリの Configure
+  → Additional settings → Application Audience (AUD) Tag
+```
+
+> ダッシュボードのメニュー構成は変わる。2026-08時点では `Access` ではなく **`Access controls`** 配下にある。見つからない場合は現行ドキュメントを確認すること。
 
 **伝えること**
-- **team domain**（例 `nasu.cloudflareaccess.com`）
 - **AUD tag**（64文字の16進文字列）
-- 使うホスト名（例 `reader.example.com`）
 
-いずれも秘密情報ではない。設定ファイルにコミットする。
+team domain（`nasu726.cloudflareaccess.com`）は既に判明しているので不要。どちらも秘密情報ではなく、設定ファイルにコミットする。
+
+**この後エージェントがやること**
+`wrangler.jsonc` の `CF_ACCESS_TEAM_DOMAIN` と `CF_ACCESS_AUD` を埋めて再デプロイし、実際にAccess経由でサインインできることを確認する。
 
 ---
 
@@ -125,12 +140,14 @@ npx wrangler secret list
 
 ---
 
-## H-6. 独自ドメインの割り当て
+## H-6. 独自ドメインの割り当て（任意）
+
+Worker単位でAccessを掛けるため、これは**必須ではない**。`book-reader.e9gp1ant-1729.workers.dev` のままでも動く。覚えやすいURLが欲しい場合だけ。
 
 **手順**
-デプロイ後、Cloudflareダッシュボード → Workers & Pages → 対象Worker → **Settings → Domains & Routes** で保有ドメインのサブドメインを割り当てる。
+Cloudflareダッシュボード → Workers & Pages → **book-reader** → **Settings → Domains & Routes** で保有ドメインのサブドメインを割り当てる。
 
-H-4で指定したホスト名と一致させること。
+Worker単位のAccess保護は追加したドメインにも自動的に適用されるので、Access側の再設定は不要。
 
 **伝えること**: 割り当てたホスト名。
 

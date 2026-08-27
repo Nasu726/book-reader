@@ -29,10 +29,13 @@
     }
   ],
   "vars": {
-    // Filled in after the Access application exists; see docs/HUMAN-TASKS.md H-4.
-    // While these are empty the deployed app has no way to sign anyone in: the
-    // password login needs a SQLite file a Worker does not have.
-    "CF_ACCESS_TEAM_DOMAIN": "",
+    // The team domain is known; the audience tag appears once the Worker is
+    // protected behind Access. See docs/HUMAN-TASKS.md H-4.
+    //
+    // While CF_ACCESS_AUD is empty the deployed reader cannot sign anyone in —
+    // the password login needs a SQLite file a Worker does not have — so every
+    // route answers 401 and /login explains what is missing.
+    "CF_ACCESS_TEAM_DOMAIN": "https://nasu726.cloudflareaccess.com",
     "CF_ACCESS_AUD": "",
     "AI_PROVIDER": "openrouter",
     "AI_MODEL": "nvidia/nemotron-3-super-120b-a12b:free"
