@@ -6,16 +6,16 @@ test("library links authenticated users to the document route", async ({ page })
   await login(page);
   const documentId = await importDocument(page, "linked.pdf", MULTIPAGE_PDF, "application/pdf");
 
+  // Each row carries an explicit Read control; the row itself is not a link.
   const library = page.getByRole("region", { name: "Library" });
-  await library.getByRole("link", { name: /linked/ }).click();
+  await library.locator("li").filter({ hasText: "linked" }).getByRole("link", { name: "Read" }).click();
   await expect(page).toHaveURL(`/documents/${documentId}`);
 });
 
 test("the library shows a useful empty state before anything is imported", async ({ page }) => {
   await login(page);
   const library = page.getByRole("region", { name: "Library" });
-  const links = await library.getByRole("link").count();
-  if (links === 0) {
+  if (await library.locator("li").count() === 0) {
     await expect(library).toContainText("No documents yet");
   }
 });
@@ -62,8 +62,12 @@ test("PDF selection exposes selectable text and captures normalized intent", asy
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(reader).toBeVisible({ timeout: 10_000 });
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
-  await expect(secondary.getByRole("group", { name: "AI actions" })).toBeVisible();
-  await expect(secondary.getByRole("button", { name: "Highlight" })).toBeDisabled();
+  const actions = secondary.getByRole("group", { name: "AI actions" });
+  await expect(actions).toBeVisible();
+  // Nothing is selected, so no action has anything to act on.
+  for (const label of ["Explain", "Translate", "Simplify", "Highlight"]) {
+    await expect(actions.getByRole("button", { name: label, exact: true })).toBeDisabled();
+  }
   await expect(reader.getByText("Select PDF text to prepare it for AI actions.")).toBeVisible();
 });
 
@@ -81,14 +85,18 @@ test("PDF selection highlights persist and can be deleted", async ({ page }) => 
   });
   expect(created.status()).toBe(201);
 
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/documents/${documentId}`);
-  const savedHighlights = page.getByRole("region", { name: "Saved highlights" });
+  // Highlights live with the other annotations beside the text, not under it.
+  const savedHighlights = page.getByRole("complementary", { name: "AI and notes" })
+    .locator("details")
+    .filter({ hasText: "Highlights" });
   await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
   await page.reload();
   await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
 
   await savedHighlights.getByRole("button", { name: /Delete highlight/ }).click();
-  await expect(savedHighlights.getByText("No saved highlights.")).toBeVisible();
+  await expect(savedHighlights).toContainText("Highlights (0)");
 });
 
 test("uploads whose bytes do not match their declared type are rejected", async ({ page }) => {

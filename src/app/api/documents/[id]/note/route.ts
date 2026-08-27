@@ -42,7 +42,9 @@ export async function POST(
   } catch {
     return Response.json({ error: "Invalid note." }, { status: 400 });
   }
-  if (typeof input.content !== "string" || !input.content.trim() || input.content.length > 100000) {
+  // An empty note is how a note is removed, so emptiness is not an error here.
+  // Rejecting it left a note that could be written but never taken back.
+  if (typeof input.content !== "string" || input.content.length > 100000) {
     return Response.json({ error: "Invalid note." }, { status: 400 });
   }
 

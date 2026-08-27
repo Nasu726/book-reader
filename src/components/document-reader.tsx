@@ -149,10 +149,14 @@ export function DocumentReader({
     setSectionIndex(nextIndex);
   }
   // PDF pages are turned by the PDF renderer's own shortcuts.
+  // Omitted at the ends so the key press does nothing rather than re-rendering
+  // the section already showing.
   usePageShortcuts({
     enabled: format === "epub" && sectionCount > 0,
-    onNext: () => goToSection(sectionIndex + 1),
-    onPrevious: () => goToSection(sectionIndex - 1),
+    onNext: sectionIndex < sectionCount - 1
+      ? () => goToSection(sectionIndex + 1)
+      : undefined,
+    onPrevious: sectionIndex > 0 ? () => goToSection(sectionIndex - 1) : undefined,
   });
 
   useEffect(() => {
@@ -244,6 +248,9 @@ export function DocumentReader({
   }
 
   if (format === "pdf") {
+    // Waiting for the saved position means the first render already knows which
+    // page to show, instead of starting at page 1 and correcting itself.
+    if (initialLocation === undefined) return <p aria-live="polite">Opening…</p>;
     return (
       <PdfRenderer
         documentTitle={documentTitle}

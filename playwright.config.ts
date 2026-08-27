@@ -10,6 +10,17 @@ import {
 export default defineConfig({
   testDir: "./tests/e2e",
   globalTeardown: "./tests/e2e/global-teardown.ts",
+  // Two at a time. Every reading test now renders PDF pages in a real browser,
+  // and several headless Chromium instances doing that at once starve the
+  // development server until uploads time out.
+  //
+  // The obvious answer — serve `next build` output instead — does not work:
+  // `next start` runs with NODE_ENV=production, so the session cookie is issued
+  // Secure and a browser will not keep it over the suite's plain HTTP. Making
+  // the Secure flag conditional would weaken the deployed cookie to speed up a
+  // test, which is the wrong trade.
+  workers: 2,
+
   use: {
     baseURL: "http://127.0.0.1:3100",
   },

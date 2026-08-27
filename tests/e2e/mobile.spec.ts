@@ -45,7 +45,7 @@ test("a PDF page fits the phone width without horizontal scrolling", async ({ pa
   await expect(reader.getByText("Structure of Scientific Revolutions")).toBeVisible({ timeout: 10_000 });
 
   const fits = await reader.evaluate((section) => {
-    const canvas = section.querySelector("canvas");
+    const canvas = section.querySelector('[data-page-number="1"] canvas');
     const area = canvas?.parentElement;
     if (!canvas || !area) return null;
     return {
@@ -70,12 +70,12 @@ test("the AI drawer opens over the reader and returns to it", async ({ page }) =
   await page.goto(`/documents/${documentId}`);
   await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible({ timeout: 10_000 });
 
-  await page.getByRole("button", { name: "AI", exact: true }).tap();
+  await page.getByRole("button", { name: "Ask AI", exact: true }).tap();
   const drawer = page.getByRole("dialog", { name: "AI drawer" });
   await expect(drawer).toBeVisible();
   await expect(drawer.getByLabel("Follow-up question")).toBeVisible();
 
-  await drawer.getByRole("button", { name: "Back to Reader" }).tap();
+  await drawer.getByRole("button", { name: "Close", exact: true }).tap();
   await expect(drawer).toBeHidden();
   await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible();
 });

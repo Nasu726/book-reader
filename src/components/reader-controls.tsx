@@ -25,7 +25,13 @@ export {
   type ReaderTheme,
 } from "./reader-preferences";
 
-export function ReaderControls() {
+/**
+ * Theme is always meaningful. Text size only is where reflowable text is being
+ * shown: it scales `.reader-prose`, which is the EPUB body and nothing else, so
+ * on a PDF the control moved a number and changed nothing on screen. A PDF's
+ * equivalent is the zoom control in the reader's own toolbar (SPEC READ-005).
+ */
+export function ReaderControls({ showTextSize = false }: { showTextSize?: boolean }) {
   const theme = useSyncExternalStore(subscribe, getStoredTheme, serverTheme);
   const fontSize = useSyncExternalStore(subscribe, getStoredFontSize, serverFontSize);
 
@@ -57,7 +63,8 @@ export function ReaderControls() {
       >
         {theme === "dark" ? "Light" : "Dark"}
       </button>
-      <div aria-label="Font size" className="flex items-center gap-2" role="group">
+      {showTextSize && (
+      <div aria-label="Text size" className="flex items-center gap-2" role="group">
         <button
           aria-label="Decrease text size"
           className="h-11 w-11 rounded-lg border border-zinc-300 text-lg dark:border-zinc-700"
@@ -78,6 +85,7 @@ export function ReaderControls() {
           +
         </button>
       </div>
+      )}
     </div>
   );
 }

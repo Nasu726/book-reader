@@ -120,14 +120,22 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                 </form>
               ) : (
                 <div className="flex flex-wrap items-center gap-2 p-3">
-                  <a className="flex min-h-11 min-w-0 flex-1 flex-col justify-center py-1" href={`/documents/${document.id}`}>
+                  <div className="min-w-0 flex-1">
                     <span className="flex items-baseline gap-2">
                       <span className="truncate font-medium">{document.title}</span>
                       <span className="shrink-0 text-sm uppercase text-zinc-500">{document.format}</span>
                     </span>
                     {lastOpened && (
-                      <span className="text-sm text-zinc-500">Last opened {lastOpened}</span>
+                      <span className="block text-sm text-zinc-500">Last opened {lastOpened}</span>
                     )}
+                  </div>
+                  {/* An explicit control, because a clickable card gives no sign
+                      that the whole row is the button. */}
+                  <a
+                    className="flex min-h-11 items-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    href={`/documents/${document.id}`}
+                  >
+                    Read
                   </a>
                   <button
                     aria-label={`Rename ${document.title}`}

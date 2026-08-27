@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, importDocument, login, MULTIPAGE_PDF } from "./helpers";
+import { buildEpub, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
 
 // The server runs with AI_PROVIDER=mock, so these journeys exercise the real
 // /api/ai/action route — authentication, conversation persistence and all —
@@ -18,7 +18,7 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   await expect(page.getByText("This PDF page could not be rendered.")).toBeHidden({ timeout: 10_000 });
 
   await expect(reader.getByText("Structure of Scientific Revolutions")).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator('[aria-label="PDF reader"] .textLayer')).toHaveCount(1);
+  await expect(page.locator('[aria-label="PDF reader"] [data-page-number="1"] .textLayer')).toHaveCount(1);
   await page.waitForFunction(
     () => document.querySelectorAll(".textLayer span").length > 0,
     undefined,
@@ -40,8 +40,9 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   expect(selectedText).toContain("Structure of Scientific Revolutions");
 
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
+  const actions = secondary.getByRole("group", { name: "AI actions" });
   for (const action of ["Explain", "Translate", "Simplify"]) {
-    await secondary.getByRole("button", { name: action }).click();
+    await actions.getByRole("button", { name: action, exact: true }).click();
     await expect(secondary.getByRole("region", { name: "AI response" }).first())
       .toContainText(MOCK_AI_RESPONSE, { timeout: 15_000 });
   }
@@ -50,7 +51,7 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   await expect(secondary.getByRole("region", { name: "AI response" }).first())
     .toContainText(MOCK_AI_RESPONSE, { timeout: 15_000 });
 
-  await secondary.getByRole("button", { name: "Highlight" }).click();
+  await actions.getByRole("button", { name: "Highlight", exact: true }).click();
   await expect(page.getByText("Highlight saved.")).toBeVisible();
   const note = page.getByRole("textbox", { name: "Document note" });
   await note.fill("Persisted document note.");
@@ -62,7 +63,8 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   await expect(page.getByText("Vocabulary saved.")).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole("region", { name: "Saved highlights" })
+  await expect(page.getByRole("complementary", { name: "AI and notes" })
+    .locator("details").filter({ hasText: "Highlights" })
     .getByText("Structure of Scientific Revolutions")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Document note" })).toHaveValue("Persisted document note.");
   const savedVocabulary = page.getByRole("region", { name: "Saved vocabulary" }).locator("li");
@@ -77,14 +79,20 @@ test("PDF reading position survives a reload", async ({ page }) => {
   await page.goto(`/documents/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
-  await expect(reader.getByText("Page 1 / 2")).toBeVisible({ timeout: 10_000 });
-  await reader.getByRole("button", { name: "Next" }).click();
-  await expect(reader.getByText("Page 2 / 2")).toBeVisible();
-  await page.waitForResponse((response) =>
-    response.url().includes("/progress") && response.request().method() === "POST");
+  const pageNumber = page.getByRole("spinbutton", { name: "Page number" });
+  await expect(pageNumber).toHaveValue("1", { timeout: 10_000 });
+  await scrollReaderToEnd(page);
+  await expect(pageNumber).toHaveValue("2");
+  // The save that carries page 2, not merely any progress request. Polled
+  // rather than waited on: the request may already have gone out by the time
+  // the page number settles.
+  await expect.poll(async () => {
+    const response = await page.request.get(`/api/documents/${documentId}/progress`);
+    return (await response.json()) as { location: string | null };
+  }, { timeout: 15_000 }).toEqual({ location: JSON.stringify({ page: 2, version: 1 }) });
 
   await page.reload();
-  await expect(reader.getByText("Page 2 / 2")).toBeVisible({ timeout: 10_000 });
+  await expect(pageNumber).toHaveValue("2", { timeout: 10_000 });
   await expect(reader.getByText("Normal science means research")).toBeVisible({ timeout: 10_000 });
 });
 
@@ -105,7 +113,14 @@ test("EPUB journey renders authored structure and restores the stored position",
   await expect(reader.getByText("Alpha journey text.")).toBeVisible({ timeout: 10_000 });
 
   // The book's own title replaces the uploaded filename once the browser has
-  // parsed it; the server never opens the file.
+  // parsed it; the server never opens the file. That rename is a request of its
+  // own, so wait for it rather than racing it to the library.
+  await expect.poll(async () => {
+    const response = await page.request.get("/api/documents");
+    const { documents } = (await response.json()) as { documents: { id: string; title: string }[] };
+    return documents.find((document) => document.id === documentId)?.title;
+  }, { timeout: 15_000 }).toBe("Notes on Thinking Machines");
+
   await page.goto("/");
   await expect(page.getByRole("region", { name: "Library" }))
     .toContainText("Notes on Thinking Machines");
@@ -171,7 +186,7 @@ test("Chrome QA records no critical console errors across responsive journeys", 
   await expect(page.getByRole("region", { name: "Library" })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole("region", { name: "Reader", exact: true })).toBeVisible();
+  await expect(page.getByRole("main", { name: "Reader" })).toBeVisible();
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);

@@ -20,9 +20,9 @@ test("a document can be renamed from the library", async ({ page }) => {
   await titleField.fill("Attention Is All You Need");
   await page.getByRole("button", { name: "Save", exact: true }).click();
 
-  await expect(library.getByRole("link", { name: /Attention Is All You Need/ })).toBeVisible();
+  await expect(library.locator("li").filter({ hasText: "Attention Is All You Need" })).toBeVisible();
   await page.reload();
-  await expect(library.getByRole("link", { name: /Attention Is All You Need/ })).toBeVisible();
+  await expect(library.locator("li").filter({ hasText: "Attention Is All You Need" })).toBeVisible();
 });
 
 test("removing a document deletes its stored bytes as well as its row", async ({ page }) => {
@@ -34,10 +34,10 @@ test("removing a document deletes its stored bytes as well as its row", async ({
   const library = page.getByRole("region", { name: "Library" });
   await library.getByRole("button", { name: "Remove remove-me" }).click();
 
-  await expect(library.getByRole("link", { name: /remove-me/ })).toBeHidden();
+  await expect(library.locator("li").filter({ hasText: "remove-me" })).toHaveCount(0);
   expect((await page.request.get(`/api/documents/${documentId}/source`)).status()).toBe(404);
   await page.reload();
-  await expect(library.getByRole("link", { name: /remove-me/ })).toBeHidden();
+  await expect(library.locator("li").filter({ hasText: "remove-me" })).toHaveCount(0);
 });
 
 test("rename and delete reject documents the caller does not own", async ({ page }) => {
@@ -65,4 +65,28 @@ test("rename rejects an empty title", async ({ page }) => {
   const { documents } = (await library.json()) as { documents: { id: string; title: string }[] };
   // Never opened in the reader, so it still carries the filename stem.
   expect(documents.find((document) => document.id === documentId)?.title).toBe("titled");
+});
+
+test("a note can be written, read back, and cleared", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  const documentId = await importDocument(page, "noted.pdf", MULTIPAGE_PDF, "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+
+  const note = page.getByRole("textbox", { name: "Document note" });
+  await note.fill("Kuhn on paradigms.");
+  await page.getByRole("button", { name: "Save note" }).click();
+  await expect(page.getByText("Note saved.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Document note" }))
+    .toHaveValue("Kuhn on paradigms.");
+
+  // Anything that can be written has to be removable.
+  await page.getByRole("textbox", { name: "Document note" }).fill("");
+  await page.getByRole("button", { name: "Clear note" }).click();
+  await expect(page.getByText("Note cleared.")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Document note" })).toHaveValue("");
 });

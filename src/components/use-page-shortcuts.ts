@@ -10,8 +10,10 @@ import { useEffect } from "react";
  * follow-up question or a note must never move the reader.
  */
 export function usePageShortcuts(options: {
-  onPrevious: () => void;
-  onNext: () => void;
+  /** Omit at the first page: the key press should then do nothing at all. */
+  onPrevious?: () => void;
+  /** Omit at the last page. */
+  onNext?: () => void;
   enabled?: boolean;
 }): void {
   const { enabled = true, onNext, onPrevious } = options;
@@ -30,14 +32,14 @@ export function usePageShortcuts(options: {
       if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) {
         return;
       }
-      if (event.key === "ArrowLeft") {
-        onPrevious();
-      } else if (event.key === "ArrowRight") {
-        onNext();
-      } else {
-        return;
-      }
+      const move = event.key === "ArrowLeft"
+        ? onPrevious
+        : event.key === "ArrowRight" ? onNext : undefined;
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      // At an end there is nothing to move to, but the arrow still belongs to
+      // the reader rather than scrolling the page sideways.
       event.preventDefault();
+      move?.();
     }
 
     window.addEventListener("keydown", handleKeyDown);

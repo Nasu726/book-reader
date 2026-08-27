@@ -86,3 +86,28 @@ export function applyFontScaleToDocument(size: number): void {
   // Undo the root scaling a previous version of this control left behind.
   document.documentElement.style.fontSize = "";
 }
+
+export const ANSWER_LANGUAGE_STORAGE_KEY = "book-reader-answer-language";
+
+/**
+ * The language the AI answers and translates into.
+ *
+ * Japanese by default because that is the reader's language, but stored rather
+ * than hard-coded: SPEC LANG-001 requires the translation target to stay
+ * configurable instead of being fixed to one pair.
+ */
+export function readAnswerLanguage(): string {
+  try {
+    return localStorage.getItem(ANSWER_LANGUAGE_STORAGE_KEY) || "Japanese";
+  } catch {
+    return "Japanese";
+  }
+}
+
+export function writeAnswerLanguage(language: string): void {
+  try {
+    localStorage.setItem(ANSWER_LANGUAGE_STORAGE_KEY, language);
+  } catch {
+    // A reader with storage disabled simply gets the default each time.
+  }
+}

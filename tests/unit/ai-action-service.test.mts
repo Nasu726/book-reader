@@ -57,16 +57,47 @@ test("highlight actions do not invoke providers", async () => {
 test("prompt construction centralizes instructions and prioritizes selection", () => {
   assert.match(buildPrompt({ ...baseInput, action: "explain" }).prompt, /Explain the selected text/);
   assert.match(buildPrompt({ ...baseInput, action: "translate", targetLanguage: "Japanese" }).prompt, /into Japanese/);
+  // "auto" is a placeholder, not a language. Someone reading in several
+  // languages must not have one assumed, and the model should not be handed
+  // "translate from auto" as if that were an instruction.
+  const autoSource = buildPrompt({
+    ...baseInput,
+    action: "translate",
+    sourceLanguage: "auto",
+    targetLanguage: "Portuguese",
+  }).prompt;
+  assert.match(autoSource, /Translate the selected text into Portuguese/);
+  assert.ok(!autoSource.includes("from auto"));
+
   assert.match(
     buildPrompt({
       ...baseInput,
       action: "translate",
-      sourceLanguage: "auto",
+      sourceLanguage: "French",
       targetLanguage: "Portuguese",
     }).prompt,
-    /from auto into Portuguese/,
+    /from French into Portuguese/,
+  );
+
+  assert.throws(
+    () => buildPrompt({ ...baseInput, action: "translate", targetLanguage: "  " }),
+    AiActionError,
   );
   assert.match(buildPrompt({ ...baseInput, action: "simplify" }).prompt, /Simplify the selected text/);
+
+  // The answer language applies to every action except translate, which already
+  // names its target and would otherwise be told twice.
+  assert.match(
+    buildPrompt({ ...baseInput, action: "explain", responseLanguage: "Japanese" }).prompt,
+    /Respond in Japanese\./,
+  );
+  const translated = buildPrompt({
+    ...baseInput,
+    action: "translate",
+    responseLanguage: "Japanese",
+    targetLanguage: "Japanese",
+  }).prompt;
+  assert.equal(translated.match(/Japanese/g)?.length, 1);
   assert.match(buildPrompt({ ...baseInput, action: "ask", userQuestion: "Why?" }).prompt, /Question: Why\?/);
   assert.equal(
     buildPrompt({ ...baseInput, action: "explain" }).context,

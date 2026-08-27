@@ -22,7 +22,7 @@ test("signing out ends the session for this browser", async ({ page }) => {
   await login(page);
   await expect(page.getByRole("region", { name: "Library" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Log out" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login$/);
 
   await page.goto("/");
@@ -33,7 +33,7 @@ test("the reader fills a narrow viewport and the AI pane stays out of the way", 
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
 
-  const reader = page.getByRole("region", { name: "Reader", exact: true });
+  const reader = page.getByRole("main", { name: "Reader" });
   await expect(reader).toBeVisible();
   const box = await reader.boundingBox();
   expect(box).not.toBeNull();
@@ -45,8 +45,11 @@ test("the reader fills a narrow viewport and the AI pane stays out of the way", 
 test("a wide viewport hosts the secondary pane beside the reader", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
+  // The pane belongs to a document; the library has nothing to ask about.
+  const documentId = await importDocument(page, "two-pane.epub", await buildEpub(), "application/epub+zip");
+  await page.goto(`/documents/${documentId}`);
 
-  const reader = page.getByRole("region", { name: "Reader", exact: true });
+  const reader = page.getByRole("main", { name: "Reader" });
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
   await expect(secondary).toBeVisible();
 
@@ -61,6 +64,9 @@ test("a wide viewport hosts the secondary pane beside the reader", async ({ page
 test("theme and font size preferences persist across a reload", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
+  // Text size only appears where reflowing the text does something.
+  const documentId = await importDocument(page, "prefs.epub", await buildEpub(), "application/epub+zip");
+  await page.goto(`/documents/${documentId}`);
 
   // Polled: the dev server injects the stylesheet after the document is
   // interactive, and an unstyled pane reports a transparent background.
@@ -78,7 +84,7 @@ test("theme and font size preferences persist across a reload", async ({ page })
     await expect(page.getByRole("button", { name: "Switch to light theme" })).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 15_000 });
   await page.getByRole("button", { name: "Increase text size" }).click();
-  await expect(page.getByRole("group", { name: "Font size" })).toContainText("110%");
+  await expect(page.getByRole("group", { name: "Text size" })).toContainText("110%");
 
   const stored = await page.evaluate(() => ({
     fontSize: localStorage.getItem("book-reader-font-size"),
@@ -88,7 +94,7 @@ test("theme and font size preferences persist across a reload", async ({ page })
 
   await page.reload();
   await expect(page.getByRole("button", { name: "Switch to light theme" })).toBeVisible();
-  await expect(page.getByRole("group", { name: "Font size" })).toContainText("110%");
+  await expect(page.getByRole("group", { name: "Text size" })).toContainText("110%");
   // The saved theme has to actually repaint the page. The reader pane is
   // painted by Tailwind's `dark:` variant rather than by a plain CSS rule, so
   // this also proves the variant follows the theme class instead of the
@@ -119,7 +125,7 @@ test("the font size control scales the book text but not the controls", async ({
 
   const measure = async () => page.evaluate(() => {
     const article = document.querySelector("article.reader-prose");
-    const button = document.querySelector('[aria-label="Font size"] button');
+    const button = document.querySelector('[aria-label="Text size"] button');
     return {
       textSize: article ? Number.parseFloat(getComputedStyle(article).fontSize) : 0,
       buttonHeight: button ? button.getBoundingClientRect().height : 0,
@@ -129,7 +135,7 @@ test("the font size control scales the book text but not the controls", async ({
   const before = await measure();
   const increase = page.getByRole("button", { name: "Increase text size" });
   for (let step = 0; step < 4; step += 1) await increase.click();
-  await expect(page.getByRole("group", { name: "Font size" })).toContainText("140%");
+  await expect(page.getByRole("group", { name: "Text size" })).toContainText("140%");
 
   const after = await measure();
   expect(after.textSize).toBeGreaterThan(before.textSize * 1.2);
@@ -143,7 +149,8 @@ test("the library offers import and a useful empty state", async ({ page }) => {
   await login(page);
 
   await expect(page.getByLabel("Import PDF or EPUB")).toBeAttached();
-  await expect(page.getByRole("button", { name: "Import", exact: true })).toBeVisible();
+  // A label rather than a button, so the picker opens without waiting on React.
+  await expect(page.getByText("Add a book")).toBeVisible();
 
   const library = page.getByRole("region", { name: "Library" });
   const links = await library.getByRole("link").count();

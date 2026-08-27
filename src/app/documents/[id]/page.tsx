@@ -5,7 +5,8 @@ import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-r
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { createSqliteVocabularyRepository } from "@/repositories/sqlite/vocabulary-repository";
-import { getCurrentUser } from "@/server/auth/current-session";
+import { getCurrentUser, usesExternalAuth } from "@/server/auth/current-session";
+import { SignOut } from "@/components/sign-out";
 import { getDatabase } from "@/server/db/database";
 
 type DocumentPageProps = {
@@ -33,6 +34,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
 
   return (
     <SelectionAiConnector
+      account={<SignOut usesAccess={usesExternalAuth()} />}
       documentFormat={document.format}
       documentId={id}
       documentTitle={document.title}

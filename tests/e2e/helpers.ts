@@ -23,10 +23,17 @@ export async function importDocument(
   file: Buffer,
   mimeType: string,
 ): Promise<string> {
-  const upload = page.waitForResponse((response) => response.url().endsWith("/api/documents"));
-  await page.setInputFiles("#document-file", { buffer: file, mimeType, name });
-  await page.getByRole("button", { name: "Import", exact: true }).click();
-  await upload;
+  // Choosing a file submits the form, but that submit is wired up by React, so
+  // a file set before hydration silently does nothing. Retry until the upload
+  // actually leaves rather than waiting out a request that was never made.
+  await expect(async () => {
+    const upload = page.waitForResponse(
+      (response) => response.url().endsWith("/api/documents"),
+      { timeout: 5_000 },
+    );
+    await page.setInputFiles("#document-file", { buffer: file, mimeType, name });
+    await upload;
+  }).toPass({ timeout: 40_000 });
   await expect(page).toHaveURL("/");
   const documents = await page.request.get("/api/documents");
   const payload = (await documents.json()) as { documents: { id: string; sourceFilename?: string }[] };
@@ -81,4 +88,18 @@ export async function buildEpub(options?: {
     );
   }
   return Buffer.from(await zip.generateAsync({ type: "arraybuffer" }));
+}
+
+/** Scrolls the reading pane to the end, once the pages have height to scroll. */
+export async function scrollReaderToEnd(page: Page): Promise<void> {
+  // Scrolling before the pages exist moves nothing: the column is still as tall
+  // as the viewport, so scrollHeight and clientHeight are the same number.
+  await page.waitForFunction(() => {
+    const column = document.querySelector("[data-reader-scroll]");
+    return !!column && column.scrollHeight > column.clientHeight + 50;
+  }, undefined, { timeout: 15_000 });
+  await page.evaluate(() => {
+    const column = document.querySelector("[data-reader-scroll]")!;
+    column.scrollTop = column.scrollHeight;
+  });
 }
