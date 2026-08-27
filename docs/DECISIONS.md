@@ -258,7 +258,38 @@ Worker 単位の保護は workers.dev ホスト名、カスタムドメイン、
 副次的に、独自ドメインの割り当てが Access 設定の前提でなくなる。デプロイ → Access 保護 → （必要なら）ドメイン割り当て、の順に進められる。
 
 **手順が古びる前提で書く**
-Zero Trust のダッシュボード構成は変わる。2026-08時点で Applications は `Access` ではなく `Access controls` 配下にあり、AUD tag は `Configure → Additional settings` にある。`docs/HUMAN-TASKS.md` の手順が実物と食い違ったら、記憶ではなく現行ドキュメントを確認してから直すこと。
+Zero Trust のダッシュボード構成は変わる。この作業中だけで、記憶で書いた手順が3回実物と食い違った。
+
+| 書いていた場所 | 実際（2026-08時点） |
+|---|---|
+| `Access → Applications` | `Access controls → Applications` |
+| `Settings → Authentication`（IdP追加） | `Integrations → Identity providers` |
+| （AUD tagの場所を書けていなかった） | アプリの `Configure → Additional settings` |
+
+`docs/HUMAN-TASKS.md` の手順が実物と食い違ったら、記憶で直さず現行ドキュメントを確認すること。
 
 **エージェントが代行できない理由**
 `wrangler` の OAuth トークンには Zero Trust / Access のスコープが無い（`wrangler whoami` の scope 一覧で確認済み。workers・d1・pages 等はあるが access は無い）。API トークンを別途発行すれば可能だが、ダッシュボードで数クリックする方が早い。
+
+---
+
+## D-16. Zero Trust の「team name」「team domain」「ログイン画面の組織名」は別物
+
+**判断**
+この3つを混同しない。設定を変えたら、ログイン画面の表示を必ず目視で確認する。
+
+**内訳**
+
+| 名前 | 何か | どこで変えるか |
+|---|---|---|
+| team domain | `nasu726.cloudflareaccess.com`。JWTの `iss` になる。アプリの設定に入る値 | Zero Trust → Settings |
+| team name | 組織の識別名 | Zero Trust → Settings |
+| ログイン画面の組織名 | サインイン画面に表示される文字列 | Zero Trust → **Custom pages → Team name and domain → Access login page → Manage** |
+
+**理由**
+team domain を変更しても、**ログイン画面の組織名は自動では追随しない**。別の値として保持されている。実際、team domain を `nasu726` に変えた後もサインイン画面には変更前のランダム名が残っていた。
+
+Block page も同じ値を別に持つ。App Launcher は Access login page の値を引き継ぐので個別変更は不要。
+
+**関連する落とし穴**
+One-time PIN は **Access ポリシーで許可されたアドレスにしか送信されない**。許可されていないアドレスを入力しても、画面には「コードを送信しました」と表示される。「メールが来ない」の第一容疑者はポリシーの記載漏れであって、メール配送ではない。

@@ -21,8 +21,10 @@
 | R2バケット作成 | 済（エージェントが実行） |
 | Workerのデプロイ | 済（エージェントが実行） |
 | Cloudflare Access設定 | 済（2026-08-27） |
-| **Worker secrets登録** | **未 — 次にやること（H-5）** |
-| ドメイン割り当て | 未（任意。H-6） |
+| Worker secrets登録 | 済（2026-08-27） |
+| 独自ドメイン割り当て | 済 `book-reader.nasu.uk` |
+| **Access ログイン画面の組織名** | **未 — H-4b** |
+| **One-time PIN が届かない** | **調査中 — H-4c** |
 | iPhone実機確認 | 未（HUMAN-001） |
 
 `wrangler login` が済んだ時点で、エージェントは認証済みCLIとしてD1・R2の作成やデプロイを実行できる。
@@ -86,6 +88,67 @@ npx wrangler whoami
 
 ---
 
+## H-4b. Access ログイン画面に出る組織名を直す
+
+**症状**
+サインイン画面に、変更前のランダムなチーム名が残っている。
+
+**原因**
+team domain を変えても、**ログイン画面に表示される「組織名」は自動では追随しない**。別設定として保持されている。
+
+**手順**
+
+```
+Zero Trust → Custom pages → Team name and domain
+  → 「Access login page」の Manage
+  → Your Organization's name を書き換える
+  → Save
+```
+
+同じページに Block page の設定もある。そちらも古い名前なら合わせて直す。App Launcher は Access login page の値を引き継ぐので個別の変更は不要。
+
+---
+
+## H-4c. One-time PIN のメールが届かない
+
+**原因の候補（可能性の高い順）**
+
+1. **入力したメールアドレスが Access ポリシーに含まれていない**
+   Cloudflare は **ポリシーで許可されたアドレスにしかコードを送らない**。許可されていない場合でも、画面には「コードを送信しました」と出る。**届かない場合、まずこれを疑う。**
+
+   確認:
+   ```
+   Workers & Pages → book-reader → Access タブ → ポリシーを確認
+   ```
+   または
+   ```
+   Zero Trust → Access controls → Policies
+   ```
+   `Include → Emails` に入力したアドレスが**完全一致**で入っているか確認する。別名やエイリアス（`+` 付きなど）は別物として扱われる。
+
+2. **One-time PIN が identity provider として有効になっていない**
+
+   ```
+   Zero Trust → Integrations → Identity providers → Add new → One-time PIN
+   ```
+
+   > 以前この手順書には `Settings → Authentication` と書いていたが誤り。現在は **Integrations → Identity providers**。
+
+3. **メールが迷惑メールに振り分けられている / フィルタに消費されている**
+   送信元は `noreply@notify.cloudflare.com`。迷惑メールフォルダを確認し、必要なら許可リストへ追加する。
+   企業のメールセキュリティ製品がリンクを自動走査すると、届く前にコードが使用済みになることがある。
+
+4. **コードは1回限り**
+   新しいコードを要求すると、前のコードは無効になる。複数回押していたら最新のメールだけが有効。
+
+**確認できないこと**
+`wrangler` の OAuth トークンに Zero Trust のスコープが無いため、エージェントからポリシーの中身を確認できない。1と2はダッシュボードで見てほしい。
+
+**補足**
+Access の認証はアプリの手前で完結するため、`wrangler tail` にも何も出ない。アプリまでリクエストが到達していないことは確認済み（`/` が302でAccessへ）。
+
+---
+
 ## H-5. Worker secrets の登録
 
 **なぜ人間が必要か**
@@ -112,16 +175,11 @@ npx wrangler secret list
 
 ---
 
-## H-6. 独自ドメインの割り当て（任意）
+## H-6. 独自ドメインの割り当て — 完了
 
-Worker単位でAccessを掛けるため、これは**必須ではない**。`book-reader.e9gp1ant-1729.workers.dev` のままでも動く。覚えやすいURLが欲しい場合だけ。
+`book-reader.nasu.uk` を割り当て済み。Worker単位のAccess保護が自動的に適用されていることを確認した（未認証で302、リダイレクト先の `kid` が同じAUD tag）。
 
-**手順**
-Cloudflareダッシュボード → Workers & Pages → **book-reader** → **Settings → Domains & Routes** で保有ドメインのサブドメインを割り当てる。
-
-Worker単位のAccess保護は追加したドメインにも自動的に適用されるので、Access側の再設定は不要。
-
-**伝えること**: 割り当てたホスト名。
+本番URL: **https://book-reader.nasu.uk**
 
 ---
 
@@ -130,7 +188,7 @@ Worker単位のAccess保護は追加したドメインにも自動的に適用�
 **なぜ人間が必要か**
 Access のポリシーがあなたのメールアドレスだけを許可しているため、エージェントは本番にサインインできない。ここから先の end-to-end 確認は本人にしか実行できない。
 
-**URL**: https://book-reader.e9gp1ant-1729.workers.dev
+**URL**: https://book-reader.nasu.uk
 
 **確認項目**
 
