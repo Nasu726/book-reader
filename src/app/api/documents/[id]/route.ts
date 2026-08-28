@@ -1,6 +1,7 @@
 
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { getCurrentUser } from "@/server/auth/current-session";
+import { chargeWrite } from "@/server/usage/write-budget";
 import { getDatabase } from "@/server/db/database";
 import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 import { getDocumentStorage } from "@/server/storage";
@@ -16,6 +17,9 @@ export async function PATCH(
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
+
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
 
   let input: { title?: unknown };
   try {
@@ -48,6 +52,9 @@ export async function DELETE(
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
+
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
 
   const { id } = await context.params;
   const document = await requireOwnedDocument(database, id, session.userId);

@@ -1,6 +1,7 @@
 
 import { createSqliteVocabularyRepository } from "@/repositories/sqlite/vocabulary-repository";
 import { getCurrentUser } from "@/server/auth/current-session";
+import { chargeWrite } from "@/server/usage/write-budget";
 import { getDatabase } from "@/server/db/database";
 
 export async function DELETE(
@@ -12,6 +13,9 @@ export async function DELETE(
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
+
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
 
   const { entryId } = await context.params;
   const deleted = await createSqliteVocabularyRepository(

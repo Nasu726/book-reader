@@ -116,3 +116,24 @@ export const messages = sqliteTable("messages", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+/**
+ * One row per person per UTC day, counting write requests.
+ *
+ * D1's free tier allows 100,000 rows written a day for the whole account, and
+ * an account with no payment method does not spill over into billing — it
+ * starts refusing writes. A runaway client, a mistake, or an attack would
+ * therefore take the day's budget with it and leave the reader looking at
+ * unexplained 500s. Counting here lets the application refuse first, in words,
+ * and keep the rest of the day.
+ */
+export const usageCounters = sqliteTable(
+  "usage_counters",
+  {
+    userId: text("user_id").notNull(),
+    /** UTC calendar day, YYYY-MM-DD. */
+    day: text("day").notNull(),
+    writes: integer("writes").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.day] })],
+);

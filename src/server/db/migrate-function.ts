@@ -96,6 +96,14 @@ export function migrate(database: SqliteMigratable) {
     )
   `);
   db.exec(`
+    CREATE TABLE IF NOT EXISTS usage_counters (
+      user_id TEXT NOT NULL,
+      day TEXT NOT NULL,
+      writes INTEGER NOT NULL,
+      PRIMARY KEY (user_id, day)
+    )
+  `);
+  db.exec(`
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,

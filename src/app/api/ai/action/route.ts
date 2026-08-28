@@ -4,6 +4,7 @@ import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-r
 import { AiProviderError, generateWithRetry } from "@/core/ai/provider";
 import { createAiProvider } from "@/server/ai/provider-factory";
 import { getCurrentUser } from "@/server/auth/current-session";
+import { chargeWrite } from "@/server/usage/write-budget";
 import { getDatabase } from "@/server/db/database";
 
 const MAX_HISTORY_MESSAGES = 8;
@@ -17,6 +18,9 @@ export async function POST(request: Request) {
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
+
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
   const authenticatedUser = session;
 
   let input: {

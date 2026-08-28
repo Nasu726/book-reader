@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { getCurrentUser } from "@/server/auth/current-session";
+import { chargeWrite } from "@/server/usage/write-budget";
 import { getDatabase } from "@/server/db/database";
 import { detectFormatFromBytes } from "@/core/documents/file-signature";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
@@ -29,6 +30,9 @@ export async function POST(request: Request) {
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
+
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
 
   let file: File;
   let storageError: unknown;

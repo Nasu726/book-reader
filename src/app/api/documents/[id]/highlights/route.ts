@@ -2,6 +2,7 @@
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
 import { parseSelectionLocation } from "@/core/selection/capture";
 import { getCurrentUser } from "@/server/auth/current-session";
+import { chargeWrite } from "@/server/usage/write-budget";
 import { getDatabase, type Db } from "@/server/db/database";
 import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 
@@ -38,6 +39,9 @@ export async function POST(
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
+
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
 
   let input: {
     format?: unknown;
