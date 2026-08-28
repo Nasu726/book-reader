@@ -1,5 +1,6 @@
 
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
+import { DEFAULT_HIGHLIGHT_COLOR, isHighlightColor } from "@/core/highlights/colors";
 import { parseSelectionLocation } from "@/core/selection/capture";
 import { getCurrentUser } from "@/server/auth/current-session";
 import { chargeWrite } from "@/server/usage/write-budget";
@@ -48,11 +49,19 @@ export async function POST(
     location?: unknown;
     selectedText?: unknown;
     note?: unknown;
+    color?: unknown;
   };
   try {
     input = await request.json();
   } catch {
     return Response.json({ error: "Invalid highlight." }, { status: 400 });
+  }
+
+  // An absent colour is the default; a colour that is not one of ours is a
+  // mistake worth reporting, because it would silently save as something the
+  // reader never picked.
+  if (input.color !== undefined && !isHighlightColor(input.color)) {
+    return Response.json({ error: "Unknown highlight colour." }, { status: 400 });
   }
 
   if (
@@ -77,6 +86,7 @@ export async function POST(
 
   try {
     const highlight = await repository(database).create({
+      color: input.color ?? DEFAULT_HIGHLIGHT_COLOR,
       documentId: id,
       location: input.location,
       note: typeof input.note === "string" && input.note.trim() ? input.note : undefined,

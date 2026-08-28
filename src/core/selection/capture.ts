@@ -38,18 +38,71 @@ function closestSection(node: Node | null): HTMLElement | null {
   return null;
 }
 
+const TEXT_NODE = 3;
+
+function firstTextNodeIn(node: Node): Text | null {
+  if (node.nodeType === TEXT_NODE) return node as Text;
+  for (let child = node.firstChild; child; child = child.nextSibling) {
+    const found = firstTextNodeIn(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+function lastTextNodeIn(node: Node): Text | null {
+  if (node.nodeType === TEXT_NODE) return node as Text;
+  for (let child = node.lastChild; child; child = child.previousSibling) {
+    const found = lastTextNodeIn(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * A selection boundary expressed against a text node.
+ *
+ * A boundary is not always one to begin with: triple-clicking a paragraph, or
+ * dragging past the end of one, leaves Chrome holding an element and a child
+ * index instead. `(element, i)` means "before the i-th child", so the same
+ * place in the text is the end of the last text before that child, or the start
+ * of the first text after it.
+ */
+function toTextBoundary(node: Node, offset: number): { node: Node; offset: number } {
+  if (node.nodeType === TEXT_NODE) return { node, offset };
+
+  const children = node.childNodes;
+  const boundary = Math.max(0, Math.min(offset, children.length));
+  for (let index = boundary - 1; index >= 0; index -= 1) {
+    const text = lastTextNodeIn(children[index]);
+    if (text) return { node: text, offset: text.data.length };
+  }
+  for (let index = boundary; index < children.length; index += 1) {
+    const text = firstTextNodeIn(children[index]);
+    if (text) return { node: text, offset: 0 };
+  }
+  return { node, offset };
+}
+
+/**
+ * How many characters into the section a selection boundary sits.
+ *
+ * Walking text nodes never found an element boundary, so the offset came back
+ * as -1 and the whole selection was discarded: a triple-clicked paragraph could
+ * not be highlighted or asked about at all.
+ */
 export function getSectionTextOffset(
   section: HTMLElement,
   node: Node,
   offset: number,
   ownerDocument: Document = document,
 ): number {
+  const boundary = toTextBoundary(node, offset);
   const walker = ownerDocument.createTreeWalker(section, 4);
   let position = 0;
   let current = walker.nextNode();
   while (current) {
-    if (current === node) {
-      return Math.min(position + offset, position + (current.textContent?.length ?? 0));
+    if (current === boundary.node) {
+      return Math.min(position + boundary.offset, position + (current.textContent?.length ?? 0));
     }
     position += current.textContent?.length ?? 0;
     current = walker.nextNode();

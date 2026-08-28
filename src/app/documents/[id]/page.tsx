@@ -42,7 +42,9 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
       initialHighlights={(await createSqliteHighlightRepository(
         database,
       ).listByDocument(id, session.userId)).map((highlight) => ({
+        color: highlight.color,
         id: highlight.id,
+        location: highlight.location,
         note: highlight.note,
         selectedText: highlight.selectedText,
       }))}

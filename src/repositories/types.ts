@@ -1,3 +1,5 @@
+import type { HighlightColor } from "@/core/highlights/colors";
+
 export type DocumentRecord = {
   id: string;
   userId: string;
@@ -43,6 +45,7 @@ export type HighlightRecord = {
   location: string;
   selectedText: string;
   note?: string;
+  color: HighlightColor;
   createdAt: Date;
 };
 
@@ -54,6 +57,7 @@ export interface HighlightRepository {
     location: string;
     selectedText: string;
     note?: string;
+    color?: HighlightColor;
   }): Promise<HighlightRecord>;
   delete(id: string, userId: string): Promise<boolean>;
 }

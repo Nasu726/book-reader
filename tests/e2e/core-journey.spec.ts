@@ -7,6 +7,22 @@ import { buildEpub, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } fr
 // instead of a browser-level stub that would skip the server entirely.
 const MOCK_AI_RESPONSE = "Mock AI response.";
 
+/** Selects the title line on page 1, the way a reader drags across it. */
+async function selectPassage(page: import("@playwright/test").Page) {
+  return page.evaluate(() => {
+    const target = Array.from(document.querySelectorAll(".textLayer span"))
+      .find((node) => node.textContent?.includes("Structure of Scientific Revolutions"));
+    if (!target) throw new Error("PDF text node not found.");
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    const selected = window.getSelection();
+    selected?.removeAllRanges();
+    selected?.addRange(range);
+    target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    return target.textContent;
+  });
+}
+
 test("PDF journey imports, reads, selects, acts, highlights, and restores", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
@@ -25,18 +41,7 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
     { timeout: 10_000 },
   );
 
-  const selectedText = await page.evaluate(() => {
-    const target = Array.from(document.querySelectorAll(".textLayer span"))
-      .find((node) => node.textContent?.includes("Structure of Scientific Revolutions"));
-    if (!target) throw new Error("PDF text node not found.");
-    const range = document.createRange();
-    range.selectNodeContents(target);
-    const selected = window.getSelection();
-    selected?.removeAllRanges();
-    selected?.addRange(range);
-    target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-    return target.textContent;
-  });
+  const selectedText = await selectPassage(page);
   expect(selectedText).toContain("Structure of Scientific Revolutions");
 
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
@@ -51,16 +56,24 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   await expect(secondary.getByRole("region", { name: "AI response" }).first())
     .toContainText(MOCK_AI_RESPONSE, { timeout: 15_000 });
 
-  await actions.getByRole("button", { name: "Highlight", exact: true }).click();
-  await expect(page.getByText("Highlight saved.")).toBeVisible();
+  // Highlighting lives against the passage now, so the selection the AI actions
+  // consumed has to be made again — clicking in the pane clears it, exactly as
+  // it would for a reader.
+  await selectPassage(page);
+  await page.getByRole("group", { name: "Actions for the selected text" })
+    .getByRole("button", { name: "Highlight in yellow" }).click();
+  // The same allowance the AI assertions above use. These confirmations wait on
+  // a round trip to the development server, which two Playwright workers
+  // rendering PDF pages can hold up well past the default five seconds.
+  await expect(page.getByText("Highlight saved.")).toBeVisible({ timeout: 15_000 });
   const note = page.getByRole("textbox", { name: "Document note" });
   await note.fill("Persisted document note.");
   await page.getByRole("button", { name: "Save note" }).click();
-  await expect(page.getByText("Note saved.")).toBeVisible();
+  await expect(page.getByText("Note saved.")).toBeVisible({ timeout: 15_000 });
   const vocabularySection = page.getByRole("region", { name: "Saved vocabulary" });
   await vocabularySection.getByRole("textbox", { name: "Meaning" }).fill("A short demonstration sentence.");
   await vocabularySection.getByRole("button", { name: "Save vocabulary" }).click();
-  await expect(page.getByText("Vocabulary saved.")).toBeVisible();
+  await expect(page.getByText("Vocabulary saved.")).toBeVisible({ timeout: 15_000 });
 
   await page.reload();
   await expect(page.getByRole("complementary", { name: "AI and notes" })

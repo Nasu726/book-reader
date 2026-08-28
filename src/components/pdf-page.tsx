@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { getDocument, TextLayer } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 import { extractPdfText } from "@/core/documents/pdf-extraction";
+import { clearHighlights, paintHighlights, type PaintableHighlight } from "./highlight-paint";
 
 /** Derived from pdf.js rather than described by hand, so the calls stay honest. */
 export type PdfDocumentProxy = Awaited<ReturnType<typeof getDocument>["promise"]>;
@@ -15,6 +16,8 @@ type PdfPageProps = {
   zoom: number;
   /** Page size at scale 1, used to hold space before the page is drawn. */
   aspectRatio: number;
+  /** Every saved highlight; this page draws the ones that name its number. */
+  highlights?: readonly PaintableHighlight[];
   onTextExtracted?: (pageNumber: number, text: string) => void;
 };
 
@@ -31,13 +34,17 @@ export function PdfPage({
   pageNumber,
   zoom,
   aspectRatio,
+  highlights = [],
   onTextExtracted,
 }: PdfPageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
-  const [drawn, setDrawn] = useState(false);
+  // Counts completed draws rather than recording that one happened, so that a
+  // re-draw — a resize, a zoom — is something the highlights can react to.
+  const [layerVersion, setLayerVersion] = useState(0);
+  const drawn = layerVersion > 0;
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -111,7 +118,7 @@ export function PdfPage({
           viewport,
         }).render();
         page.cleanup();
-        if (!cancelled) { setError(false); setDrawn(true); }
+        if (!cancelled) { setError(false); setLayerVersion((current) => current + 1); }
       } catch {
         if (!cancelled) setError(true);
       }
@@ -120,6 +127,19 @@ export function PdfPage({
     void draw();
     return () => { cancelled = true; };
   }, [visible, pdfDocument, pageNumber, zoom, attempt, onTextExtracted]);
+
+  // Never before the text layer exists: the spans a highlight points at are
+  // created by that render, and pdf.js replaces them wholesale every time the
+  // page is drawn again — which is what layerVersion is here to notice.
+  useEffect(() => {
+    const layer = textLayerRef.current;
+    if (layerVersion === 0 || !layer) return;
+    paintHighlights(layer, highlights, { format: "pdf", page: pageNumber });
+  }, [highlights, layerVersion, pageNumber]);
+
+  // A page scrolled far out of view keeps its ranges registered against nodes
+  // that are still in the document, so only unmounting has to clean up.
+  useEffect(() => () => clearHighlights({ format: "pdf", page: pageNumber }), [pageNumber]);
 
   // Re-draw when the column changes width: a rotated phone, a resized window,
   // or the pane beside it appearing.

@@ -4,6 +4,7 @@ import { DOMParser } from "linkedom";
 
 import {
   DOCUMENT_SELECTION_VERSION,
+  getSectionTextOffset,
   captureEpubSelection,
   capturePdfSelection,
   normalizePdfSelectionText,
@@ -168,4 +169,26 @@ test("PDF selection context falls back safely without page text", () => {
 
   assert.ok(captured);
   assert.equal(captured.surroundingText, undefined);
+});
+
+test("a selection that starts or ends on an element is still captured", () => {
+  // What Chrome hands over for a triple-click, or a drag that runs past the end
+  // of a paragraph: the boundary is an element and a child index, not a text
+  // node. This used to come back as -1 and the selection was thrown away.
+  const parser = new DOMParser();
+  const document = parser.parseFromString(
+    '<article data-reader-section="chapter-1"><p>Normal science</p><p>means research.</p></article>',
+    "text/html",
+  ) as unknown as Document;
+  const article = document.querySelector("article")! as unknown as HTMLElement;
+  const paragraphs = document.querySelectorAll("p");
+
+  // The whole first paragraph: from before its first child to after its last.
+  assert.equal(getSectionTextOffset(article, paragraphs[0], 0, document), 0);
+  assert.equal(getSectionTextOffset(article, paragraphs[0], 1, document), "Normal science".length);
+  // A boundary on the article itself, before the second paragraph.
+  assert.equal(getSectionTextOffset(article, article, 1, document), "Normal science".length);
+  // Still -1 for a node that is not in this section at all.
+  const stranger = document.createElement("p");
+  assert.equal(getSectionTextOffset(article, stranger, 0, document), -1);
 });

@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
-import { glob } from "node:fs/promises";
 
 const API_DIR = join(import.meta.dirname, "../../src/app/api");
 
@@ -20,15 +19,16 @@ const WRITE_METHOD = /^export async function (POST|PATCH|PUT|DELETE)\(/;
  * stops being true is a new route added without the call. Reading the source is
  * the only check that fails for a route nobody wrote a test for yet.
  */
-test("every write route charges the daily budget", async () => {
+test("every write route charges the daily budget", () => {
   const missing: string[] = [];
   let checked = 0;
 
-  for await (const file of glob(join(API_DIR, "**/route.ts"))) {
-    const name = relative(API_DIR, file).replaceAll("\\", "/");
-    if (EXEMPT.includes(name)) continue;
+  const entries = readdirSync(API_DIR, { recursive: true }) as string[];
+  for (const entry of entries) {
+    const name = entry.replaceAll("\\", "/");
+    if (!name.endsWith("route.ts") || EXEMPT.includes(name)) continue;
 
-    const source = readFileSync(file, "utf8");
+    const source = readFileSync(join(API_DIR, entry), "utf8");
     for (const handler of source.split(/(?=export async function )/)) {
       const method = handler.match(WRITE_METHOD)?.[1];
       if (!method) continue;

@@ -10,6 +10,7 @@ type HighlightRow = typeof highlights.$inferSelect;
 
 function toRecord(row: HighlightRow): HighlightRecord {
   return {
+    color: row.color,
     createdAt: row.createdAt,
     documentId: row.documentId,
     id: row.id,

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PdfRenderer } from "./pdf-renderer";
 import { captureEpubSelection, type DocumentSelection } from "@/core/selection/capture";
+import { clearAllHighlights, paintHighlights, type PaintableHighlight } from "./highlight-paint";
 import { usePageShortcuts } from "./use-page-shortcuts";
 
 type DocumentReaderProps = {
@@ -12,6 +13,8 @@ type DocumentReaderProps = {
   /** The uploaded filename, used to tell an untouched title from a rename. */
   documentSourceFilename?: string;
   format: "epub" | "pdf";
+  /** Saved highlights, drawn onto the text as it renders. */
+  highlights?: readonly PaintableHighlight[];
   onSelectionChange?: (selection: DocumentSelection | null) => void;
 };
 
@@ -95,8 +98,10 @@ export function DocumentReader({
   documentTitle = "",
   documentSourceFilename,
   format,
+  highlights = [],
   onSelectionChange,
 }: DocumentReaderProps) {
+  const chapterRef = useRef<HTMLElement>(null);
   const [epub, setEpub] = useState<ParsedEpub | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
@@ -200,6 +205,18 @@ export function DocumentReader({
     };
   }, [documentTitle, format, onSelectionChange]);
 
+  const section = epub?.sections[sectionIndex];
+  const sectionId = section?.id;
+  useEffect(() => {
+    const chapter = chapterRef.current;
+    if (format !== "epub" || !chapter || !sectionId) return;
+    paintHighlights(chapter, highlights, { format: "epub", sectionId });
+  }, [format, highlights, sectionId]);
+
+  // The registry outlives this component, so a document left open would keep
+  // colouring text in the next one.
+  useEffect(() => clearAllHighlights, []);
+
   useEffect(() => {
     if (format === "pdf" || !hasUserNavigated || !epub) return;
     const section = epub.sections[sectionIndex];
@@ -216,7 +233,6 @@ export function DocumentReader({
   if (error) return <div className="rounded-lg border border-red-300 p-3 text-sm" role="alert">{error}</div>;
   if (format === "epub") {
     if (!epub) return <p aria-live="polite">Opening…</p>;
-    const section = epub.sections[sectionIndex];
     if (!section) return <div role="alert">This EPUB has no readable sections.</div>;
     return (
       <section aria-label="EPUB reader" className="space-y-4">
@@ -225,7 +241,7 @@ export function DocumentReader({
           <span className="text-sm">{sectionIndex + 1} / {epub.sections.length}</span>
           <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => goToSection(sectionIndex + 1)} type="button">Next</button>
         </div>
-        <article className="reader-prose max-w-prose rounded-xl border border-zinc-200 p-4 dark:border-zinc-800" data-reader-section={section.id}>
+        <article className="reader-prose max-w-prose rounded-xl border border-zinc-200 p-4 dark:border-zinc-800" data-reader-section={section.id} ref={chapterRef}>
           {/* The nav label is only shown when the chapter body carries no heading of its own. */}
           {section.title && !/<h[1-6]>/.test(section.html ?? "") && (
             <h2 className="mb-3 text-xl font-semibold">{section.title}</h2>
@@ -254,6 +270,7 @@ export function DocumentReader({
     return (
       <PdfRenderer
         documentTitle={documentTitle}
+        highlights={highlights}
         initialLocation={initialLocation}
         onSelectionChange={(selection) => {
           setCapturedSelection(selection);

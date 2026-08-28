@@ -1,3 +1,4 @@
+import { DEFAULT_HIGHLIGHT_COLOR, HIGHLIGHT_COLORS } from "@/core/highlights/colors";
 import {
   sqliteTable,
   text,
@@ -61,6 +62,7 @@ export const highlights = sqliteTable("highlights", {
   location: text("location").notNull(),
   selectedText: text("selected_text").notNull(),
   note: text("note"),
+  color: text("color", { enum: HIGHLIGHT_COLORS }).notNull().default(DEFAULT_HIGHLIGHT_COLOR),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),

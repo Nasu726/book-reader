@@ -22,12 +22,15 @@ test("AI actions render in the desktop secondary pane", async ({ page }) => {
   await expect(secondary).toBeVisible();
   const actions = secondary.getByRole("group", { name: "AI actions" });
   await expect(actions).toBeVisible();
-  for (const action of ["Explain", "Translate", "Simplify", "Ask", "Highlight"]) {
+  // Highlighting is not among them: it happens against the selection, where a
+  // colour can be chosen, rather than as a colourless button in this pane.
+  for (const action of ["Explain", "Translate", "Simplify", "Ask"]) {
     const button = actions.getByRole("button", { name: action, exact: true });
     await expect(button).toBeVisible();
     // Offered, but not usable until there is a passage to act on.
     await expect(button).toBeDisabled();
   }
+  await expect(actions.getByRole("button", { name: "Highlight", exact: true })).toHaveCount(0);
 });
 
 test("the AI panel exists exactly once, so its labels stay wired to its own inputs", async ({ page }) => {

@@ -9,6 +9,7 @@ import {
 
 import { capturePdfSelection, type DocumentSelection } from "@/core/selection/capture";
 import { inferPaperStructure } from "@/core/documents/paper-structure";
+import type { PaintableHighlight } from "./highlight-paint";
 import { PdfPage, type PdfDocumentProxy } from "./pdf-page";
 import { usePageShortcuts } from "./use-page-shortcuts";
 
@@ -20,6 +21,8 @@ const MAX_ZOOM = 3;
 
 type PdfRendererProps = {
   documentTitle?: string;
+  /** Saved highlights, drawn onto each page as it is rendered. */
+  highlights?: readonly PaintableHighlight[];
   source: string;
   initialLocation?: string | null;
   onLocationChange?: (location: string) => void;
@@ -49,6 +52,7 @@ function parsePage(location: string | null | undefined): number {
  */
 export function PdfRenderer({
   documentTitle = "",
+  highlights = [],
   initialLocation,
   onLocationChange,
   onSelectionChange,
@@ -275,6 +279,7 @@ export function PdfRenderer({
             <PdfPage
               aspectRatio={aspectRatio}
               document={document_}
+              highlights={highlights}
               key={index + 1}
               onTextExtracted={rememberPageText}
               pageNumber={index + 1}

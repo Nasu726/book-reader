@@ -13,6 +13,14 @@ const ACTION_LABELS: Record<(typeof AI_ACTIONS)[number], string> = {
   translate: "Translate",
 };
 
+/**
+ * Highlighting is not offered here. It is not an AI action at all — the service
+ * only carries it so that a saved passage has a name — and the control that
+ * does it lives against the selection now, where it can also ask which colour.
+ * A second, colourless button for the same thing was one way too many.
+ */
+const PANEL_ACTIONS = AI_ACTIONS.filter((action) => action !== "highlight");
+
 const TARGET_LANGUAGES = [
   "English",
   "French",
@@ -24,11 +32,9 @@ const TARGET_LANGUAGES = [
 
 export function AiAnswerPanel({
   conversation,
-  onHighlightCreated,
   selection,
 }: {
   conversation: AiConversation;
-  onHighlightCreated?: (selection: DocumentSelection) => Promise<void> | void;
   selection: DocumentSelection | null;
 }) {
   const {
@@ -42,7 +48,7 @@ export function AiAnswerPanel({
     // nothing and printed its text over the controls below it.
     <div className="space-y-4">
       <div aria-label="AI actions" className="flex flex-wrap gap-2" role="group">
-        {AI_ACTIONS.map((candidate) => (
+        {PANEL_ACTIONS.map((candidate) => (
           <button
             className={`min-h-11 rounded-lg border px-3 text-sm ${
               action === candidate
@@ -54,13 +60,7 @@ export function AiAnswerPanel({
             // error with a Retry button that could only fail the same way.
             disabled={loading || !selection}
             key={candidate}
-            onClick={() => {
-              if (candidate === "highlight") {
-                if (selection) void onHighlightCreated?.(selection);
-                return;
-              }
-              void run(candidate);
-            }}
+            onClick={() => void run(candidate)}
             type="button"
           >
             {ACTION_LABELS[candidate]}

@@ -65,7 +65,7 @@ test("PDF selection exposes selectable text and captures normalized intent", asy
   const actions = secondary.getByRole("group", { name: "AI actions" });
   await expect(actions).toBeVisible();
   // Nothing is selected, so no action has anything to act on.
-  for (const label of ["Explain", "Translate", "Simplify", "Highlight"]) {
+  for (const label of ["Explain", "Translate", "Simplify"]) {
     await expect(actions.getByRole("button", { name: label, exact: true })).toBeDisabled();
   }
   await expect(reader.getByText("Select PDF text to prepare it for AI actions.")).toBeVisible();
