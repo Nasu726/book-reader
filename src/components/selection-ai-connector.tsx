@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { AiAnswerPanel } from "./ai-answer-panel";
 import { useAiActions } from "./use-ai-actions";
 import { AppShell } from "./app-shell";
+import { SecondaryTabs, type SecondaryTab } from "./secondary-tabs";
 import { SelectionActions } from "./selection-actions";
 import { DocumentReader } from "./document-reader";
 import { DocumentNotes } from "./document-notes";
@@ -54,6 +55,7 @@ export function SelectionAiConnector({
 }: SelectionAiConnectorProps) {
   const [selection, setSelection] = useState<DocumentSelection | null>(null);
   const [sheetSignal, setSheetSignal] = useState(0);
+  const [tab, setTab] = useState<SecondaryTab>("ai");
   const [highlightState, setHighlightState] = useState<"idle" | "saved" | "error">("idle");
   const [highlights, setHighlights] = useState(() => [...initialHighlights]);
   const [vocabulary, setVocabulary] = useState(() => [...initialVocabulary]);
@@ -167,7 +169,9 @@ export function SelectionAiConnector({
               // an effect turned a user event into a state change, and made the
               // same action twice in a row look like no change at all.
               void conversation.run(action);
-              // On a phone the answer arrives in the sheet, so open it.
+              // The answer has somewhere to arrive: the AI tab, and on a phone
+              // the sheet that holds it.
+              setTab("ai");
               setSheetSignal((current) => current + 1);
             }}
             onHighlight={(color) => {
@@ -195,12 +199,16 @@ export function SelectionAiConnector({
         </>
       }
       secondary={
-        <>
-          <AiAnswerPanel conversation={conversation} selection={selection} />
-          <details className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800" open={highlights.length > 0}>
-            <summary aria-label="Saved highlights" className="cursor-pointer text-sm font-semibold">
-              Highlights ({highlights.length})
-            </summary>
+        <SecondaryTabs
+          active={tab}
+          ai={<AiAnswerPanel conversation={conversation} selection={selection} />}
+          onChange={setTab}
+          saved={<>
+          {/* A plain section rather than a disclosure: the tab it sits in is
+              already the thing that reveals it, and one of the two was a click
+              nobody asked for. */}
+          <section aria-label="Saved highlights" className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <h2 className="text-sm font-semibold">Highlights ({highlights.length})</h2>
             <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
               Passages you marked while reading. They stay with this document.
             </p>
@@ -234,7 +242,7 @@ export function SelectionAiConnector({
                 ))}
               </ul>
             )}
-          </details>
+          </section>
           <DocumentNotes documentId={documentId} />
           <section aria-label="Saved vocabulary" className="mt-6 space-y-2 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
             <h2 className="text-sm font-semibold">Save vocabulary</h2>
@@ -285,7 +293,8 @@ export function SelectionAiConnector({
               </ul>
             )}
           </section>
-        </>
+          </>}
+        />
       }
     />
   );

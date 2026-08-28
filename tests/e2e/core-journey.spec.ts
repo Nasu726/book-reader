@@ -66,6 +66,9 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   // a round trip to the development server, which two Playwright workers
   // rendering PDF pages can hold up well past the default five seconds.
   await expect(page.getByText("Highlight saved.")).toBeVisible({ timeout: 15_000 });
+
+  // What the reader keeps lives in its own tab, away from the AI's answers.
+  await page.getByRole("tab", { name: "Saved" }).click();
   const note = page.getByRole("textbox", { name: "Document note" });
   await note.fill("Persisted document note.");
   await page.getByRole("button", { name: "Save note" }).click();
@@ -76,8 +79,8 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   await expect(page.getByText("Vocabulary saved.")).toBeVisible({ timeout: 15_000 });
 
   await page.reload();
-  await expect(page.getByRole("complementary", { name: "AI and notes" })
-    .locator("details").filter({ hasText: "Highlights" })
+  await page.getByRole("tab", { name: "Saved" }).click();
+  await expect(page.getByRole("region", { name: "Saved highlights" })
     .getByText("Structure of Scientific Revolutions")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Document note" })).toHaveValue("Persisted document note.");
   const savedVocabulary = page.getByRole("region", { name: "Saved vocabulary" }).locator("li");

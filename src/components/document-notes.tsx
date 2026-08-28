@@ -8,6 +8,10 @@ type DocumentNotesProps = {
 
 export function DocumentNotes({ documentId }: DocumentNotesProps) {
   const [content, setContent] = useState("");
+  // What the server is holding, so the button can say which of the two things
+  // pressing it would do. Without it a document that has never had a note
+  // offered to clear one.
+  const [stored, setStored] = useState("");
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
   // Typing before the saved note arrives must not be thrown away by it.
   const edited = useRef(false);
@@ -19,7 +23,9 @@ export function DocumentNotes({ documentId }: DocumentNotesProps) {
         const response = await fetch(`/api/documents/${documentId}/note`, { cache: "no-store" });
         if (!response.ok) throw new Error("Load failed.");
         const payload = (await response.json()) as { note?: { content?: string } | null };
-        if (!cancelled && !edited.current) setContent(payload.note?.content ?? "");
+        if (cancelled) return;
+        setStored(payload.note?.content ?? "");
+        if (!edited.current) setContent(payload.note?.content ?? "");
       } catch {
         if (!cancelled) setStatus("error");
       }
@@ -38,6 +44,7 @@ export function DocumentNotes({ documentId }: DocumentNotesProps) {
         method: "POST",
       });
       if (!response.ok) throw new Error("Save failed.");
+      setStored(content);
       setStatus("saved");
       window.setTimeout(() => setStatus((current) => current === "saved" ? "idle" : current), 5000);
     } catch {
@@ -70,11 +77,12 @@ export function DocumentNotes({ documentId }: DocumentNotesProps) {
           removed. Disabling the button on empty text meant a note could be
           written but never taken back. */}
       <button
-        className="min-h-11 w-full rounded-lg bg-zinc-900 px-4 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+        className="min-h-11 w-full rounded-lg bg-zinc-900 px-4 font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+        disabled={!content.trim() && !stored.trim()}
         onClick={() => void save()}
         type="button"
       >
-        {content.trim() ? "Save note" : "Clear note"}
+        {!content.trim() && stored.trim() ? "Clear note" : "Save note"}
       </button>
     </section>
   );

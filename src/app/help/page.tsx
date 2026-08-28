@@ -84,7 +84,12 @@ export default function HelpPage() {
           </p>
 
           <h2>保存されるもの3種と、その居場所</h2>
-          <p>どれも右側のパネルにあり、本ごとに分かれている。</p>
+          <p>
+            右側のパネル（スマホでは <strong>Ask AI</strong> のシート）は
+            <strong>AI</strong> と <strong>Saved</strong> の2つに分かれている。
+            AIとのやりとりと、自分で残したものは別のものなので、混ざらないようにしてある。
+            保存したものは <strong>Saved</strong> 側、本ごとに分かれている。
+          </p>
           <ul>
             <li>
               <strong>Highlights</strong> — 付箋。選択メニューの丸い色を押すと、

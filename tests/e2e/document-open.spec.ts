@@ -88,11 +88,12 @@ test("PDF selection highlights persist and can be deleted", async ({ page }) => 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/documents/${documentId}`);
   // Highlights live with the other annotations beside the text, not under it.
-  const savedHighlights = page.getByRole("complementary", { name: "AI and notes" })
-    .locator("details")
-    .filter({ hasText: "Highlights" });
+  await page.getByRole("tab", { name: "Saved" }).click();
+  const savedHighlights = page.getByRole("region", { name: "Saved highlights" });
   await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
   await page.reload();
+  // The pane opens on AI, so getting back to what was saved is a click.
+  await page.getByRole("tab", { name: "Saved" }).click();
   await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
 
   await savedHighlights.getByRole("button", { name: /Delete highlight/ }).click();

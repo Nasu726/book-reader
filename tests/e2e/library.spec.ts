@@ -73,12 +73,19 @@ test("a note can be written, read back, and cleared", async ({ page }) => {
   const documentId = await importDocument(page, "noted.pdf", MULTIPAGE_PDF, "application/pdf");
   await page.goto(`/documents/${documentId}`);
 
+  // The note lives with the other things the reader keeps, one tab over.
+  const openSaved = async () => page.getByRole("tab", { name: "Saved" }).click();
+  await openSaved();
+  // Nothing is stored yet, so there is nothing to clear and nothing to save.
+  const saveNote = page.getByRole("button", { name: "Save note" });
+  await expect(saveNote).toBeDisabled();
   const note = page.getByRole("textbox", { name: "Document note" });
   await note.fill("Kuhn on paradigms.");
   await page.getByRole("button", { name: "Save note" }).click();
   await expect(page.getByText("Note saved.")).toBeVisible();
 
   await page.reload();
+  await openSaved();
   await expect(page.getByRole("textbox", { name: "Document note" }))
     .toHaveValue("Kuhn on paradigms.");
 
@@ -88,5 +95,6 @@ test("a note can be written, read back, and cleared", async ({ page }) => {
   await expect(page.getByText("Note cleared.")).toBeVisible();
 
   await page.reload();
+  await openSaved();
   await expect(page.getByRole("textbox", { name: "Document note" })).toHaveValue("");
 });

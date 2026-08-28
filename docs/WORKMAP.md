@@ -1133,6 +1133,24 @@ Evidence:
 
 ---
 
+## DESK-002 — 右パネルのタブ分割
+**Status:** DONE
+**Priority:** P1
+**Depends on:** DESK-001
+
+### Goal
+
+AIとのやりとりと、読者が保存したもの（ハイライト・ノート・単語帳）を別のタブにする。別の機能なので混ぜない。
+
+### Verify
+
+- `tests/e2e/secondary-tabs.spec.ts` — 切り替え、書きかけのノートの保持、矢印キーがページを送らずタブを移ること、選択メニューからのAI操作でAIタブが前に出ること
+- mutation: `stopPropagation` の削除で矢印キーのテストが赤、`hidden` の削除で分離のテストが赤
+
+判断理由は `docs/DECISIONS.md` D-22。
+
+---
+
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
 **Priority:** P0 before final v0.1 sign-off  
