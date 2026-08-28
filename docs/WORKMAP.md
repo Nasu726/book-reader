@@ -989,9 +989,14 @@ SSRのCPU実測はデプロイ後に取る。
 
 ### デプロイ状況
 
-- URL: https://book-reader.e9gp1ant-1729.workers.dev
-- Cloudflare Access で Worker 単位に保護済み。未認証は Access のログインへ302され、アプリまで到達しない
-- 残り: `OPENROUTER_API_KEY` のsecret登録（未登録のためAIアクションは503）と、本人による本番動作確認
+最終デプロイ: 2026-08-28、main の `c8444eb` から。
+
+- URL: https://book-reader.nasu.uk（`https://book-reader.e9gp1ant-1729.workers.dev` も同じWorker）
+- Cloudflare Access で Worker 単位に保護済み。未認証は Access のログインへ302され、アプリまで到達しない。`/help` も同様にAccessの内側にある（アプリ自身は認証を要求しないが、エッジで保護される）
+- `npm run check:access` — audience 一致を確認済み
+- D1 のスキーマは `0003` まで remote へ適用済み（`usage_counters`、`highlights.color`）
+- デプロイはローカルの wrangler から実行した。**GitHub Actions からの自動デプロイは `docs/HUMAN-TASKS.md` の H-6 待ち**（APIトークンが必要）
+- 残り: 本人による本番動作確認。Access のポリシーが1アドレスのみ許可のため、エージェントはサインインできない
 
 人間側の待ち行列は `docs/HUMAN-TASKS.md` を参照。
 
