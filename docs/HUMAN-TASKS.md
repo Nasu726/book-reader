@@ -309,3 +309,25 @@ Access導入でscryptの問題は消えるが、SSRの分は実測しないと�
 - `wrangler` の認証情報
 
 秘密は必ず `wrangler secret put` か `.env.local` へ直接書き込む。
+
+---
+
+## H-6. GitHub から自動デプロイするための認証情報
+
+**Status:** TODO
+**なぜ人間なのか:** APIトークンの発行はCloudflareダッシュボードでの操作であり、値はシークレット。エージェントが持ってはいけない。
+
+`.github/workflows/deploy.yml` は main への push でデプロイするが、`CLOUDFLARE_API_TOKEN` が無い間は**何もせず緑で終わる**（未設定を理由にCIを赤くしない）。
+
+### 手順
+
+1. Cloudflareダッシュボード → 右上のアカウントメニュー → **Profile** → **API Tokens** → **Create Token**
+2. テンプレート **Edit Cloudflare Workers** を使う。必要な権限は Workers Scripts:Edit、D1:Edit、R2:Edit、Account Settings:Read
+3. 発行された値をコピーする（**この画面を閉じると二度と見られない**）
+4. GitHub の `Nasu726/book-reader` → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+   - `CLOUDFLARE_API_TOKEN` = 手順3の値
+   - `CLOUDFLARE_ACCOUNT_ID` = `e61fea9fb730866ead95086cfe206ef4`（秘密ではないが、ワークフローはシークレットとして読む）
+
+### 完了の確認
+
+main へ push するか、Actions タブから **Deploy** を手動実行する。`Apply D1 migrations` と `Build and deploy the Worker` が実行されれば設定できている。スキップされた場合はトークンが読めていない。
