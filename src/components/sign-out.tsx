@@ -12,7 +12,7 @@ export function SignOut({ usesAccess }: { usesAccess: boolean }) {
   if (usesAccess) {
     return (
       <a
-        className="flex min-h-11 items-center rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+        className="text-ink-quiet hover:text-ink flex min-h-11 shrink-0 items-center text-xs tracking-wide uppercase transition-colors duration-(--fast)"
         href="/cdn-cgi/access/logout"
       >
         Sign out
@@ -23,7 +23,7 @@ export function SignOut({ usesAccess }: { usesAccess: boolean }) {
   return (
     <form action="/api/auth/logout" method="post">
       <button
-        className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+        className="text-ink-quiet hover:text-ink min-h-11 text-xs tracking-wide uppercase transition-colors duration-(--fast)"
         type="submit"
       >
         Sign out

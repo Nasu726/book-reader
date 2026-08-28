@@ -1212,6 +1212,66 @@ pdf.js の text layer は、本文をなぞれるようにするための**透�
 
 ---
 
+## DESIGN-001 — デザイントークンと版面の規約
+**Status:** DONE
+**Priority:** P0
+**Depends on:** DESK-002
+
+### Goal
+
+色・余白・動き・書体をトークン1箇所に集約し、UIはそれだけを使う。余白は `clamp()` の割合指定にする。
+
+### Verify
+
+- `npm run verify`
+- `tests/e2e/auth.spec.ts` — テーマ切り替えが実際に紙の色を塗り替えること（body で測る）
+- 1440 / 402px の目視
+
+判断理由は `docs/DECISIONS.md` D-25。
+
+---
+
+## CONV-003 — 送信は入力欄だけ。アクションはコマンド
+**Status:** DONE
+**Priority:** P0
+**Depends on:** CONV-002
+
+### Goal
+
+`/explain` 等をボタンで入力欄に書き込み、送信は1箇所に集約する。選択の所有者を本文に戻す。
+
+### Verify
+
+- `tests/unit/command-parsing.test.mts` — コマンド解釈
+- `tests/e2e/conversation.spec.ts` — 本文で選択を解けばパネルも未選択になり、パネル操作では外れないこと
+- `tests/e2e/document-open.spec.ts` — 未選択でもアクションは押せ、送信だけが止まり、理由が出ること
+
+判断理由は `docs/DECISIONS.md` D-26。
+
+---
+
+## PDFMEM-001 — 読み終えたページのcanvasを解放する
+**Status:** DONE
+**Priority:** P0
+**Depends on:** READ-005
+
+### 問題
+
+実機（iPhone 17）でPDFが描画されず、Try againも効かないとの報告。
+
+### 原因
+
+一度描いたcanvasを**一度も解放していなかった**。dpr3のiPhoneでは1ページあたり 1206×1706 ≈ 8MB。iOS Safari はページが保持できるcanvas総量に上限があり、超えると割り当てを拒否する。長いPDFを読み進めるほど確実に到達する。
+
+### Verify
+
+- `tests/e2e/mobile.spec.ts` — 12ページのPDFを末尾までスクロールし、先頭ページのcanvasが 0 px になり、読んでいるページは描かれたままであること
+- mutation: 解放を外すと 1,881,360 px が残って赤
+
+描画タスクのキャンセル漏れ（再描画時の二重描画で例外）も同時に修正。
+
+---
+
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
 **Priority:** P0 before final v0.1 sign-off  

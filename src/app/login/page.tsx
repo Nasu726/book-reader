@@ -9,14 +9,14 @@ export default function LoginPage() {
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-6 py-24">
         <h1 className="text-2xl font-semibold tracking-tight">Sign-in is not configured</h1>
-        <p className="text-zinc-600 dark:text-zinc-400">
+        <p className="text-ink-quiet">
           This deployment expects Cloudflare Access to authenticate readers before
           they reach it. Create an Access application for this hostname, then set
-          <code className="mx-1 rounded bg-zinc-100 px-1 dark:bg-zinc-800">CF_ACCESS_TEAM_DOMAIN</code>
+          <code className="mx-1 rounded bg-rule/40 px-1">CF_ACCESS_TEAM_DOMAIN</code>
           and
-          <code className="mx-1 rounded bg-zinc-100 px-1 dark:bg-zinc-800">CF_ACCESS_AUD</code>.
+          <code className="mx-1 rounded bg-rule/40 px-1">CF_ACCESS_AUD</code>.
         </p>
-        <p className="text-sm text-zinc-500">See docs/HUMAN-TASKS.md, task H-4.</p>
+        <p className="text-sm text-ink-quiet">See docs/HUMAN-TASKS.md, task H-4.</p>
       </main>
     );
   }
@@ -29,7 +29,7 @@ export default function LoginPage() {
           <label className="block text-sm font-medium" htmlFor="username">Username</label>
           <input
             autoComplete="username"
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-lg border border-rule px-3 py-2"
             id="username"
             name="username"
             required
@@ -40,14 +40,14 @@ export default function LoginPage() {
           <label className="block text-sm font-medium" htmlFor="password">Password</label>
           <input
             autoComplete="current-password"
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-lg border border-rule px-3 py-2"
             id="password"
             name="password"
             required
             type="password"
           />
         </div>
-        <button className="min-h-11 w-full rounded-lg bg-zinc-900 py-2 text-white dark:bg-zinc-100 dark:text-zinc-900" type="submit">
+        <button className="min-h-11 w-full rounded-lg bg-ink py-2 text-white" type="submit">
           Log in
         </button>
       </form>

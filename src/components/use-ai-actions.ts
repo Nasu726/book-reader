@@ -82,15 +82,14 @@ export function useAiActions({
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
-   * The passage the conversation is about.
+   * The passage the conversation is about: whatever is selected in the book.
    *
-   * Kept here rather than read from the live selection, because the browser
-   * drops a selection the moment anything else is clicked. Every action was
-   * disabled by the reader's next click, so a passage could be explained but
-   * never then translated without selecting it a second time.
+   * Reported only by the book itself, never by the pane beside it. That is the
+   * whole trick — clicking an action used to count as "nothing is selected any
+   * more" and disabled every action, while letting go of a passage in the text
+   * left it attached here with no way to see it or drop it.
    */
-  const [subject, setSubject] = useState<DocumentSelection | null>(null);
-  if (selection && selection !== subject) setSubject(selection);
+  const subject = selection;
 
   useEffect(() => {
     if (!documentId) return;

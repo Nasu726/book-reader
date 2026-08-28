@@ -32,14 +32,22 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
-      // Chromium with a phone viewport, touch input, and mobile device pixel
-      // ratio. This guards the mobile *layout* only: iOS forces every browser
-      // onto WKWebView, so iOS Safari and iOS Chrome behaviour — selection
-      // handles, dvh against the collapsing toolbar, keyboard insets — is not
-      // reproduced here and still needs a real device (HUMAN-001).
+      // The reader's actual phone: an iPhone 17, at its real viewport and its
+      // real pixel ratio of 3 — which is what decides how large a rendered PDF
+      // canvas is, and therefore how much memory a long document costs.
+      //
+      // Run in Chromium rather than WebKit because Playwright's WebKit needs
+      // system libraries this machine does not have; installing them is task
+      // H-10. So this guards the mobile *layout* and the sizes, not iOS
+      // behaviour: selection handles, dvh against the collapsing toolbar, and
+      // Safari's canvas budget still need the device itself (HUMAN-001).
       name: "mobile-layout",
       testMatch: /mobile\.spec\.ts/,
-      use: { ...devices["Pixel 7"] },
+      use: {
+        ...devices["iPhone 17"],
+        browserName: "chromium",
+        defaultBrowserType: "chromium",
+      },
     },
   ],
   webServer: {

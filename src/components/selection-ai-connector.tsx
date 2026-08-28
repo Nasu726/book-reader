@@ -16,7 +16,7 @@ import type { DocumentSelection } from "@/core/selection/capture";
 
 type SelectionAiConnectorProps = {
   documentId: string;
-  documentFormat: "epub" | "pdf";
+  documentFormat: "epub" |"pdf";
   documentTitle: string;
   documentSourceFilename?: string;
   /** Sign-out control, built on the server because only it knows how. */
@@ -57,13 +57,13 @@ export function SelectionAiConnector({
   const [selection, setSelection] = useState<DocumentSelection | null>(null);
   const [sheetSignal, setSheetSignal] = useState(0);
   const [tab, setTab] = useState<SecondaryTab>("ai");
-  const [highlightState, setHighlightState] = useState<"idle" | "saved" | "error">("idle");
+  const [highlightState, setHighlightState] = useState<"idle" |"saved" |"error">("idle");
   const [highlights, setHighlights] = useState(() => [...initialHighlights]);
   const [vocabulary, setVocabulary] = useState(() => [...initialVocabulary]);
   const [meaning, setMeaning] = useState("");
   const conversation = useAiActions({ documentId, selection });
   const note = useDocumentNote(documentId);
-  const [vocabularyState, setVocabularyState] = useState<"idle" | "saved" | "error">("idle");
+  const [vocabularyState, setVocabularyState] = useState<"idle" |"saved" |"error">("idle");
 
   async function deleteVocabularyEntry(entryId: string) {
     try {
@@ -86,7 +86,7 @@ export function SelectionAiConnector({
           selectedText: selection.text,
           term: selection.text.split(/\s+/).slice(0, 8).join(" "),
         }),
-        headers: { "content-type": "application/json" },
+        headers: {"content-type": "application/json" },
         method: "POST",
       });
       const payload = (await response.json()) as { entry?: { id: string } };
@@ -130,7 +130,7 @@ export function SelectionAiConnector({
           location: captured.location,
           selectedText: captured.text,
         }),
-        headers: { "content-type": "application/json" },
+        headers: {"content-type": "application/json" },
         method: "POST",
       });
       const payload = (await response.json()) as { highlight?: { id: string } };
@@ -156,7 +156,7 @@ export function SelectionAiConnector({
       showTextSize={documentFormat === "epub"}
       title={
         <div className="min-w-0">
-          <Link className="text-sm text-zinc-600 hover:underline dark:text-zinc-400" href="/">
+          <Link className="text-sm text-ink-quiet hover:underline" href="/">
             ← Library
           </Link>
           <h1 className="truncate text-lg font-semibold tracking-tight">{documentTitle}</h1>
@@ -209,9 +209,9 @@ export function SelectionAiConnector({
           {/* A plain section rather than a disclosure: the tab it sits in is
               already the thing that reveals it, and one of the two was a click
               nobody asked for. */}
-          <section aria-label="Saved highlights" className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+          <section aria-label="Saved highlights" className="rounded-xl border-rule border p-3">
             <h2 className="text-sm font-semibold">Highlights ({highlights.length})</h2>
-            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+            <p className="mt-1 text-xs text-ink-quiet">
               Passages you marked while reading. They stay with this document.
             </p>
             {highlights.length === 0 ? (
@@ -234,7 +234,7 @@ export function SelectionAiConnector({
                     </div>
                     <button
                       aria-label={`Delete highlight: ${highlight.selectedText}`}
-                      className="min-h-9 shrink-0 rounded-lg border border-zinc-300 px-2 text-xs dark:border-zinc-700"
+                      className="min-h-9 shrink-0 rounded-lg border border-rule px-2 text-xs"
                       onClick={() => void deleteHighlight(highlight.id)}
                       type="button"
                     >
@@ -246,14 +246,14 @@ export function SelectionAiConnector({
             )}
           </section>
           <DocumentNotes note={note} />
-          <section aria-label="Saved vocabulary" className="mt-6 space-y-2 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+          <section aria-label="Saved vocabulary" className="mt-6 space-y-2 rounded-xl border-rule border p-3">
             <h2 className="text-sm font-semibold">Save vocabulary</h2>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+            <p className="text-xs text-ink-quiet">
               {selection ? `Selected source: ${selection.text}` : "Select text first."}
             </p>
             <label className="block text-sm font-medium" htmlFor="vocabulary-meaning">Meaning</label>
             <textarea
-              className="min-h-20 w-full rounded-lg border border-zinc-300 p-3 text-sm dark:border-zinc-700"
+              className="min-h-20 w-full rounded-lg border border-rule p-3 text-sm"
               id="vocabulary-meaning"
               onChange={(event) => {
                 setMeaning(event.target.value);
@@ -266,7 +266,7 @@ export function SelectionAiConnector({
               <div className="rounded-lg border border-red-300 p-3 text-sm" role="alert">Vocabulary could not be saved or deleted.</div>
             )}
             <button
-              className="min-h-11 w-full rounded-lg bg-zinc-900 px-4 font-medium text-white disabled:opacity-50"
+              className="min-h-11 w-full rounded-lg bg-ink px-4 font-medium text-white disabled:opacity-50"
               disabled={!selection || !meaning.trim()}
               onClick={() => void saveVocabularyEntry()}
               type="button"
@@ -280,11 +280,11 @@ export function SelectionAiConnector({
                     <div>
                       <p className="font-medium">{entry.term}</p>
                       <p className="text-sm">{entry.meaning}</p>
-                      <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">Source: {entry.sourceText}</p>
+                      <p className="mt-1 text-xs text-ink-quiet">Source: {entry.sourceText}</p>
                     </div>
                     <button
                       aria-label={`Delete vocabulary entry: ${entry.term}`}
-                      className="min-h-9 shrink-0 rounded-lg border border-zinc-300 px-2 text-xs dark:border-zinc-700"
+                      className="min-h-9 shrink-0 rounded-lg border border-rule px-2 text-xs"
                       onClick={() => void deleteVocabularyEntry(entry.id)}
                       type="button"
                     >

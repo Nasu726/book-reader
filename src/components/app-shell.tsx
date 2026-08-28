@@ -56,15 +56,15 @@ export function AppShell({
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-zinc-50 dark:bg-zinc-900">
-      <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-zinc-200 px-4 py-3 sm:px-6 dark:border-zinc-800">
+    <div className="bg-paper text-ink flex h-dvh flex-col">
+      <header className="border-rule flex shrink-0 items-center gap-3 border-b px-(--gutter) py-3">
         <div className="min-w-0 flex-1">{title}</div>
         <ReaderControls showTextSize={showTextSize} />
         {/* One entry point, in the one header every screen shares. The manual
             answers what nothing on screen can: what a highlight is for, why the
             text size control only appears on some books, and what an EPUB is. */}
         <Link
-          className="flex min-h-11 items-center rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          className="text-ink-quiet hover:text-ink flex min-h-11 shrink-0 items-center text-xs tracking-wide uppercase transition-colors duration-(--fast)"
           href="/help"
         >
           Help
@@ -72,15 +72,11 @@ export function AppShell({
         {account}
       </header>
 
-      {/*
-        Edge to edge on a phone, framed on a wide screen. A PDF page is only as
-        readable as it is wide, and on a 390-pixel screen the shell's padding
-        was taking a tenth of that away from the page itself.
-      */}
-      <div className="flex min-h-0 flex-1 gap-4 sm:p-4 lg:px-6">
+      {/* The sheet and its margin, divided by one line. */}
+      <div className="flex min-h-0 flex-1">
         <main
           aria-label="Reader"
-          className="min-w-0 flex-1 overflow-y-auto bg-white shadow-sm sm:rounded-2xl sm:border sm:border-zinc-200 sm:p-5 dark:bg-zinc-950 sm:dark:border-zinc-800"
+          className="min-w-0 flex-1 overflow-y-auto px-(--gutter) py-(--gutter)"
           data-reader-scroll
         >
           {reader}
@@ -88,7 +84,7 @@ export function AppShell({
 
         {secondary && !sheetOpen && (
           <button
-            className="fixed right-4 bottom-4 z-30 min-h-12 rounded-full bg-zinc-900 px-5 font-medium text-white shadow-lg lg:hidden dark:bg-zinc-100 dark:text-zinc-900"
+            className="bg-ink text-paper right-(--gutter) bottom-(--gutter) fixed z-30 min-h-12 rounded-full px-5 text-xs tracking-widest uppercase shadow-lg transition-transform duration-(--fast) ease-(--ease) active:scale-95 lg:hidden"
             onClick={() => setSheetOpen(true)}
             type="button"
           >
@@ -100,7 +96,7 @@ export function AppShell({
         {secondary && sheetOpen && (
           <button
             aria-label="Close the AI panel"
-            className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+            className="fixed inset-0 z-30 bg-black/25 backdrop-blur-[1px] transition-opacity duration-(--slow) lg:hidden"
             onClick={() => setSheetOpen(false)}
             type="button"
           />
@@ -122,29 +118,32 @@ export function AppShell({
           aria-label={sheetOpen ? "AI drawer" : "AI and notes"}
           aria-modal={sheetOpen || undefined}
           className={[
-            "flex flex-col bg-white dark:bg-zinc-950",
+"bg-paper flex flex-col",
             // Phone: a sheet parked below the edge until it is asked for.
-            "fixed inset-x-0 bottom-0 z-40 max-h-[72dvh] rounded-t-2xl p-4 shadow-2xl",
-            "transition-[transform,visibility] duration-200 ease-out motion-reduce:transition-none",
+"fixed inset-x-0 bottom-0 z-40 max-h-[72dvh] rounded-t-2xl p-(--gutter) shadow-2xl",
+"transition-[transform,visibility] duration-(--slow) ease-(--ease) motion-reduce:transition-none",
             // Parked off-screen is not the same as absent: an element that is
             // merely translated away still answers to a screen reader and to a
             // test asking whether the pane is showing.
             sheetOpen ? "translate-y-0 visible" : "invisible translate-y-full",
             // Wide screen: an ordinary column, no transform, always present.
-            "lg:visible lg:static lg:z-auto lg:max-h-none lg:w-[380px] lg:shrink-0 lg:translate-y-0",
+"lg:visible lg:static lg:z-auto lg:max-h-none lg:w-[380px] lg:shrink-0 lg:translate-y-0",
             // The pane itself never scrolls. What has more than fits — the
             // transcript, the list of saved things — scrolls inside its own
             // box, so the controls stay put and the whole column does not
             // creep up and down by a few pixels while reading.
-            "lg:overflow-hidden lg:rounded-2xl lg:border lg:border-zinc-200 lg:p-5",
-            "lg:shadow-sm lg:transition-none lg:dark:border-zinc-800",
+            //
+            // On a wide screen it is the margin of the page: one hairline, no
+            // card, no shadow, no second border inside the first.
+"lg:border-rule lg:overflow-hidden lg:rounded-none lg:border-l lg:p-(--gutter)",
+"lg:shadow-none lg:transition-none",
           ].join(" ")}
           role={sheetOpen ? "dialog" : undefined}
         >
           <div className="mb-3 flex shrink-0 items-center justify-between lg:hidden">
-            <span aria-hidden className="mx-auto h-1 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+            <span aria-hidden className="bg-rule mx-auto h-1 w-10 rounded-full" />
             <button
-              className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+              className="text-ink-quiet hover:text-ink min-h-11 text-xs tracking-wide uppercase transition-colors duration-(--fast)"
               onClick={() => setSheetOpen(false)}
               type="button"
             >

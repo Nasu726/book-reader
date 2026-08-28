@@ -6,7 +6,7 @@ import { HIGHLIGHT_COLORS, type HighlightColor } from "@/core/highlights/colors"
 import type { DocumentSelection } from "@/core/selection/capture";
 
 /** Highlighting is handled separately: it needs a colour, not just a verb. */
-export type SelectionAction = "explain" | "translate" | "simplify";
+export type SelectionAction ="explain" |"translate" |"simplify";
 
 const LABELS: Record<SelectionAction, string> = {
   explain: "Explain",
@@ -75,7 +75,7 @@ function useEdgeAwarePlacement(left: number) {
 /**
  * The actions, offered where the reader is already looking.
  *
- * They existed only in the pane beside the text, which is why "how do I add a
+ * They existed only in the pane beside the text, which is why"how do I add a
  * highlight" was a fair question: nothing near the passage said it was
  * possible. A control that appears against the selection answers that without a
  * manual.
@@ -106,7 +106,7 @@ export function SelectionActions({
   return (
     <div
       aria-label="Actions for the selected text"
-      className="fixed z-40 flex max-w-[calc(100vw-16px)] flex-wrap items-center justify-center gap-1 rounded-xl border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+      className="fixed z-40 flex max-w-[calc(100vw-16px)] flex-wrap items-center justify-center gap-1 rounded-xl border-rule bg-paper-raised border p-1 shadow-lg"
       ref={keepOnScreen}
       role="group"
       style={{
@@ -119,7 +119,7 @@ export function SelectionActions({
     >
       {(Object.keys(LABELS) as SelectionAction[]).map((action) => (
         <button
-          className="min-h-11 rounded-lg px-3 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          className="min-h-11 rounded-lg px-3 text-sm hover:bg-rule/40"
           key={action}
           // The menu must not steal the selection it is acting on.
           onMouseDown={(event) => event.preventDefault()}
@@ -132,7 +132,7 @@ export function SelectionActions({
       {/* Four colours instead of one Highlight button: choosing the colour is
           the same single tap as highlighting, so nothing is asked of a reader
           who does not care which one it is. */}
-      <span aria-hidden className="mx-1 w-px self-stretch bg-zinc-200 dark:bg-zinc-700" />
+      <span aria-hidden className="mx-1 w-px self-stretch bg-rule" />
       <span aria-label="Highlight" className="flex items-center gap-1 pr-1" role="group">
         {HIGHLIGHT_COLORS.map((color) => (
           <button

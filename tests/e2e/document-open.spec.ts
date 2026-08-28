@@ -64,10 +64,17 @@ test("PDF selection exposes selectable text and captures normalized intent", asy
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
   const actions = secondary.getByRole("group", { name: "AI actions" });
   await expect(actions).toBeVisible();
-  // Nothing is selected, so no action has anything to act on.
-  for (const label of ["Explain", "Translate", "Simplify"]) {
-    await expect(actions.getByRole("button", { name: label, exact: true })).toBeDisabled();
+  // The actions stay pressable with nothing selected: they write a command into
+  // the composer, and a control that cannot be pressed cannot say why. What is
+  // held back is sending, and the composer says what is missing.
+  for (const action of ["explain", "translate", "simplify"]) {
+    await expect(actions.getByRole("button", { name: `Insert /${action}` })).toBeEnabled();
   }
+  await actions.getByRole("button", { name: "Insert /explain" }).click();
+  await expect(secondary.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
+  await expect(secondary).toContainText("No passage selected");
+  await expect(secondary.getByLabel("Ask about this passage"))
+    .toHaveAttribute("placeholder", "Select a passage in the book first");
   await expect(reader.getByText("Select PDF text to prepare it for AI actions.")).toBeVisible();
 });
 

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, importDocument, login, MULTIPAGE_PDF } from "./helpers";
+import { buildEpub, buildPdf, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
 
 /**
  * Mobile layout regression, run under the `mobile-layout` project: Chromium
@@ -98,4 +98,32 @@ test("every control is large enough to tap", async ({ page }) => {
     }
     return tooSmall;
   }), { timeout: 15_000 }).toEqual([]);
+});
+
+test("a long PDF gives back the pages it has scrolled past", async ({ page }) => {
+  test.setTimeout(90_000);
+  await login(page);
+  const documentId = await importDocument(page, "long.pdf", buildPdf(12), "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
+  await page.waitForFunction(
+    () => document.querySelectorAll(".textLayer span").length > 0,
+    undefined,
+    { timeout: 15_000 },
+  );
+
+  const canvasPixels = async (pageNumber: number) => page.evaluate((wanted) => {
+    const canvas = document.querySelector(`[data-page-number="${wanted}"] canvas`) as HTMLCanvasElement | null;
+    return canvas ? canvas.width * canvas.height : -1;
+  }, pageNumber);
+
+  expect(await canvasPixels(1)).toBeGreaterThan(0);
+
+  await scrollReaderToEnd(page);
+  // At three device pixels to one, a phone-width page is about eight megabytes
+  // of canvas. Holding every page ever scrolled past is what makes iOS Safari
+  // stop drawing them, and no amount of pressing Try again brings it back.
+  await expect.poll(() => canvasPixels(1), { timeout: 15_000 }).toBe(0);
+  // The pages actually being read are still drawn.
+  await expect.poll(() => canvasPixels(12), { timeout: 15_000 }).toBeGreaterThan(0);
 });

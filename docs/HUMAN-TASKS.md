@@ -347,3 +347,26 @@ Access導入でscryptの問題は消えるが、SSRの分は実測しないと�
 ### 完了の確認
 
 main へ push するか、Actions タブから **Deploy** を手動実行する。`Apply D1 migrations` と `Build and deploy the Worker` が実行されれば設定できている。スキップされた場合はトークンが読めていない。
+
+---
+
+## H-10. WebKit を E2E で動かすためのシステムライブラリ
+
+**Status:** TODO
+**なぜ人間なのか:** `sudo` が必要。このマシンではパスワード無しの sudo が使えない。
+
+読者の端末は iPhone 17 で、iOS のブラウザはすべて WebKit。Playwright には WebKit 26.5 が**既に入っている**が、実行に必要なシステムライブラリが足りず起動しない。入れれば、実機でしか出なかった種類の不具合（canvasの上限、選択ハンドル、`dvh` とツールバーの関係）を自動テストで捕まえられるようになる。
+
+```bash
+sudo npx playwright install-deps webkit
+```
+
+うまくいかない場合は、エラーに出るパッケージを直接:
+
+```bash
+sudo apt-get install libgtk-4-1 libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 libavif16 gstreamer1.0-libav
+```
+
+### 完了の確認
+
+`playwright.config.ts` の `mobile-layout` プロジェクトから `browserName: "chromium"` の2行を消して、`npx playwright test --project=mobile-layout` が通ること。現状は iPhone 17 の画面サイズと dpr3 のまま Chromium で走っている。

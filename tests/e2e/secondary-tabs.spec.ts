@@ -63,8 +63,12 @@ test("an action chosen at the selection brings its answer's tab forward", async 
     const selected = window.getSelection();
     selected?.removeAllRanges();
     selected?.addRange(range);
-    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    // Dispatched inside the book: letting go of a passage is something the
+    // reader does there, and the pane beside it no longer listens at all.
+    paragraph!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
   });
+  // From the menu against the passage, not from the composer: the composer is
+  // in the tab this test is checking gets brought forward.
   await page.getByRole("group", { name: "Actions for the selected text" })
     .getByRole("button", { name: "Explain", exact: true }).click();
 

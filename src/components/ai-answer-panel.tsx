@@ -2,23 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { AI_ACTION_LABELS, type AiAction } from "@/core/ai/action-service";
+import { COMMAND_ACTIONS, parseCommand } from "@/core/ai/action-service";
 import { AnswerText } from "./answer-text";
 import type { AiConversation } from "./use-ai-actions";
 
-/** Sent with one click, against the passage the conversation is about. */
-const QUICK_ACTIONS: AiAction[] = ["explain", "simplify"];
-
 const TARGET_LANGUAGES = [
-  "Japanese",
-  "English",
-  "French",
-  "Portuguese",
-  "Simplified Chinese",
-  "Spanish",
+"Japanese",
+"English",
+"French",
+"Portuguese",
+"Simplified Chinese",
+"Spanish",
 ] as const;
 
-/** The passage the last question before this one was about. */
+/** The passage the question before this one was about. */
 function previousSubject(
   turns: readonly { role: string; selectedText?: string }[],
   index: number,
@@ -29,24 +26,25 @@ function previousSubject(
   return undefined;
 }
 
-/** Enough of the passage to recognise it, not enough to fill the pane. */
+/** Enough of the passage to recognise it, not enough to fill the margin. */
 function excerpt(text: string, limit = 90): string {
   const collapsed = text.replace(/\s+/g, " ").trim();
   return collapsed.length > limit ? `${collapsed.slice(0, limit - 1)}…` : collapsed;
 }
 
 /**
- * One conversation about the book, read top to bottom.
+ * One conversation about the book, and one place to add to it.
  *
- * It used to be a mode switch over a stack of separate answers: choosing
- * Translate replaced what Explain had said, the transcript came back newest
- * first, and a second input labelled "Follow-up question" sat below an action
- * called "Ask" that did the same thing. None of that read as a conversation,
- * which is what it always was.
+ * Everything here follows from a single rule: the composer sends, and nothing
+ * else does. The transcript above it carries no border, because a box with a
+ * border in a column of controls reads as somewhere to type and it is not. The
+ * commands live inside the composer rather than between it and the transcript,
+ * so there is nothing between what was said and where you say the next thing.
  *
- * The passage being discussed is named at the top rather than taken from the
- * live selection, because the browser drops a selection as soon as anything
- * else is clicked — including these buttons.
+ * The action is named in the input as `/explain`, which is also what the
+ * buttons write there. That makes asking about a passage and asking a plain
+ * question the same gesture with the same control, instead of a mode switch
+ * with two inputs that did the same job under different names.
  */
 export function AiAnswerPanel({
   conversation,
@@ -61,6 +59,7 @@ export function AiAnswerPanel({
   } = conversation;
 
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState<number | null>(null);
 
   // Follow the conversation down as it grows, the way any chat does.
@@ -69,48 +68,34 @@ export function AiAnswerPanel({
     if (transcript) transcript.scrollTop = transcript.scrollHeight;
   }, [turns.length, loading]);
 
+  const command = parseCommand(question);
+  const needsPassage = command.action !== "ask" && !subject;
+  const canSend = !loading && !needsPassage
+    && (command.action !== "ask" || command.question.length > 0);
+
+  function submit() {
+    if (!canSend) return;
+    setQuestion("");
+    void send(command.action, command.question);
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-start justify-between gap-2 pb-2 text-xs">
-        <p className="min-w-0 text-zinc-600 dark:text-zinc-400">
-          {subject
-            ? <>About: <span className="text-zinc-900 dark:text-zinc-100">“{excerpt(subject.text)}”</span></>
-            : "Select a passage in the book to talk about it."}
-        </p>
-        {turns.length > 0 && (
-          <button
-            className="min-h-8 shrink-0 rounded-lg border border-zinc-300 px-2 dark:border-zinc-700"
-            onClick={() => void clear()}
-            type="button"
-          >
-            Clear
-          </button>
-        )}
-      </div>
-
       <div
         aria-label="Conversation"
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-xl border border-zinc-200 p-3 dark:border-zinc-800"
+        className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1"
         ref={transcriptRef}
         role="log"
       >
-        {turns.length === 0 && !loading && !error && (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Nothing asked yet. Choose an action below, or type a question.
-          </p>
-        )}
-
         {turns.map((turn, index) => (
           turn.role === "user" ? (
             <div className="flex justify-end" key={index}>
-              <div className="max-w-[85%] rounded-xl rounded-br-sm bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-800">
-                <p>{turn.text}</p>
+              <div className="border-marker max-w-[85%] border-r-2 pr-2 text-right">
+                <p className="text-xs tracking-wide uppercase">{turn.text}</p>
                 {/* Only when the passage changes. Repeating the same quotation
                     under every turn of one conversation is noise. */}
                 {turn.selectedText && turn.selectedText !== previousSubject(turns, index) && (
-                  <p className="mt-1 border-l-2 border-zinc-300 pl-2 text-xs text-zinc-600 dark:border-zinc-600 dark:text-zinc-400">
-                    {excerpt(turn.selectedText, 120)}
-                  </p>
+                  <p className="text-ink-quiet mt-1 text-sm">{excerpt(turn.selectedText, 120)}</p>
                 )}
               </div>
             </div>
@@ -119,7 +104,7 @@ export function AiAnswerPanel({
               <AnswerText>{turn.text}</AnswerText>
               {onSaveToNotes && (
                 <button
-                  className="min-h-8 rounded-lg border border-zinc-300 px-2 text-xs dark:border-zinc-700"
+                  className="text-ink-quiet hover:text-ink text-xs tracking-wide uppercase transition-colors duration-(--fast)"
                   onClick={async () => {
                     await onSaveToNotes(turn.text);
                     setSaved(index);
@@ -138,57 +123,69 @@ export function AiAnswerPanel({
         ))}
 
         {loading && (
-          <div className="flex items-center justify-between gap-3">
-            <p aria-live="polite" className="text-sm">Thinking…</p>
-            <button
-              className="min-h-8 shrink-0 rounded-lg border border-zinc-300 px-2 text-xs dark:border-zinc-700"
-              onClick={cancel}
-              type="button"
-            >
+          <div className="text-ink-quiet flex items-center justify-between gap-3 text-xs tracking-wide uppercase">
+            <p aria-live="polite">Thinking…</p>
+            <button className="hover:text-ink transition-colors duration-(--fast)" onClick={cancel} type="button">
               Cancel
             </button>
           </div>
         )}
 
         {error && (
-          <div className="rounded-lg border border-red-300 p-3 text-sm" role="alert">
+          <div className="border-marker border-l-2 pl-3 text-sm" role="alert">
             <p>{error}</p>
           </div>
         )}
       </div>
 
-      <div className="shrink-0 space-y-2 pt-3">
-        <div aria-label="AI actions" className="flex flex-wrap items-center gap-2" role="group">
-          {QUICK_ACTIONS.map((candidate) => (
+      {/* The one box on the panel, and the only thing that sends. */}
+      <form
+        className="border-rule bg-paper-raised focus-within:border-marker mt-3 shrink-0 space-y-2 rounded-xl border p-2 transition-colors duration-(--fast)"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
+        <div className="flex items-center gap-1">
+          <div aria-label="AI actions" className="flex min-w-0 gap-1" role="group">
+            {COMMAND_ACTIONS.map((action) => (
+              <button
+                aria-label={`Insert /${action}`}
+                className={`min-h-9 shrink-0 rounded-lg px-2 text-xs tracking-wide uppercase transition-colors duration-(--fast) ${
+                  command.action === action ? "bg-marker text-ink-on-marker" : "text-ink-quiet hover:text-ink"
+                }`}
+                key={action}
+                // Writing the command rather than sending it: one control
+                // sends, so a passage and a question of your own about it are
+                // the same gesture. Never steals the selection it is about.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setQuestion(`/${action} `);
+                  inputRef.current?.focus();
+                }}
+                type="button"
+              >
+                /{action}
+              </button>
+            ))}
+          </div>
+          {turns.length > 0 && (
             <button
-              className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm disabled:opacity-50 dark:border-zinc-700"
-              // Every action needs a passage to act on, and nothing else.
-              disabled={loading || !subject}
-              key={candidate}
-              onClick={() => void send(candidate)}
+              className="text-ink-quiet hover:text-ink ml-auto min-h-9 shrink-0 text-xs tracking-wide uppercase transition-colors duration-(--fast)"
+              onClick={() => void clear()}
               type="button"
             >
-              {AI_ACTION_LABELS[candidate]}
+              Clear
             </button>
-          ))}
-          {/*
-            The language belongs to Translate, so it is part of the Translate
-            control rather than a field that comes and goes beside the others.
-            A picker sitting next to an Explain result invited the question of
-            what it was doing there.
-          */}
-          <div className="flex min-w-0">
-            <button
-              className="min-h-11 rounded-l-lg border border-zinc-300 px-3 text-sm disabled:opacity-50 dark:border-zinc-700"
-              disabled={loading || !subject}
-              onClick={() => void send("translate")}
-              type="button"
-            >
-              {AI_ACTION_LABELS.translate}
-            </button>
+          )}
+        </div>
+
+        {command.action === "translate" && (
+          <label className="text-ink-quiet flex items-center gap-2 text-xs">
+            Into
             <select
               aria-label="Translate into"
-              className="min-h-11 min-w-0 rounded-r-lg border border-l-0 border-zinc-300 px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="text-ink min-h-9 min-w-0 flex-1 bg-transparent text-xs"
               disabled={loading}
               onChange={(event) => setLanguage(event.target.value)}
               value={language}
@@ -197,35 +194,36 @@ export function AiAnswerPanel({
                 <option key={candidate} value={candidate}>{candidate}</option>
               ))}
             </select>
-          </div>
-        </div>
+          </label>
+        )}
 
-        <form
-          className="flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const value = question.trim();
-            setQuestion("");
-            void send("ask", value);
-          }}
-        >
+        {/* What the command will act on, shown where the command is written. */}
+        <p className="text-ink-quiet border-rule border-l-2 pl-2 text-sm">
+          {subject ? excerpt(subject.text) : "No passage selected"}
+        </p>
+
+        <div className="flex gap-2">
           <label className="sr-only" htmlFor="ai-follow-up">Ask about this passage</label>
           <input
-            className="min-h-11 min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 dark:border-zinc-700"
+            className="min-h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
             id="ai-follow-up"
             onChange={(event) => setQuestion(event.target.value)}
-            placeholder="Ask about this passage"
+            placeholder={needsPassage ? "Select a passage in the book first" : "Ask, or press an action above"}
+            ref={inputRef}
             value={question}
           />
           <button
-            className="min-h-11 shrink-0 rounded-lg bg-zinc-900 px-4 font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-            disabled={loading || !question.trim()}
+            aria-label="Send"
+            className="bg-ink text-paper flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-transform duration-(--fast) ease-(--ease) active:scale-95 disabled:opacity-30"
+            disabled={!canSend}
             type="submit"
           >
-            Send
+            <svg aria-hidden fill="none" height="16" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24" width="16">
+              <path d="M5 12h13M12 5.5 18.5 12 12 18.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   );
 }

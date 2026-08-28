@@ -109,7 +109,9 @@ test("an EPUB highlight is placed by the offsets it was captured with", async ({
     const selected = window.getSelection();
     selected?.removeAllRanges();
     selected?.addRange(range);
-    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    // Dispatched inside the book: letting go of a passage is something the
+    // reader does there, and the pane beside it no longer listens at all.
+    paragraph!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
   });
 
   await page.getByRole("group", { name: "Actions for the selected text" })
@@ -131,7 +133,9 @@ test("the highlight rules survive the CSS pipeline", async ({ page }) => {
   // recognises, and passes it through anyway. If a toolchain upgrade ever turns
   // that warning into a removal, every highlight would still register and
   // nothing would be drawn — silently. This is the check that would notice.
-  const rules = await page.evaluate(() => {
+  // Polled: the development server injects the stylesheet after the document is
+  // interactive, so under load it is not there the instant the page settles.
+  const readRules = () => page.evaluate(() => {
     const found: string[] = [];
     for (const sheet of Array.from(document.styleSheets)) {
       let cssRules: CSSRuleList;
@@ -147,6 +151,6 @@ test("the highlight rules survive the CSS pipeline", async ({ page }) => {
     return found;
   });
 
-  expect(rules).toHaveLength(4);
-  expect(rules.join(" ")).toContain("background-color");
+  await expect.poll(async () => (await readRules()).length, { timeout: 15_000 }).toBe(4);
+  expect((await readRules()).join(" ")).toContain("background-color");
 });

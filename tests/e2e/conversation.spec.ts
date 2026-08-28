@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, importDocument, login } from "./helpers";
+import { buildEpub, importDocument, login, runAction } from "./helpers";
 
 // A distinct filename per test: importDocument resolves a document by the name
 // it was uploaded under, so a shared one would hand every test the same
@@ -23,39 +23,44 @@ async function openBookAndSelect(page: import("@playwright/test").Page, name: st
     const selected = window.getSelection();
     selected?.removeAllRanges();
     selected?.addRange(range);
-    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    // Dispatched inside the book: letting go of a passage is something the
+    // reader does there, and the pane beside it no longer listens at all.
+    paragraph!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
   });
   return documentId;
 }
 
-test("the passage stays the subject after the selection is gone", async ({ page }) => {
+test("the panel follows the book's selection, and only the book's", async ({ page }) => {
   await openBookAndSelect(page, "talk-subject");
-  const actions = page.getByRole("group", { name: "AI actions" });
+  const composer = page.getByRole("complementary", { name: "AI and notes" });
+  await expect(composer).toContainText("Alpha journey text.");
 
-  await actions.getByRole("button", { name: "Explain", exact: true }).click();
+  await runAction(page, "explain");
   await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(1, { timeout: 15_000 });
 
-  // What a reader does next: click somewhere in the book. The browser drops the
-  // selection, which used to disable every action until it was made again — so
-  // a passage could be explained but never then translated.
+  // Acting in the panel does not count as letting go of the passage, so a
+  // paragraph that was explained can then be translated. Every click used to
+  // report "nothing is selected" and disable the lot.
+  await expect(composer).toContainText("Alpha journey text.");
+  await runAction(page, "translate");
+  await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(2, { timeout: 15_000 });
+
+  // Letting go in the book does. The panel must not go on offering a passage
+  // the reader can no longer see they have chosen.
   await page.evaluate(() => {
     window.getSelection()?.removeAllRanges();
-    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    document.querySelector("article")!
+      .dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
   });
-
-  const translate = actions.getByRole("button", { name: "Translate", exact: true });
-  await expect(translate).toBeEnabled();
-  await translate.click();
-  await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(2, { timeout: 15_000 });
-  // Still about the same passage.
-  await expect(page.getByRole("log", { name: "Conversation" })).toContainText("Alpha journey text.");
+  await expect(composer).toContainText("No passage selected");
+  await page.getByRole("button", { name: "Insert /explain" }).click();
+  await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
 });
 
 test("a reopened conversation reads as a conversation, not as prompts", async ({ page }) => {
   await openBookAndSelect(page, "talk-history");
 
-  await page.getByRole("group", { name: "AI actions" })
-    .getByRole("button", { name: "Explain", exact: true }).click();
+  await runAction(page, "explain");
   await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(1, { timeout: 15_000 });
 
   await page.reload();
@@ -72,8 +77,7 @@ test("a reopened conversation reads as a conversation, not as prompts", async ({
 test("the conversation can be thrown away", async ({ page }) => {
   const documentId = await openBookAndSelect(page, "talk-clear");
 
-  await page.getByRole("group", { name: "AI actions" })
-    .getByRole("button", { name: "Explain", exact: true }).click();
+  await runAction(page, "explain");
   await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(1, { timeout: 15_000 });
 
   await page.getByRole("button", { name: "Clear", exact: true }).click();
@@ -91,14 +95,12 @@ test("the conversation can be thrown away", async ({ page }) => {
   await page.waitForResponse((response) =>
     response.url().includes("/api/ai/action?documentId=") && response.request().method() === "GET");
   await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(0);
-  await expect(page.getByRole("log", { name: "Conversation" })).toContainText("Nothing asked yet");
 });
 
 test("an answer worth keeping goes into the document note", async ({ page }) => {
   await openBookAndSelect(page, "talk-notes");
 
-  await page.getByRole("group", { name: "AI actions" })
-    .getByRole("button", { name: "Explain", exact: true }).click();
+  await runAction(page, "explain");
   await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(1, { timeout: 15_000 });
   await page.getByRole("button", { name: "Save to notes" }).click();
   await expect(page.getByRole("button", { name: "Saved to notes" })).toBeVisible();

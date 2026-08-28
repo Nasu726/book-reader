@@ -24,15 +24,12 @@ test("AI actions render in the desktop secondary pane", async ({ page }) => {
   await expect(actions).toBeVisible();
   // Highlighting is not among them: it happens against the selection, where a
   // colour can be chosen, rather than as a colourless button in this pane.
-  for (const action of ["Explain", "Translate", "Simplify"]) {
-    const button = actions.getByRole("button", { name: action, exact: true });
-    await expect(button).toBeVisible();
-    // Offered, but not usable until there is a passage to act on.
-    await expect(button).toBeDisabled();
+  for (const action of ["explain", "translate", "simplify"]) {
+    await expect(actions.getByRole("button", { name: `Insert /${action}` })).toBeVisible();
   }
-  await expect(actions.getByRole("button", { name: "Highlight", exact: true })).toHaveCount(0);
+  await expect(actions.getByRole("button", { name: /Highlight/ })).toHaveCount(0);
   // Asking is the composer, not a fourth action: one input, one button.
-  await expect(actions.getByRole("button", { name: "Ask", exact: true })).toHaveCount(0);
+  await expect(actions.getByRole("button", { name: /Insert \/ask/ })).toHaveCount(0);
   await expect(secondary.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
   await expect(secondary.getByLabel("Ask about this passage")).toBeVisible();
 });

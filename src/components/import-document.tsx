@@ -41,12 +41,12 @@ export function ImportDocument() {
           rather than through a click handler, so it works from the moment the
           markup arrives instead of once React has hydrated. */}
       <label
-        className="inline-flex min-h-11 cursor-pointer items-center rounded-lg bg-zinc-900 px-4 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+        className="inline-flex min-h-11 cursor-pointer items-center rounded-lg bg-ink px-4 font-medium text-white"
         htmlFor="document-file"
       >
         {busyWith ? `Adding ${busyWith}…` : "Add a book"}
       </label>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mt-2 text-sm text-ink-quiet">
         PDF or EPUB, up to 100 MB.
       </p>
     </form>

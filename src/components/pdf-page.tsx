@@ -26,7 +26,7 @@ type PdfPageProps = {
  *
  * Each page owns its own canvas, text layer, and error state. A single shared
  * error state let a failed render overwrite a successful one, which is how a
- * page that was plainly visible on screen still carried "This PDF page could
+ * page that was plainly visible on screen still carried"This PDF page could
  * not be rendered" with a Retry button that changed nothing.
  */
 export function PdfPage({
@@ -61,6 +61,38 @@ export function PdfPage({
     return () => observer.disconnect();
   }, []);
 
+  // Give the page back once it is well out of the way.
+  //
+  // A drawn canvas holds its pixels for as long as it exists, and on a phone
+  // that is 8 MB a page: the reader's iPhone renders at three device pixels to
+  // one, so an A4 page at 402 points wide is 1206 x 1706. Keeping every page
+  // ever scrolled past is how a long PDF stops drawing altogether — iOS Safari
+  // caps how much canvas a page may hold and simply refuses the next one, which
+  // no amount of pressing Try again can undo.
+  //
+  // Three screens of slack, so ordinary back-and-forth reading never pays to
+  // redraw. The reserved aspect ratio takes over again, so nothing moves.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) return;
+        const canvas = canvasRef.current;
+        if (canvas) {
+          canvas.width = 0;
+          canvas.height = 0;
+        }
+        textLayerRef.current?.replaceChildren();
+        clearHighlights({ format: "pdf", page: pageNumber });
+        setLayerVersion(0);
+      },
+      { rootMargin: "300% 0px" },
+    );
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [pageNumber]);
+
   useEffect(() => {
     if (!visible) return;
     const canvas = canvasRef.current;
@@ -69,6 +101,10 @@ export function PdfPage({
     if (!canvas || !layer || !container) return;
 
     let cancelled = false;
+    // pdf.js refuses to draw onto a canvas another render is still using, so a
+    // resize or a zoom arriving mid-draw would throw and leave the page showing
+    // an error it could not recover from.
+    let task: { cancel: () => void; promise: Promise<unknown> } | null = null;
 
     async function draw() {
       try {
@@ -87,10 +123,12 @@ export function PdfPage({
         canvas!.height = Math.floor(viewport.height * devicePixelRatio);
         canvas!.style.width = `${Math.floor(viewport.width)}px`;
         canvas!.style.height = `${Math.floor(viewport.height)}px`;
-        await page.render({
+        task = page.render({
           canvas: canvas!,
           viewport: page.getViewport({ scale: cssScale * devicePixelRatio }),
-        }).promise;
+        });
+        await task.promise;
+        task = null;
         if (cancelled) return;
 
         const textContent = await page.getTextContent();
@@ -119,13 +157,19 @@ export function PdfPage({
         }).render();
         page.cleanup();
         if (!cancelled) { setError(false); setLayerVersion((current) => current + 1); }
-      } catch {
-        if (!cancelled) setError(true);
+      } catch (cause) {
+        // A cancelled render rejects on its way out. That is this component
+        // tidying up, not a page that failed to draw.
+        const name = (cause as { name?: string } | null)?.name;
+        if (!cancelled && name !== "RenderingCancelledException") setError(true);
       }
     }
 
     void draw();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      task?.cancel();
+    };
   }, [visible, pdfDocument, pageNumber, zoom, attempt, onTextExtracted]);
 
   // Never before the text layer exists: the spans a highlight points at are
@@ -170,10 +214,10 @@ export function PdfPage({
       <canvas className={drawn ? "block" : "hidden"} ref={canvasRef} />
       <div className="textLayer absolute inset-0" ref={textLayerRef} />
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-sm dark:bg-zinc-950/90" role="alert">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-paper/90 text-sm" role="alert">
           <p>Page {pageNumber} could not be drawn.</p>
           <button
-            className="min-h-10 rounded bg-zinc-900 px-3 text-white dark:bg-zinc-100 dark:text-zinc-900"
+            className="min-h-10 rounded bg-ink px-3 text-white"
             onClick={() => { setError(false); setAttempt((current) => current + 1); }}
             type="button"
           >

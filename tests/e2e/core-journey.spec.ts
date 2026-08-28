@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
+import { buildEpub, importDocument, login, MULTIPAGE_PDF, runAction, scrollReaderToEnd } from "./helpers";
 
 // The server runs with AI_PROVIDER=mock, so these journeys exercise the real
 // /api/ai/action route — authentication, conversation persistence and all —
@@ -45,11 +45,10 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   expect(selectedText).toContain("Structure of Scientific Revolutions");
 
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
-  const actions = secondary.getByRole("group", { name: "AI actions" });
   // One conversation, so each action adds to it rather than replacing what the
   // last one said.
-  for (const [index, action] of ["Explain", "Translate", "Simplify"].entries()) {
-    await actions.getByRole("button", { name: action, exact: true }).click();
+  for (const [index, action] of (["explain", "translate", "simplify"] as const).entries()) {
+    await runAction(page, action);
     await expect(secondary.getByRole("region", { name: "AI response" }))
       .toHaveCount(index + 1, { timeout: 15_000 });
   }

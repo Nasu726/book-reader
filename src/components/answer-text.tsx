@@ -30,7 +30,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       return <em key={key}>{part.slice(1, -1)}</em>;
     }
     if (part.length > 2 && part.startsWith("`") && part.endsWith("`")) {
-      return <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800" key={key}>{part.slice(1, -1)}</code>;
+      return <code className="rounded bg-rule/40 px-1" key={key}>{part.slice(1, -1)}</code>;
     }
     // Plain runs stay plain strings; React escapes them and the DOM stays flat.
     return part;
@@ -97,7 +97,7 @@ export function AnswerText({ children }: { children: string }) {
         const key = `block-${index}`;
         if (block.type === "heading") {
           const level = Math.min(block.level + 2, 6);
-          const Heading = `h${level}` as "h3" | "h4" | "h5" | "h6";
+          const Heading = `h${level}` as"h3" |"h4" |"h5" |"h6";
           return (
             <Heading className="font-semibold" key={key}>
               {renderInline(block.text, key)}

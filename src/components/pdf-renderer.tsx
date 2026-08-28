@@ -161,7 +161,7 @@ export function PdfRenderer({
 
   // Saved only once the page actually changes. Reporting the restored page
   // straight after mount wrote a row that said nothing new, and a test waiting
-  // for "the progress request" could catch that one instead of the real move.
+  // for"the progress request" could catch that one instead of the real move.
   // It also spends a write against D1's daily budget for no reason.
   const savedPageRef = useRef<number | null>(null);
   useEffect(() => {
@@ -224,12 +224,12 @@ export function PdfRenderer({
 
   return (
     <section aria-label="PDF reader">
-      <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-white/90 px-3 py-2 backdrop-blur sm:border-0 sm:px-0 dark:border-zinc-800 dark:bg-zinc-950/90">
+      <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-2 border-b border-rule bg-paper/90 px-3 py-2 backdrop-blur sm:border-0 sm:px-0 /90">
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-zinc-600 dark:text-zinc-400">Page</span>
+          <span className="text-ink-quiet">Page</span>
           <input
             aria-label="Page number"
-            className="min-h-11 w-16 rounded-lg border border-zinc-300 px-2 text-center tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+            className="min-h-11 w-16 rounded-lg border border-rule px-2 text-center tabular-nums"
             max={pageCount || 1}
             min={1}
             onChange={(event) => {
@@ -239,14 +239,14 @@ export function PdfRenderer({
             type="number"
             value={currentPage}
           />
-          <span aria-live="polite" className="text-zinc-600 tabular-nums dark:text-zinc-400">
-            of {pageCount || "…"}
+          <span aria-live="polite" className="text-ink-quiet tabular-nums">
+            of {pageCount ||"…"}
           </span>
         </label>
         <div aria-label="Page zoom" className="ml-auto flex items-center gap-1" role="group">
           <button
             aria-label="Zoom out"
-            className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            className="min-h-11 rounded-lg border border-rule px-3 text-sm"
             disabled={zoom <= MIN_ZOOM}
             onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Math.round((current - 0.25) * 100) / 100))}
             type="button"
@@ -255,7 +255,7 @@ export function PdfRenderer({
           </button>
           <button
             aria-label={`Zoom, currently ${Math.round(zoom * 100)} percent. Reset to fit width`}
-            className="min-h-11 rounded-lg border border-zinc-300 px-2 text-sm tabular-nums dark:border-zinc-700"
+            className="min-h-11 rounded-lg border border-rule px-2 text-sm tabular-nums"
             onClick={() => setZoom(1)}
             type="button"
           >
@@ -263,7 +263,7 @@ export function PdfRenderer({
           </button>
           <button
             aria-label="Zoom in"
-            className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            className="min-h-11 rounded-lg border border-rule px-3 text-sm"
             disabled={zoom >= MAX_ZOOM}
             onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Math.round((current + 0.25) * 100) / 100))}
             type="button"
@@ -289,8 +289,8 @@ export function PdfRenderer({
           : <p aria-live="polite" className="text-sm">Opening…</p>}
       </div>
 
-      <section aria-label="PDF selection preview" className="mx-3 mt-4 rounded-xl border border-zinc-200 p-3 text-sm sm:mx-0 dark:border-zinc-800">
-        {capturedSelection?.text || "Select PDF text to prepare it for AI actions."}
+      <section aria-label="PDF selection preview" className="mx-3 mt-4 rounded-xl border border-rule p-3 text-sm sm:mx-0">
+        {capturedSelection?.text ||"Select PDF text to prepare it for AI actions."}
       </section>
     </section>
   );

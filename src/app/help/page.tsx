@@ -23,7 +23,7 @@ export default function HelpPage() {
     <AppShell
       title={
         <div className="min-w-0">
-          <Link className="text-sm text-zinc-600 hover:underline dark:text-zinc-400" href="/">
+          <Link className="text-sm text-ink-quiet hover:underline" href="/">
             ← Library
           </Link>
           <h1 className="truncate text-lg font-semibold tracking-tight">使い方</h1>
@@ -73,20 +73,26 @@ export default function HelpPage() {
             <strong>1本の会話</strong>になっている。Explain も Translate も質問も、
             同じ流れに上から順に積まれる。前の回答が消えることはない。
           </p>
+          <p>
+            <strong>送るのは一番下の入力欄だけ</strong>。上のボタンは、その入力欄に
+            <code>/explain</code> のようなコマンドを書き込むだけで、送信はしない。
+            おかげで「選んだ文章について聞く」と「ただ質問する」が同じ操作になる。
+          </p>
           <ul>
             <li>
-              一番上の <strong>About:</strong> が、いま話題にしている文章。
-              <strong>本文の選択を解除しても消えない</strong>ので、
-              説明させたあとに訳させる、といった続きができる
+              <code>/explain</code> — 選んだ文章を説明させる。
+              <code>/explain もっと短く</code> のように、続けて注文を書いてもよい
             </li>
-            <li>
-              下の <strong>Explain</strong> / <strong>Simplify</strong> / <strong>Translate</strong> は1クリックで送る。
-              訳す先の言語は <strong>Translate</strong> の隣で選ぶ（既定は日本語）
-            </li>
-            <li>
-              自由に聞きたいときは一番下の入力欄に書いて <strong>Send</strong>。
-              直前までの会話とその文章が一緒に送られる
-            </li>
+            <li><code>/translate</code> — 訳させる。訳す先の言語はその下で選ぶ（既定は日本語）</li>
+            <li><code>/simplify</code> — やさしく言い直させる</li>
+            <li>コマンドを付けなければ、そのまま質問になる</li>
+          </ul>
+          <p>
+            入力欄のすぐ上に、<strong>いまどの文章が対象か</strong>が出ている。
+            本文の選択を解除すると <strong>No passage selected</strong> に変わり、
+            コマンドは送れなくなる。パネル側のボタンを押しても選択は外れない。
+          </p>
+          <ul>
             <li>
               回答の下の <strong>Save to notes</strong> で、その回答を
               <strong>Document note</strong> に書き足せる。会話は流れていくものなので、

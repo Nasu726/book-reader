@@ -47,6 +47,30 @@ export function describeUserTurn(input: {
   return AI_ACTION_LABELS[input.action];
 }
 
+/** Actions a reader can name in the composer. Highlighting is not one. */
+export const COMMAND_ACTIONS = ["explain", "translate", "simplify"] as const;
+
+/**
+ * The action and the question, read out of one line of input.
+ *
+ * There is one place to type and one button to send. A leading `/explain` says
+ * what to do with the attached passage; anything else is a question. Two inputs
+ * — an action called Ask and a field called Follow-up question — were two names
+ * for the same thing, and neither explained how to ask about a passage without
+ * first choosing a mode.
+ */
+export function parseCommand(input: string): { action: AiAction; question: string } {
+  const trimmed = input.trim();
+  const match = /^\/([a-z]+)(?:\s+([\s\S]*))?$/i.exec(trimmed);
+  const named = match?.[1]?.toLowerCase();
+  const action = (COMMAND_ACTIONS as readonly string[]).includes(named ?? "")
+    ? (named as AiAction)
+    : null;
+  return action
+    ? { action, question: (match?.[2] ?? "").trim() }
+    : { action: "ask", question: trimmed };
+}
+
 export type AiActionInput = {
   action: AiAction;
   selectedText: string;

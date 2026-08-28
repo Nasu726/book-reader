@@ -103,3 +103,57 @@ export async function scrollReaderToEnd(page: Page): Promise<void> {
     column.scrollTop = column.scrollHeight;
   });
 }
+
+/**
+ * A PDF of `pageCount` pages, assembled here rather than checked in.
+ *
+ * Memory behaviour only shows up over a document long enough to scroll through:
+ * two pages fit in a phone's canvas budget however carelessly they are handled.
+ */
+export function buildPdf(pageCount: number): Buffer {
+  const objects: string[] = [];
+  const pageIds = Array.from({ length: pageCount }, (_, index) => 3 + index);
+  const fontId = 3 + pageCount;
+  const contentIds = pageIds.map((_, index) => fontId + 1 + index);
+
+  objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageCount} >>`;
+  pageIds.forEach((id, index) => {
+    objects[id] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] `
+      + `/Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentIds[index]} 0 R >>`;
+  });
+  objects[fontId] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+  contentIds.forEach((id, index) => {
+    const stream = `BT\n/F1 24 Tf\n1 0 0 1 60 700 Tm\n(Page ${index + 1} of ${pageCount}) Tj\nET`;
+    objects[id] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  });
+
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  for (let id = 1; id < objects.length; id += 1) {
+    offsets[id] = pdf.length;
+    pdf += `${id} 0 obj\n${objects[id]}\nendobj\n`;
+  }
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let id = 1; id < objects.length; id += 1) {
+    pdf += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(pdf, "latin1");
+}
+
+/**
+ * Names an action in the composer and sends it.
+ *
+ * The buttons write `/explain` into the input rather than sending, because the
+ * composer is the only thing that sends: asking about a passage and asking a
+ * question of your own are then the same gesture.
+ */
+export async function runAction(
+  page: Page,
+  action: "explain" | "translate" | "simplify",
+): Promise<void> {
+  await page.getByRole("button", { name: `Insert /${action}` }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+}

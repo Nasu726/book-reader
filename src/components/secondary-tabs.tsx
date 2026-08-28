@@ -2,7 +2,7 @@
 
 import { useRef, type ReactNode } from "react";
 
-export type SecondaryTab = "ai" | "saved";
+export type SecondaryTab ="ai" |"saved";
 
 const TABS: { id: SecondaryTab; label: string }[] = [
   { id: "ai", label: "AI" },
@@ -38,7 +38,7 @@ export function SecondaryTabs({
     <div className="flex h-full min-h-0 flex-1 flex-col">
       <div
         aria-label="Panel"
-        className="mb-4 flex shrink-0 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-900"
+        className="border-rule mb-4 flex shrink-0 border-b"
         onKeyDown={(event) => {
           const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
           if (!step) return;
@@ -57,10 +57,10 @@ export function SecondaryTabs({
           <button
             aria-controls={`panel-${tab.id}`}
             aria-selected={active === tab.id}
-            className={`min-h-10 flex-1 rounded-lg text-sm font-medium ${
+            className={`-mb-px min-h-10 flex-1 border-b-2 text-xs tracking-widest uppercase transition-colors duration-(--fast) ${
               active === tab.id
-                ? "bg-white shadow-sm dark:bg-zinc-800"
-                : "text-zinc-600 dark:text-zinc-400"
+                ? "border-marker text-ink"
+                : "hover:text-ink border-transparent text-ink-quiet"
             }`}
             id={`tab-${tab.id}`}
             key={tab.id}

@@ -6,7 +6,7 @@ import { useState } from "react";
 export type LibraryEntry = {
   id: string;
   title: string;
-  format: "epub" | "pdf";
+  format: "epub" |"pdf";
   lastOpenedAt?: string;
 };
 
@@ -36,7 +36,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
     try {
       const response = await fetch(`/api/documents/${id}`, {
         body: JSON.stringify({ title }),
-        headers: { "content-type": "application/json" },
+        headers: {"content-type": "application/json" },
         method: "PATCH",
       });
       if (!response.ok) throw new Error("Rename failed.");
@@ -68,7 +68,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
 
   if (documents.length === 0) {
     return (
-      <p className="max-w-prose text-zinc-600 dark:text-zinc-400">
+      <p className="max-w-prose text-ink-quiet">
         No documents yet. Import a PDF or EPUB to start reading.
       </p>
     );
@@ -84,7 +84,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
           const lastOpened = formatLastOpened(document.lastOpenedAt);
           return (
             <li
-              className="rounded-xl border border-zinc-200 transition hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+              className="border-rule hover:border-ink-quiet rounded-xl border transition-colors duration-(--fast)"
               key={document.id}
             >
               {renaming === document.id ? (
@@ -98,20 +98,20 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                   <input
                     aria-label="Title"
                     autoFocus
-                    className="min-h-11 min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 dark:border-zinc-700 dark:bg-zinc-900"
+                    className="min-h-11 min-w-0 flex-1 rounded-lg border border-rule px-3"
                     id={`rename-${document.id}`}
                     onChange={(event) => setDraftTitle(event.target.value)}
                     value={draftTitle}
                   />
                   <button
-                    className="min-h-11 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    className="min-h-11 rounded-lg bg-ink px-4 text-sm font-medium text-white"
                     disabled={busy === document.id || !draftTitle.trim()}
                     type="submit"
                   >
                     Save
                   </button>
                   <button
-                    className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm dark:border-zinc-700"
+                    className="min-h-11 rounded-lg border border-rule px-4 text-sm"
                     onClick={() => setRenaming(null)}
                     type="button"
                   >
@@ -120,26 +120,26 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                 </form>
               ) : (
                 <div className="flex flex-wrap items-center gap-2 p-3">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 basis-full sm:basis-auto">
                     <span className="flex items-baseline gap-2">
                       <span className="truncate font-medium">{document.title}</span>
-                      <span className="shrink-0 text-sm uppercase text-zinc-500">{document.format}</span>
+                      <span className="shrink-0 text-sm uppercase text-ink-quiet">{document.format}</span>
                     </span>
                     {lastOpened && (
-                      <span className="block text-sm text-zinc-500">Last opened {lastOpened}</span>
+                      <span className="block text-sm text-ink-quiet">Last opened {lastOpened}</span>
                     )}
                   </div>
                   {/* An explicit control, because a clickable card gives no sign
                       that the whole row is the button. */}
                   <a
-                    className="flex min-h-11 items-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    className="flex min-h-11 items-center rounded-lg bg-ink px-4 text-sm font-medium text-white"
                     href={`/documents/${document.id}`}
                   >
                     Read
                   </a>
                   <button
                     aria-label={`Rename ${document.title}`}
-                    className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+                    className="min-h-11 rounded-lg border border-rule px-3 text-sm"
                     onClick={() => {
                       setRenaming(document.id);
                       setDraftTitle(document.title);
@@ -150,7 +150,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                   </button>
                   <button
                     aria-label={`Remove ${document.title}`}
-                    className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+                    className="min-h-11 rounded-lg border border-rule px-3 text-sm"
                     disabled={busy === document.id}
                     onClick={() => void remove(document.id, document.title)}
                     type="button"

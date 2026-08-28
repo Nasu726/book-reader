@@ -68,14 +68,18 @@ test("theme and font size preferences persist across a reload", async ({ page })
   const documentId = await importDocument(page, "prefs.epub", await buildEpub(), "application/epub+zip");
   await page.goto(`/documents/${documentId}`);
 
-  // Polled: the dev server injects the stylesheet after the document is
-  // interactive, and an unstyled pane reports a transparent background.
-  const readerBackground = async () => page.evaluate(() => {
-    const reader = document.querySelector('[aria-label="Reader"]');
-    return reader ? getComputedStyle(reader).backgroundColor : null;
+  // Measured on the body, which is what paints the paper. The reader pane
+  // itself is deliberately transparent: the page is one sheet, not a card on a
+  // background.
+  //
+  // Polled, because the dev server injects the stylesheet after the document is
+  // interactive and an unstyled body reports no colour at all.
+  const paperChannels = async () => page.evaluate(() => {
+    const painted = getComputedStyle(document.body).backgroundColor;
+    return painted.match(/\d+(?:\.\d+)?/g)?.slice(0, 3).map(Number) ?? [];
   });
-  await expect.poll(readerBackground, { timeout: 10_000 }).toBe("rgb(255, 255, 255)");
-  const lightReaderBackground = await readerBackground();
+  await expect.poll(async () => Math.max(...await paperChannels()), { timeout: 10_000 })
+    .toBeGreaterThan(200);
 
   // These are server-rendered before React attaches its handlers, so an early
   // click lands on nothing.
@@ -95,18 +99,10 @@ test("theme and font size preferences persist across a reload", async ({ page })
   await page.reload();
   await expect(page.getByRole("button", { name: "Switch to light theme" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Text size" })).toContainText("110%");
-  // The saved theme has to actually repaint the page. The reader pane is
-  // painted by Tailwind's `dark:` variant rather than by a plain CSS rule, so
-  // this also proves the variant follows the theme class instead of the
-  // operating system preference.
-  await expect.poll(readerBackground, { timeout: 10_000 }).not.toBe(lightReaderBackground);
-
-  const darkReaderBackground = await page.evaluate(() => {
-    const reader = document.querySelector('[aria-label="Reader"]');
-    return reader ? getComputedStyle(reader).backgroundColor : "";
-  });
-  const channels = darkReaderBackground.match(/\d+(?:\.\d+)?/g)?.slice(0, 3).map(Number) ?? [255, 255, 255];
-  expect(Math.max(...channels)).toBeLessThan(80);
+  // The saved theme has to actually repaint the page, which also proves the
+  // `dark:` variant follows the theme class rather than the operating system.
+  await expect.poll(async () => Math.max(...await paperChannels()), { timeout: 10_000 })
+    .toBeLessThan(80);
 });
 
 test("the font size control scales the book text but not the controls", async ({ page }) => {

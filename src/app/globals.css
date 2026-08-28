@@ -7,8 +7,58 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /*
+   * The whole design lives in these values.
+   *
+   * The app is a page with a margin beside it: the reader is the sheet, the AI
+   * and the marks are marginalia, and a hairline is the only thing that
+   * separates them. There are no cards, no shadows and no nested borders,
+   * because a book does not have any.
+   */
+
+  /* Paper, ink, and the one line that divides them. */
+  --paper: #fcfbf9;
+  --paper-raised: #ffffff;
+  --ink: #171614;
+  --ink-quiet: #6b6862;
+  --rule: #e5e1d9;
+
+  /* The accent is the highlighter — the one mark the reader actually makes in
+     the text. It marks the active tab, the focused field, and nothing else. */
+  --marker: #f4c93d;
+  /* The marker stays yellow in both themes, so what sits on it stays dark. */
+  --ink-on-marker: #171614;
+
+  /* Kept for the Tailwind bridge below. */
+  --background: var(--paper);
+  --foreground: var(--ink);
+
+  /*
+   * One inset for every edge in the application, proportional to the viewport
+   * and bounded at both ends. Fixed pixel padding is what left a phone with a
+   * library pressed against both edges while a desktop had a hairline of space
+   * it did not need.
+   */
+  --gutter: clamp(0.875rem, 4vw, 2rem);
+
+  /* One curve and two durations. A sheet settles; everything else is quick. */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --fast: 140ms;
+  --slow: 260ms;
+
+  /*
+   * Two faces, and the division between them means something: prose is what a
+   * person wrote or a model said, machinery is a control or a measurement.
+   *
+   * Both are asked of the system rather than downloaded. The reader's phone is
+   * an iPhone, where these resolve to Iowan Old Style and SF Mono — a pairing
+   * chosen on purpose, at no cost in bytes or in a build that needs the
+   * network. Elsewhere they fall back through Palatino to the platform serif.
+   */
+  --font-prose: "Iowan Old Style", "Palatino Linotype", Palatino, "Hiragino Mincho ProN",
+    "Yu Mincho", "Noto Serif JP", serif;
+  --font-machine: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Hiragino Sans", "Yu Gothic UI", monospace;
 
   /* Set by the reader's font size control. It scales the book text only, so
      buttons and spacing keep their size at every setting. */
@@ -22,18 +72,30 @@
   --highlight-pink: rgb(244 114 182 / 0.38);
 }
 
+/* The bridge to Tailwind's utilities, so `bg-paper` and `text-ink` exist. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-quiet: var(--ink-quiet);
+  --color-rule: var(--rule);
+  --color-marker: var(--marker);
+  --color-ink-on-marker: var(--ink-on-marker);
+  --font-prose: var(--font-prose);
+  --font-machine: var(--font-machine);
+  --spacing-gutter: var(--gutter);
 }
 
 /* Chosen theme first, system preference when nothing is chosen. */
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #131211;
+    --paper-raised: #1b1a18;
+    --ink: #e9e6df;
+    --ink-quiet: #918c83;
+    --rule: #2b2926;
     --highlight-yellow: rgb(250 204 21 / 0.32);
     --highlight-green: rgb(52 211 153 / 0.3);
     --highlight-blue: rgb(96 165 250 / 0.34);
@@ -42,8 +104,11 @@
 }
 
 :root.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --paper: #131211;
+  --paper-raised: #1b1a18;
+  --ink: #e9e6df;
+  --ink-quiet: #918c83;
+  --rule: #2b2926;
   --highlight-yellow: rgb(250 204 21 / 0.32);
   --highlight-green: rgb(52 211 153 / 0.3);
   --highlight-blue: rgb(96 165 250 / 0.34);
@@ -51,9 +116,32 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  /* Controls and labels are the machinery; prose opts back in where it starts. */
+  font-family: var(--font-machine);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Anything a person wrote or a model said. */
+.prose-face,
+.reader-prose,
+h1, h2, h3, h4, h5, h6,
+p, li, blockquote {
+  font-family: var(--font-prose);
+}
+
+/* One visible focus treatment, in the app's own accent. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--marker);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* EPUB chapters arrive as sanitized author markup; Tailwind's reset strips the

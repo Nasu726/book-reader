@@ -12,7 +12,7 @@ type DocumentReaderProps = {
   documentTitle?: string;
   /** The uploaded filename, used to tell an untouched title from a rename. */
   documentSourceFilename?: string;
-  format: "epub" | "pdf";
+  format: "epub" |"pdf";
   /** Saved highlights, drawn onto the text as it renders. */
   highlights?: readonly PaintableHighlight[];
   onSelectionChange?: (selection: DocumentSelection | null) => void;
@@ -48,7 +48,7 @@ async function adoptBookTitle(
   try {
     await fetch(`/api/documents/${documentId}`, {
       body: JSON.stringify({ title }),
-      headers: { "content-type": "application/json" },
+      headers: {"content-type": "application/json" },
       method: "PATCH",
     });
   } catch {
@@ -80,7 +80,7 @@ function useDocumentProgress(documentId: string) {
     try {
       const response = await fetch(`/api/documents/${documentId}/progress`, {
         body: JSON.stringify({ location }),
-        headers: { "content-type": "application/json" },
+        headers: {"content-type": "application/json" },
         method: "POST",
       });
       if (!response.ok) throw new Error("Save failed.");
@@ -102,6 +102,7 @@ export function DocumentReader({
   onSelectionChange,
 }: DocumentReaderProps) {
   const chapterRef = useRef<HTMLElement>(null);
+  const readerRef = useRef<HTMLElement>(null);
   const [epub, setEpub] = useState<ParsedEpub | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
@@ -176,7 +177,7 @@ export function DocumentReader({
         if (!response.ok) throw new Error("The document could not be opened.");
         const bytes = await response.arrayBuffer();
         const { parseEpubInBrowser } = await import("./epub-browser-parser");
-        const parsed = await parseEpubInBrowser(bytes, documentTitle || "document.epub");
+        const parsed = await parseEpubInBrowser(bytes, documentTitle ||"document.epub");
         if (cancelled) return;
         setEpub(parsed as ParsedEpub);
         void adoptBookTitle(documentId, parsed.title, documentTitle, documentSourceFilename);
@@ -188,22 +189,29 @@ export function DocumentReader({
     return () => { cancelled = true; };
   }, [documentId, documentSourceFilename, documentTitle, format, source]);
 
+  // Listened for on the book, not on the whole document.
+  //
+  // On `document`, every click in the pane beside the text also reported"no
+  // selection", so choosing an action there threw away the passage it was
+  // about. Scoped here, letting go of a passage is something the reader does in
+  // the book — which is exactly when the composer should stop offering it.
   useEffect(() => {
-    if (format !== "epub") return;
-    async function capture() {
+    const reader = readerRef.current;
+    if (format !== "epub" || !reader) return;
+    function capture() {
       const selection = window.getSelection();
       if (!selection) return;
       const captured = captureEpubSelection(selection, document, documentTitle || document.title);
       setCapturedSelection(captured);
       onSelectionChange?.(captured);
     }
-    document.addEventListener("mouseup", capture);
-    document.addEventListener("touchend", capture);
+    reader.addEventListener("mouseup", capture);
+    reader.addEventListener("touchend", capture);
     return () => {
-      document.removeEventListener("mouseup", capture);
-      document.removeEventListener("touchend", capture);
+      reader.removeEventListener("mouseup", capture);
+      reader.removeEventListener("touchend", capture);
     };
-  }, [documentTitle, format, onSelectionChange]);
+  }, [documentTitle, epub, format, onSelectionChange, sectionIndex]);
 
   const section = epub?.sections[sectionIndex];
   const sectionId = section?.id;
@@ -235,13 +243,13 @@ export function DocumentReader({
     if (!epub) return <p aria-live="polite">Opening…</p>;
     if (!section) return <div role="alert">This EPUB has no readable sections.</div>;
     return (
-      <section aria-label="EPUB reader" className="space-y-4">
+      <section aria-label="EPUB reader" className="space-y-4" ref={readerRef}>
         <div className="flex items-center justify-between gap-2">
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex === 0} onClick={() => goToSection(sectionIndex - 1)} type="button">Previous</button>
+          <button className="min-h-11 rounded-lg border border-rule px-3 text-sm" disabled={sectionIndex === 0} onClick={() => goToSection(sectionIndex - 1)} type="button">Previous</button>
           <span className="text-sm">{sectionIndex + 1} / {epub.sections.length}</span>
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => goToSection(sectionIndex + 1)} type="button">Next</button>
+          <button className="min-h-11 rounded-lg border border-rule px-3 text-sm" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => goToSection(sectionIndex + 1)} type="button">Next</button>
         </div>
-        <article className="reader-prose max-w-prose rounded-xl border border-zinc-200 p-4 dark:border-zinc-800" data-reader-section={section.id} ref={chapterRef}>
+        <article className="reader-prose max-w-prose rounded-xl border border-rule p-4" data-reader-section={section.id} ref={chapterRef}>
           {/* The nav label is only shown when the chapter body carries no heading of its own. */}
           {section.title && !/<h[1-6]>/.test(section.html ?? "") && (
             <h2 className="mb-3 text-xl font-semibold">{section.title}</h2>
@@ -253,11 +261,11 @@ export function DocumentReader({
         {progress.saveError && (
           <div className="flex items-center justify-between gap-3 rounded-lg border border-red-300 p-3 text-sm" role="alert">
             <span>Reading position could not be saved.</span>
-            <button className="min-h-10 rounded bg-zinc-900 px-3 text-white" onClick={() => void progress.save(JSON.stringify({ version: 1, sectionId: section.id }))} type="button">Retry</button>
+            <button className="min-h-10 rounded bg-ink px-3 text-white" onClick={() => void progress.save(JSON.stringify({ version: 1, sectionId: section.id }))} type="button">Retry</button>
           </div>
         )}
-        <div aria-label="EPUB selection preview" className="rounded-xl border border-zinc-200 p-3 text-sm dark:border-zinc-800">
-          {capturedSelection?.text || "Select EPUB text to prepare it for AI actions."}
+        <div aria-label="EPUB selection preview" className="rounded-xl border border-rule p-3 text-sm">
+          {capturedSelection?.text ||"Select EPUB text to prepare it for AI actions."}
         </div>
       </section>
     );
