@@ -69,7 +69,8 @@ export default function HelpPage() {
             Explain / Translate / Simplify と、ハイライト用の丸い色。
           </p>
           <p>
-            右のパネル（スマホでは右下の <strong>Ask AI</strong>）の <strong>AI</strong> タブは
+            右のパネル（スマホでは右下の <strong>Ask AI</strong> で下から出てくる。
+            上端の横棒を下へスワイプすると戻る）の <strong>AI</strong> タブは
             <strong>1本の会話</strong>になっている。Explain も Translate も質問も、
             同じ流れに上から順に積まれる。前の回答が消えることはない。
           </p>

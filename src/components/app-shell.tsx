@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 
@@ -49,11 +49,69 @@ export function AppShell({
 }: AppShellProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [lastSignal, setLastSignal] = useState(0);
+  const sheetRef = useRef<HTMLElement>(null);
+  const dragRef = useRef<{ from: number; at: number; time: number } | null>(null);
 
   if (openSecondarySignal !== lastSignal) {
     setLastSignal(openSecondarySignal);
     if (openSecondarySignal > 0) setSheetOpen(true);
   }
+
+  // Escape closes it, because a swipe is not something every reader can make
+  // and the grip is not something every reader can see.
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSheetOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [sheetOpen]);
+
+  /**
+   * Drags the sheet down with the finger, and lets go of it.
+   *
+   * The grip at the top of the sheet is the promise every phone makes: this
+   * thing can be pushed back down. Keeping a Close button next to it said the
+   * promise was false, and the reader had to aim at a word instead of flicking
+   * a sheet away.
+   *
+   * The movement is written straight to the node rather than kept in state. A
+   * finger produces a position every frame, and rendering the whole panel at
+   * that rate is how a drag stops feeling attached to the finger.
+   */
+  const startDrag = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    const sheet = sheetRef.current;
+    // Only the sheet. On a wide screen this is a column and goes nowhere.
+    if (!sheet || window.matchMedia("(min-width: 64rem)").matches) return;
+    dragRef.current = { at: event.clientY, from: event.clientY, time: event.timeStamp };
+    sheet.style.transition = "none";
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, []);
+
+  const moveDrag = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    const drag = dragRef.current;
+    const sheet = sheetRef.current;
+    if (!drag || !sheet) return;
+    drag.at = event.clientY;
+    drag.time = event.timeStamp;
+    // Downwards only: dragging up would lift the sheet off the bottom edge.
+    sheet.style.transform = `translateY(${Math.max(0, event.clientY - drag.from)}px)`;
+  }, []);
+
+  const endDrag = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    const drag = dragRef.current;
+    const sheet = sheetRef.current;
+    dragRef.current = null;
+    if (!drag || !sheet) return;
+    sheet.style.transition = "";
+    sheet.style.transform = "";
+
+    const travelled = event.clientY - drag.from;
+    const elapsed = Math.max(1, event.timeStamp - drag.time);
+    // Far enough, or fast enough. A flick is over before it has gone far.
+    if (travelled > 88 || (event.clientY - drag.at) / elapsed > 0.4) setSheetOpen(false);
+  }, []);
 
   return (
     <div className="bg-paper text-ink flex h-dvh flex-col">
@@ -117,6 +175,7 @@ export function AppShell({
         <aside
           aria-label={sheetOpen ? "AI drawer" : "AI and notes"}
           aria-modal={sheetOpen || undefined}
+          ref={sheetRef}
           className={[
 "bg-paper flex flex-col",
             // Phone: a sheet parked below the edge until it is asked for.
@@ -140,15 +199,17 @@ export function AppShell({
           ].join(" ")}
           role={sheetOpen ? "dialog" : undefined}
         >
-          <div className="mb-3 flex shrink-0 items-center justify-between lg:hidden">
-            <span aria-hidden className="bg-rule mx-auto h-1 w-10 rounded-full" />
-            <button
-              className="text-ink-quiet hover:text-ink min-h-11 text-xs tracking-wide uppercase transition-colors duration-(--fast)"
-              onClick={() => setSheetOpen(false)}
-              type="button"
-            >
-              Close
-            </button>
+          {/* The grip, and the whole of it is the handle: a target the width of
+              the sheet is easier to catch than the line drawn inside it.
+              touch-action keeps the browser from claiming the drag as a scroll. */}
+          <div
+            className="-mt-1 flex shrink-0 touch-none justify-center pt-1 pb-3 lg:hidden"
+            onPointerCancel={endDrag}
+            onPointerDown={startDrag}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+          >
+            <span aria-hidden className="bg-rule h-1 w-10 rounded-full" />
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {secondary}

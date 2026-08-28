@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, importDocument, login } from "./helpers";
+import { buildEpub, importDocument, login, swipeSheetDown } from "./helpers";
 
 async function openEpub(page: import("@playwright/test").Page) {
   await login(page);
@@ -94,7 +94,7 @@ test("mobile drawer preserves a scrollable AI response and returns to the Reader
   const box = await drawer.boundingBox();
   expect(box!.y).toBeGreaterThan(80);
 
-  await drawer.getByRole("button", { name: "Close", exact: true }).click();
+  await swipeSheetDown(page);
   await expect(page.getByRole("button", { name: "Ask AI", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible();
 });

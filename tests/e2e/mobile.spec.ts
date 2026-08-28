@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, buildPdf, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
+import { buildEpub, buildPdf, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd, swipeSheetDown } from "./helpers";
 
 /**
  * Mobile layout regression, run under the `mobile-layout` project: Chromium
@@ -75,7 +75,7 @@ test("the AI drawer opens over the reader and returns to it", async ({ page }) =
   await expect(drawer).toBeVisible();
   await expect(drawer.getByLabel("Ask about this passage")).toBeVisible();
 
-  await drawer.getByRole("button", { name: "Close", exact: true }).tap();
+  await swipeSheetDown(page);
   await expect(drawer).toBeHidden();
   await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible();
 });
@@ -126,4 +126,36 @@ test("a long PDF gives back the pages it has scrolled past", async ({ page }) =>
   await expect.poll(() => canvasPixels(1), { timeout: 15_000 }).toBe(0);
   // The pages actually being read are still drawn.
   await expect.poll(() => canvasPixels(12), { timeout: 15_000 }).toBeGreaterThan(0);
+});
+
+test("a small tug on the sheet does not throw it away", async ({ page }) => {
+  await login(page);
+  const documentId = await importDocument(
+    page,
+    "sheet-tug.epub",
+    await buildEpub(),
+    "application/epub+zip",
+  );
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Ask AI", exact: true }).tap();
+
+  const drawer = page.getByRole("dialog", { name: "AI drawer" });
+  await expect(drawer).toBeVisible();
+
+  // Slowly, and not far. Anything that can be dismissed by accident is worse
+  // than something that has to be dismissed on purpose.
+  const grip = drawer.locator("div").first();
+  const box = (await grip.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (const step of [10, 20, 30]) {
+    await page.mouse.move(x, y + step);
+    await page.waitForTimeout(80);
+  }
+  await page.mouse.up();
+
+  await expect(drawer).toBeVisible();
 });

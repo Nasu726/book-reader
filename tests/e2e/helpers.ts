@@ -157,3 +157,21 @@ export async function runAction(
   await page.getByRole("button", { name: `Insert /${action}` }).click();
   await page.getByRole("button", { name: "Send", exact: true }).click();
 }
+
+/**
+ * Pushes the sheet back down with a swipe, the way the grip at its top says it
+ * can be. There is no Close button: a grip that cannot be dragged is a promise
+ * the interface does not keep.
+ */
+export async function swipeSheetDown(page: Page): Promise<void> {
+  const grip = page.getByRole("dialog", { name: "AI drawer" }).locator("div").first();
+  const box = await grip.boundingBox();
+  if (!box) throw new Error("The sheet has no grip to drag.");
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (const step of [40, 90, 150, 220]) await page.mouse.move(x, y + step);
+  await page.mouse.up();
+}
