@@ -128,6 +128,7 @@ export interface ConversationRepository {
   ): Promise<void>;
   getByDocument(documentId: string, userId: string): Promise<string | null>;
   listMessages(conversationId: string): Promise<readonly MessageRecord[]>;
+  deleteByDocument(documentId: string, userId: string): Promise<void>;
   addMessage(message: MessageRecord): Promise<void>;
   beginPendingAssistantMessage(
     message: PendingAssistantMessage,

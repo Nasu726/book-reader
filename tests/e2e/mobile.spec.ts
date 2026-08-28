@@ -73,7 +73,7 @@ test("the AI drawer opens over the reader and returns to it", async ({ page }) =
   await page.getByRole("button", { name: "Ask AI", exact: true }).tap();
   const drawer = page.getByRole("dialog", { name: "AI drawer" });
   await expect(drawer).toBeVisible();
-  await expect(drawer.getByLabel("Follow-up question")).toBeVisible();
+  await expect(drawer.getByLabel("Ask about this passage")).toBeVisible();
 
   await drawer.getByRole("button", { name: "Close", exact: true }).tap();
   await expect(drawer).toBeHidden();

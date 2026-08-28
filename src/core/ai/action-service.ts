@@ -15,6 +15,38 @@ export const AI_ACTIONS = [
 
 export type AiAction = (typeof AI_ACTIONS)[number];
 
+/** What an action is called, wherever one has to be named to a person. */
+export const AI_ACTION_LABELS: Record<AiAction, string> = {
+  ask: "Ask",
+  explain: "Explain",
+  highlight: "Highlight",
+  simplify: "Simplify",
+  translate: "Translate",
+};
+
+/**
+ * The reader's side of one exchange, as a line worth showing them again.
+ *
+ * What used to be kept was the built prompt — instructions, context, and the
+ * passage, several hundred characters of machine-facing text. Reopening a
+ * document printed all of it back as though the model had said it, so asking
+ * one question showed every prompt that came before it. A conversation should
+ * read like the conversation it was.
+ */
+export function describeUserTurn(input: {
+  action: AiAction;
+  question?: string;
+  targetLanguage?: string;
+}): string {
+  const question = input.question?.trim();
+  if (input.action === "ask") return question || AI_ACTION_LABELS.ask;
+  if (input.action === "translate") {
+    const target = input.targetLanguage?.trim();
+    return target ? `Translate into ${target}` : AI_ACTION_LABELS.translate;
+  }
+  return AI_ACTION_LABELS[input.action];
+}
+
 export type AiActionInput = {
   action: AiAction;
   selectedText: string;

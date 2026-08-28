@@ -66,22 +66,38 @@ export default function HelpPage() {
           <h2>文章を選んでAIに聞く</h2>
           <p>
             本文をなぞって選択すると、<strong>選択したところのすぐそばに小さなメニューが出る</strong>。
+            Explain / Translate / Simplify と、ハイライト用の丸い色。
+          </p>
+          <p>
+            右のパネル（スマホでは右下の <strong>Ask AI</strong>）の <strong>AI</strong> タブは
+            <strong>1本の会話</strong>になっている。Explain も Translate も質問も、
+            同じ流れに上から順に積まれる。前の回答が消えることはない。
           </p>
           <ul>
-            <li><strong>Explain</strong> — 説明させる</li>
-            <li><strong>Translate</strong> — 訳させる</li>
-            <li><strong>Simplify</strong> — やさしく言い直させる</li>
-            <li>丸い色 — ハイライトを付ける（次の節）</li>
+            <li>
+              一番上の <strong>About:</strong> が、いま話題にしている文章。
+              <strong>本文の選択を解除しても消えない</strong>ので、
+              説明させたあとに訳させる、といった続きができる
+            </li>
+            <li>
+              下の <strong>Explain</strong> / <strong>Simplify</strong> / <strong>Translate</strong> は1クリックで送る。
+              訳す先の言語は <strong>Translate</strong> の隣で選ぶ（既定は日本語）
+            </li>
+            <li>
+              自由に聞きたいときは一番下の入力欄に書いて <strong>Send</strong>。
+              直前までの会話とその文章が一緒に送られる
+            </li>
+            <li>
+              回答の下の <strong>Save to notes</strong> で、その回答を
+              <strong>Document note</strong> に書き足せる。会話は流れていくものなので、
+              残したいものだけこうして拾う
+            </li>
+            <li>
+              <strong>Clear</strong> で会話をまるごと消す。会話は文書ごとに保存され、
+              次に開くと続きから見える
+            </li>
           </ul>
-          <p>
-            聞きたいことが決まっているときは、右側のパネル（スマホでは右下の
-            <strong>Ask AI</strong> で下から出てくるシート）の <strong>Follow-up question</strong> に
-            書いて <strong>Ask</strong> を押す。直前に選んだ文章が一緒に送られる。
-          </p>
-          <p>
-            訳す先の言語は <strong>Translate</strong> を選んだときだけ出る。既定は日本語で、
-            訳元の言語は指定しない（英語とは限らないため）。答えは日本語で返る。
-          </p>
+          <p>訳元の言語は指定しない（英語とは限らないため）。答えは日本語で返る。</p>
 
           <h2>保存されるもの3種と、その居場所</h2>
           <p>
@@ -98,7 +114,8 @@ export default function HelpPage() {
             </li>
             <li>
               <strong>Document note</strong> — その本に1つだけの自由なメモ。書いて
-              <strong>Save note</strong>。空にして保存すると消える
+              <strong>Save note</strong>。空にして保存すると消える。
+              AIの回答の <strong>Save to notes</strong> もここに書き足される
             </li>
             <li>
               <strong>Save vocabulary</strong> — 単語帳。文章を選んでから意味を書いて保存すると、

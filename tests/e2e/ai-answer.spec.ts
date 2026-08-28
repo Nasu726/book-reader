@@ -24,13 +24,17 @@ test("AI actions render in the desktop secondary pane", async ({ page }) => {
   await expect(actions).toBeVisible();
   // Highlighting is not among them: it happens against the selection, where a
   // colour can be chosen, rather than as a colourless button in this pane.
-  for (const action of ["Explain", "Translate", "Simplify", "Ask"]) {
+  for (const action of ["Explain", "Translate", "Simplify"]) {
     const button = actions.getByRole("button", { name: action, exact: true });
     await expect(button).toBeVisible();
     // Offered, but not usable until there is a passage to act on.
     await expect(button).toBeDisabled();
   }
   await expect(actions.getByRole("button", { name: "Highlight", exact: true })).toHaveCount(0);
+  // Asking is the composer, not a fourth action: one input, one button.
+  await expect(actions.getByRole("button", { name: "Ask", exact: true })).toHaveCount(0);
+  await expect(secondary.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
+  await expect(secondary.getByLabel("Ask about this passage")).toBeVisible();
 });
 
 test("the AI panel exists exactly once, so its labels stay wired to its own inputs", async ({ page }) => {
@@ -58,13 +62,15 @@ test("desktop panes scroll independently", async ({ page }) => {
   await expect(reader).toBeVisible();
   await expect(secondary).toBeVisible();
 
-  // Both panes must own their scrolling, so a long AI answer never pushes the
-  // book text off screen.
-  for (const pane of [reader, secondary]) {
-    expect(
-      await pane.evaluate((element) => getComputedStyle(element).overflowY),
-    ).toBe("auto");
-  }
+  // The book text owns its scrolling. The pane beside it does not scroll at
+  // all: the transcript inside it does, so a long answer neither pushes the
+  // book off screen nor drags the whole column up and down while reading.
+  expect(await reader.evaluate((element) => getComputedStyle(element).overflowY)).toBe("auto");
+  expect(await secondary.evaluate((element) => getComputedStyle(element).overflowY)).toBe("hidden");
+  expect(
+    await page.getByRole("log", { name: "Conversation" })
+      .evaluate((element) => getComputedStyle(element).overflowY),
+  ).toBe("auto");
 
   const boxes = await Promise.all([reader.boundingBox(), secondary.boundingBox()]);
   expect(boxes[0]).not.toBeNull();
@@ -83,7 +89,7 @@ test("mobile drawer preserves a scrollable AI response and returns to the Reader
 
   const drawer = page.getByRole("dialog", { name: "AI drawer" });
   await expect(drawer).toBeVisible();
-  await expect(drawer.getByLabel("Follow-up question")).toBeVisible();
+  await expect(drawer.getByLabel("Ask about this passage")).toBeVisible();
   await expect(
     drawer.getByRole("group", { name: "AI actions" }).getByRole("button", { name: "Explain" }),
   ).toBeVisible();

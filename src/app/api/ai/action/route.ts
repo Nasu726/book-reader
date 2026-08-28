@@ -1,4 +1,5 @@
 
+import { AI_ACTIONS, describeUserTurn, type AiAction } from "@/core/ai/action-service";
 import { createSqliteConversationRepository } from "@/repositories/sqlite/conversation-repository";
 import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { AiProviderError, generateWithRetry } from "@/core/ai/provider";
@@ -29,6 +30,9 @@ export async function POST(request: Request) {
     documentId?: unknown;
     selectedText?: unknown;
     location?: unknown;
+    action?: unknown;
+    question?: unknown;
+    targetLanguage?: unknown;
   };
   try {
     input = await request.json();
@@ -38,6 +42,9 @@ export async function POST(request: Request) {
   if (
     typeof input.prompt !== "string" || !input.prompt.trim() ||
     input.prompt.length > MAX_PROMPT_CHARACTERS ||
+    (input.action !== undefined && !AI_ACTIONS.includes(input.action as AiAction)) ||
+    (typeof input.question === "string" && input.question.length > 2_000) ||
+    (typeof input.targetLanguage === "string" && input.targetLanguage.length > 100) ||
     (typeof input.context === "string" && input.context.length > MAX_CONTEXT_CHARACTERS) ||
     (typeof input.selectedText === "string" && input.selectedText.length > 100_000) ||
     (typeof input.location === "string" && input.location.length > 10_000)
@@ -68,12 +75,20 @@ export async function POST(request: Request) {
     : [];
   const historyContext = formatConversationHistory(previousMessages);
 
+  // What is stored is the reader's side of the exchange, not the prompt that
+  // was built from it. The prompt goes to the provider and nowhere else.
+  const userTurn = describeUserTurn({
+    action: (input.action as AiAction) ?? "ask",
+    question: typeof input.question === "string" ? input.question : undefined,
+    targetLanguage: typeof input.targetLanguage === "string" ? input.targetLanguage : undefined,
+  });
+
   if (conversationId) {
     await conversationRepository.addMessage({
       id: crypto.randomUUID(),
       conversationId,
       role: "user",
-      content: input.prompt,
+      content: userTurn,
       selectedText: typeof input.selectedText === "string" ? input.selectedText : undefined,
       location: typeof input.location === "string" ? input.location : undefined,
       createdAt: new Date(),
@@ -151,9 +166,50 @@ export async function GET(request: Request) {
   );
   const conversationId = await conversationRepository.getByDocument(documentId, session.userId);
   const messages = conversationId
-    ? (await conversationRepository.listMessages(conversationId)).filter((message) => message.content)
+    ? (await conversationRepository.listMessages(conversationId))
+      .filter((message) => message.content)
+      .map((message) => ({
+        content: message.content,
+        role: message.role,
+        selectedText: message.selectedText,
+      }))
     : [];
   return Response.json({ messages });
+}
+
+/**
+ * Throws the conversation away.
+ *
+ * Every exchange was kept for ever and shown again on every open, so a document
+ * read over a week greeted its reader with a week of answers and cost a row of
+ * D1's daily budget to write each one. Anything that accumulates has to be
+ * possible to empty.
+ */
+export async function DELETE(request: Request) {
+  const database = await getDatabase();
+  const session = await getCurrentUser();
+  if (!session) {
+    return Response.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
+
+  const documentId = new URL(request.url).searchParams.get("documentId");
+  if (!documentId) {
+    return Response.json({ error: "Document ID is required." }, { status: 400 });
+  }
+
+  const document = await createSqliteDocumentRepository(database).getById(documentId);
+  if (document?.userId !== session.userId) {
+    return Response.json({ error: "Document not found." }, { status: 404 });
+  }
+
+  await createSqliteConversationRepository(database).deleteByDocument(
+    documentId,
+    session.userId,
+  );
+  return Response.json({ cleared: true });
 }
 
 function formatConversationHistory(messages: readonly {

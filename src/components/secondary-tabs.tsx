@@ -35,7 +35,7 @@ export function SecondaryTabs({
   const listRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       <div
         aria-label="Panel"
         className="mb-4 flex shrink-0 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-900"
@@ -79,7 +79,10 @@ export function SecondaryTabs({
       {TABS.map((tab) => (
         <div
           aria-labelledby={`tab-${tab.id}`}
-          className="min-h-0 flex-1 space-y-4 lg:overflow-visible"
+          // Scrolls inside itself when it has more than fits. The AI panel
+          // manages its own height and so never uses this; the saved things
+          // grow without limit and always will.
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto"
           hidden={active !== tab.id}
           id={`panel-${tab.id}`}
           key={tab.id}

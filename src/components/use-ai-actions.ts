@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   AiActionError,
+  describeUserTurn,
   runAiAction,
   type AiAction,
 } from "@/core/ai/action-service";
@@ -11,23 +12,39 @@ import type { DocumentSelection } from "@/core/selection/capture";
 import type { AiProvider, AiRequest, AiResponse } from "@/core/ai/provider";
 import { readAnswerLanguage, writeAnswerLanguage } from "./reader-preferences";
 
-function createFetchProvider(
-  documentId?: string,
-  selection?: DocumentSelection | null,
-): AiProvider {
+/** One side of one exchange, in the order it was said. */
+export type ConversationTurn = {
+  role: "user" | "assistant";
+  text: string;
+  /** The passage the turn was about, quoted back under it. */
+  selectedText?: string;
+};
+
+function createFetchProvider(request: {
+  action: AiAction;
+  documentId?: string;
+  question?: string;
+  selection: DocumentSelection | null;
+  targetLanguage: string;
+}): AiProvider {
   return {
-    async generate(request: AiRequest) {
+    async generate(outgoing: AiRequest) {
       const response = await fetch("/api/ai/action", {
         body: JSON.stringify({
-          context: request.context,
-          documentId,
-          location: selection?.location,
-          prompt: request.prompt,
-          selectedText: selection?.text,
+          // The action and the question are what gets kept as the reader's side
+          // of the conversation. The prompt goes to the provider only.
+          action: request.action,
+          context: outgoing.context,
+          documentId: request.documentId,
+          location: request.selection?.location,
+          prompt: outgoing.prompt,
+          question: request.question,
+          selectedText: request.selection?.text,
+          targetLanguage: request.targetLanguage,
         }),
         headers: { "content-type": "application/json" },
         method: "POST",
-        signal: request.signal,
+        signal: outgoing.signal,
       });
       if (!response.ok) {
         throw new Error("The provider rejected the request.");
@@ -40,14 +57,13 @@ function createFetchProvider(
 export type AiConversation = ReturnType<typeof useAiActions>;
 
 /**
- * The AI conversation for one document: what has been asked, what came back,
- * and how to ask for more.
+ * The conversation about one document: what has been said, and how to say more.
  *
  * Held above the panel so that the menu which appears against the selection can
- * start an action from its own click handler. Passing the request down as a prop
- * and reacting to it in an effect meant a user event arriving as a state change
- * — which React rightly complains about, and which made the same action twice
- * in a row indistinguishable from no action at all.
+ * start an exchange from its own click handler. Passing the request down as a
+ * prop and reacting to it in an effect meant a user event arriving as a state
+ * change — which React rightly complains about, and which made the same action
+ * twice in a row indistinguishable from no action at all.
  */
 export function useAiActions({
   documentId,
@@ -58,13 +74,23 @@ export function useAiActions({
   provider?: AiProvider;
   selection: DocumentSelection | null;
 }) {
-  const [action, setAction] = useState<AiAction>("explain");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState("");
   const [language, setLanguageState] = useState<string>(readAnswerLanguage);
-  const [history, setHistory] = useState<{ action: string; text: string }[]>([]);
+  const [turns, setTurns] = useState<ConversationTurn[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  /**
+   * The passage the conversation is about.
+   *
+   * Kept here rather than read from the live selection, because the browser
+   * drops a selection the moment anything else is clicked. Every action was
+   * disabled by the reader's next click, so a passage could be explained but
+   * never then translated without selecting it a second time.
+   */
+  const [subject, setSubject] = useState<DocumentSelection | null>(null);
+  if (selection && selection !== subject) setSubject(selection);
 
   useEffect(() => {
     if (!documentId) return;
@@ -77,11 +103,12 @@ export function useAiActions({
         );
         if (!response.ok) return;
         const payload = await response.json() as {
-          messages?: { role: string; content: string }[];
+          messages?: { role: string; content: string; selectedText?: string }[];
         };
         if (cancelled || !payload.messages) return;
-        setHistory(payload.messages.map((message) => ({
-          action: message.role,
+        setTurns(payload.messages.map((message) => ({
+          role: message.role === "user" ? "user" : "assistant",
+          selectedText: message.selectedText,
           text: message.content,
         })));
       } catch {
@@ -92,31 +119,53 @@ export function useAiActions({
     return () => { cancelled = true; };
   }, [documentId]);
 
-  const run = useCallback(async (nextAction: AiAction, followUp?: string) => {
-    setAction(nextAction);
+  const send = useCallback(async (nextAction: AiAction, followUp?: string) => {
+    const asked = nextAction === "ask" ? (followUp ?? question).trim() : undefined;
+    if (nextAction === "ask" && !asked) return;
+
     setLoading(true);
     setError(null);
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+
+    const said = describeUserTurn({
+      action: nextAction,
+      question: asked,
+      targetLanguage: language,
+    });
+    // On screen before the answer, so the transcript reads in the order it
+    // happened rather than jumping backwards when the reply lands.
+    setTurns((current) => [...current, {
+      role: "user",
+      selectedText: subject?.text,
+      text: said,
+    }]);
+
     try {
       const response = await runAiAction(
-        provider ?? createFetchProvider(documentId, selection),
+        provider ?? createFetchProvider({
+          action: nextAction,
+          documentId,
+          question: asked,
+          selection: subject,
+          targetLanguage: language,
+        }),
         {
           action: nextAction,
-          documentTitle: selection?.documentTitle,
-          paperStructure: selection?.paperStructure,
-          surroundingText: selection?.surroundingText,
-          selectedText: selection?.text ?? "",
+          documentTitle: subject?.documentTitle,
+          paperStructure: subject?.paperStructure,
+          surroundingText: subject?.surroundingText,
+          selectedText: subject?.text ?? "",
           // Left unstated so nothing is assumed about what is being read.
           sourceLanguage: "auto",
           targetLanguage: language,
           // One preference drives both: the language to read an answer in is
           // the language to translate into.
           responseLanguage: language,
-          userQuestion: nextAction === "ask" ? followUp || question : undefined,
+          userQuestion: asked,
         },
       );
-      setHistory((current) => [{ action: nextAction, text: response }, ...current]);
+      setTurns((current) => [...current, { role: "assistant", text: response }]);
     } catch (cause) {
       if (!abortController.signal.aborted) {
         setError(cause instanceof AiActionError
@@ -127,7 +176,21 @@ export function useAiActions({
       abortControllerRef.current = null;
       setLoading(false);
     }
-  }, [documentId, language, provider, question, selection]);
+  }, [documentId, language, provider, question, subject]);
+
+  const clear = useCallback(async () => {
+    if (!documentId) return;
+    setTurns([]);
+    setError(null);
+    try {
+      await fetch(`/api/ai/action?documentId=${encodeURIComponent(documentId)}`, {
+        method: "DELETE",
+      });
+    } catch {
+      // The transcript is already empty on screen; the next open will show
+      // whatever the server still holds rather than pretending otherwise.
+    }
+  }, [documentId]);
 
   const setLanguage = useCallback((next: string) => {
     setLanguageState(next);
@@ -137,15 +200,16 @@ export function useAiActions({
   const cancel = useCallback(() => abortControllerRef.current?.abort(), []);
 
   return {
-    action,
     cancel,
+    clear,
     error,
-    history,
     language,
     loading,
     question,
-    run,
+    send,
     setLanguage,
     setQuestion,
+    subject,
+    turns,
   };
 }

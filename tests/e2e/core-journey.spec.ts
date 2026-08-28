@@ -46,15 +46,19 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
 
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
   const actions = secondary.getByRole("group", { name: "AI actions" });
-  for (const action of ["Explain", "Translate", "Simplify"]) {
+  // One conversation, so each action adds to it rather than replacing what the
+  // last one said.
+  for (const [index, action] of ["Explain", "Translate", "Simplify"].entries()) {
     await actions.getByRole("button", { name: action, exact: true }).click();
-    await expect(secondary.getByRole("region", { name: "AI response" }).first())
-      .toContainText(MOCK_AI_RESPONSE, { timeout: 15_000 });
+    await expect(secondary.getByRole("region", { name: "AI response" }))
+      .toHaveCount(index + 1, { timeout: 15_000 });
   }
-  await secondary.getByLabel("Follow-up question").fill("Why does this matter?");
-  await secondary.getByRole("button", { name: "Ask", exact: true }).last().click();
-  await expect(secondary.getByRole("region", { name: "AI response" }).first())
-    .toContainText(MOCK_AI_RESPONSE, { timeout: 15_000 });
+  await secondary.getByLabel("Ask about this passage").fill("Why does this matter?");
+  await secondary.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(secondary.getByRole("region", { name: "AI response" }))
+    .toHaveCount(4, { timeout: 15_000 });
+  await expect(secondary.getByRole("region", { name: "AI response" }).last())
+    .toContainText(MOCK_AI_RESPONSE);
 
   // Highlighting lives against the passage now, so the selection the AI actions
   // consumed has to be made again — clicking in the pane clears it, exactly as

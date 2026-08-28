@@ -9,6 +9,7 @@ import { SecondaryTabs, type SecondaryTab } from "./secondary-tabs";
 import { SelectionActions } from "./selection-actions";
 import { DocumentReader } from "./document-reader";
 import { DocumentNotes } from "./document-notes";
+import { useDocumentNote } from "./use-document-note";
 import Link from "next/link";
 import { DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from "@/core/highlights/colors";
 import type { DocumentSelection } from "@/core/selection/capture";
@@ -61,6 +62,7 @@ export function SelectionAiConnector({
   const [vocabulary, setVocabulary] = useState(() => [...initialVocabulary]);
   const [meaning, setMeaning] = useState("");
   const conversation = useAiActions({ documentId, selection });
+  const note = useDocumentNote(documentId);
   const [vocabularyState, setVocabularyState] = useState<"idle" | "saved" | "error">("idle");
 
   async function deleteVocabularyEntry(entryId: string) {
@@ -168,7 +170,7 @@ export function SelectionAiConnector({
               // Started straight from the click. Routing it through a prop and
               // an effect turned a user event into a state change, and made the
               // same action twice in a row look like no change at all.
-              void conversation.run(action);
+              void conversation.send(action);
               // The answer has somewhere to arrive: the AI tab, and on a phone
               // the sheet that holds it.
               setTab("ai");
@@ -201,7 +203,7 @@ export function SelectionAiConnector({
       secondary={
         <SecondaryTabs
           active={tab}
-          ai={<AiAnswerPanel conversation={conversation} selection={selection} />}
+          ai={<AiAnswerPanel conversation={conversation} onSaveToNotes={note.append} />}
           onChange={setTab}
           saved={<>
           {/* A plain section rather than a disclosure: the tab it sits in is
@@ -243,7 +245,7 @@ export function SelectionAiConnector({
               </ul>
             )}
           </section>
-          <DocumentNotes documentId={documentId} />
+          <DocumentNotes note={note} />
           <section aria-label="Saved vocabulary" className="mt-6 space-y-2 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
             <h2 className="text-sm font-semibold">Save vocabulary</h2>
             <p className="text-xs text-zinc-600 dark:text-zinc-400">

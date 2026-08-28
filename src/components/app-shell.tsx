@@ -132,7 +132,11 @@ export function AppShell({
             sheetOpen ? "translate-y-0 visible" : "invisible translate-y-full",
             // Wide screen: an ordinary column, no transform, always present.
             "lg:visible lg:static lg:z-auto lg:max-h-none lg:w-[380px] lg:shrink-0 lg:translate-y-0",
-            "lg:overflow-y-auto lg:rounded-2xl lg:border lg:border-zinc-200 lg:p-5",
+            // The pane itself never scrolls. What has more than fits — the
+            // transcript, the list of saved things — scrolls inside its own
+            // box, so the controls stay put and the whole column does not
+            // creep up and down by a few pixels while reading.
+            "lg:overflow-hidden lg:rounded-2xl lg:border lg:border-zinc-200 lg:p-5",
             "lg:shadow-sm lg:transition-none lg:dark:border-zinc-800",
           ].join(" ")}
           role={sheetOpen ? "dialog" : undefined}
@@ -147,7 +151,7 @@ export function AppShell({
               Close
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-visible">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {secondary}
           </div>
         </aside>

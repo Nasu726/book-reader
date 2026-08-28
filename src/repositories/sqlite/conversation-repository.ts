@@ -49,6 +49,22 @@ export function createSqliteConversationRepository(
     return rows[0]?.id ?? null;
   }
 
+  /**
+   * Removes the document's conversation and everything said in it.
+   *
+   * The messages are deleted explicitly rather than left to the foreign key:
+   * cascade behaviour depends on the driver having foreign keys switched on,
+   * and a half-deleted conversation is worse than none.
+   */
+  async function deleteByDocument(documentId: string, userId: string): Promise<void> {
+    const conversationId = await getByDocument(documentId, userId);
+    if (!conversationId) return;
+    await db.delete(messages).where(eq(messages.conversationId, conversationId));
+    await db.delete(conversations).where(
+      and(eq(conversations.id, conversationId), eq(conversations.userId, userId)),
+    );
+  }
+
   async function addMessage(message: MessageRecord): Promise<void> {
     await db.insert(messages).values(toValues(message));
   }
@@ -102,6 +118,7 @@ export function createSqliteConversationRepository(
 
   return {
     create,
+    deleteByDocument,
     getByDocument,
     listMessages,
     addMessage,
