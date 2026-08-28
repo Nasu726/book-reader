@@ -1077,6 +1077,62 @@ Evidence:
 
 ---
 
+## SAFE-001 — 無料枠を超える書き込みの拒否
+**Status:** DONE
+**Priority:** P1
+**Depends on:** PROD-CF-001
+
+### Goal
+
+誤操作・暴走・攻撃のいずれでも、D1無料枠（1日10万行）を使い切らないようにする。超過時は原因不明の500ではなく、意味のあるメッセージを返す。
+
+### Verify
+
+- `tests/unit/write-budget.test.mts` — 上限到達・人ごとの独立・UTC日での復帰・数えられないときの通過
+- `tests/unit/write-budget-coverage.test.mts` — 書き込みroute全件が `chargeWrite` を呼ぶ
+- mutation: guard を1箇所外すと coverage テストが赤、上限を off-by-one にすると budget テストが赤
+
+判断理由は `docs/DECISIONS.md` D-19。
+
+---
+
+## HILITE-002 — ハイライトの着色と色選択
+**Status:** DONE
+**Priority:** P1
+**Depends on:** HILITE-001
+
+### Goal
+
+保存したハイライトを本文に描く。色は4色から選ぶ。
+
+### Verify
+
+- `tests/unit/find-range.test.mts` — EPUBのオフセット解決（同じ語が2回出る本文を含む）、PDFの正規化検索（行またぎ・行末ハイフン）
+- `tests/e2e/highlight-colors.spec.ts` — 選択→着色、再読み込み後の再描画、EPUBのオフセット経路、未知の色の400、`::highlight` 規則がブラウザに届いていること
+- mutation: 描画呼び出しの削除・色検証の削除・境界解決の削除でそれぞれ赤
+
+判断理由は `docs/DECISIONS.md` D-20。
+
+---
+
+## HELP-001 — 操作マニュアル
+**Status:** DONE
+**Priority:** P1
+**Depends on:** QUALITY-001
+
+### Goal
+
+「ハイライトの付け方が分からん」「saved highlights とは何か」「Dark の横の % が何なのか」「EPUBというものを知らないのでテスト不可能」に、画面内で答える。
+
+### Verify
+
+- `tests/e2e/help.spec.ts` — 未サインインで開けること、ヘッダの `Help` から到達できること
+- mutation: ヘッダのリンク削除・`/help` 削除でそれぞれ赤
+
+判断理由は `docs/DECISIONS.md` D-21。
+
+---
+
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
 **Priority:** P0 before final v0.1 sign-off  

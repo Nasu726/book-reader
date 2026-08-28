@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
+import Link from "next/link";
+
 import { ReaderControls } from "./reader-controls";
 
 type AppShellProps = {
@@ -58,6 +60,15 @@ export function AppShell({
       <header className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-zinc-200 px-4 py-3 sm:px-6 dark:border-zinc-800">
         <div className="min-w-0 flex-1">{title}</div>
         <ReaderControls showTextSize={showTextSize} />
+        {/* One entry point, in the one header every screen shares. The manual
+            answers what nothing on screen can: what a highlight is for, why the
+            text size control only appears on some books, and what an EPUB is. */}
+        <Link
+          className="flex min-h-11 items-center rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+          href="/help"
+        >
+          Help
+        </Link>
         {account}
       </header>
 
