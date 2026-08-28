@@ -20,6 +20,8 @@ export type AiActionInput = {
   selectedText: string;
   userQuestion?: string;
   targetLanguage?: string;
+  /** The language answers come back in. Not defaulted here: the reader chooses. */
+  responseLanguage?: string;
   documentTitle?: string;
   paperStructure?: PaperStructure;
   surroundingText?: { before?: string; after?: string };
@@ -36,8 +38,16 @@ const ACTION_INSTRUCTIONS: Record<AiAction, string> = {
 
 function actionInstruction(input: AiActionInput): string {
   if (input.action === "translate") {
-    const source = input.sourceLanguage?.trim() || "auto-detected";
-    return `Translate the selected text from ${source} into ${input.targetLanguage ?? "English"}. Preserve meaning and tone.`;
+    // The source language is left unstated unless the reader names one. Someone
+    // reading in several languages does not want English assumed, and "from
+    // auto" is not an instruction — it is a placeholder leaking into a prompt.
+    const source = input.sourceLanguage?.trim();
+    const from = source && source !== "auto" ? ` from ${source}` : "";
+    const target = input.targetLanguage?.trim();
+    if (!target) {
+      throw new AiActionError("invalid_action", "Choose a language to translate into.");
+    }
+    return `Translate the selected text${from} into ${target}. Preserve meaning and tone.`;
   }
   return ACTION_INSTRUCTIONS[input.action];
 }
@@ -73,6 +83,11 @@ export function buildPrompt(input: AiActionInput): {
 
   const instruction = actionInstruction(input);
   const promptParts = [instruction];
+  // Translate already names its target language, so saying it twice would only
+  // give the model two instructions to reconcile.
+  if (input.responseLanguage && input.action !== "translate") {
+    promptParts.push(`Respond in ${input.responseLanguage}.`);
+  }
   if (input.action === "ask" && input.userQuestion) {
     promptParts.push(`Question: ${input.userQuestion}`);
   }

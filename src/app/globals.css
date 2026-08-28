@@ -1,8 +1,25 @@
 @import "tailwindcss";
 
+/* Tailwind v4 drives `dark:` from prefers-color-scheme by default, so the
+   reader's own theme toggle set a `.dark` class that nothing responded to.
+   Bind the variant to the class, and keep the system preference as the
+   starting point for anyone who has not chosen yet. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Set by the reader's font size control. It scales the book text only, so
+     buttons and spacing keep their size at every setting. */
+  --reader-font-scale: 1;
+
+  /* Highlight colours, kept as tokens so the dark theme can restate only these.
+     Translucent, so the text underneath stays the text and not a label. */
+  --highlight-yellow: rgb(250 204 21 / 0.45);
+  --highlight-green: rgb(52 211 153 / 0.4);
+  --highlight-blue: rgb(96 165 250 / 0.4);
+  --highlight-pink: rgb(244 114 182 / 0.38);
 }
 
 @theme inline {
@@ -12,11 +29,25 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Chosen theme first, system preference when nothing is chosen. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --highlight-yellow: rgb(250 204 21 / 0.32);
+    --highlight-green: rgb(52 211 153 / 0.3);
+    --highlight-blue: rgb(96 165 250 / 0.34);
+    --highlight-pink: rgb(244 114 182 / 0.3);
   }
+}
+
+:root.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --highlight-yellow: rgb(250 204 21 / 0.32);
+  --highlight-green: rgb(52 211 153 / 0.3);
+  --highlight-blue: rgb(96 165 250 / 0.34);
+  --highlight-pink: rgb(244 114 182 / 0.3);
 }
 
 body {
@@ -28,6 +59,7 @@ body {
 /* EPUB chapters arrive as sanitized author markup; Tailwind's reset strips the
    structural styling, so the reader restores just enough of it to be readable. */
 .reader-prose {
+  font-size: calc(1rem * var(--reader-font-scale));
   line-height: 1.75;
 }
 
@@ -159,3 +191,17 @@ body {
 .textLayer ::selection {
   background: color-mix(in srgb, AccentColor 40%, transparent);
 }
+
+/* Marked passages, drawn by the CSS Custom Highlight API. Registered from
+   src/components/highlight-paint.ts, which never touches the document itself —
+   see the note there for why. A browser without the API simply draws nothing.
+
+   Next's CSS validator warns that `::highlight` is not a pseudo-element it
+   knows and then emits the rules unchanged, which is why the warning in the
+   build log can be ignored. tests/e2e/highlight-colors.spec.ts asserts that the
+   four rules really do reach the browser, so the day that stops being true is
+   a failing test rather than highlights that quietly stop showing. */
+::highlight(book-reader-yellow) { background-color: var(--highlight-yellow); }
+::highlight(book-reader-green) { background-color: var(--highlight-green); }
+::highlight(book-reader-blue) { background-color: var(--highlight-blue); }
+::highlight(book-reader-pink) { background-color: var(--highlight-pink); }

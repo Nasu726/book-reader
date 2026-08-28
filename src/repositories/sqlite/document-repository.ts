@@ -39,7 +39,7 @@ export function createSqliteDocumentRepository(
   db: Db,
 ): DocumentRepository & { sections: DocumentSectionRepository } {
   const list = async (): Promise<readonly DocumentRecord[]> => {
-    const rows = db.select().from(documents).all();
+    const rows = await db.select().from(documents);
 
     return rows.map(toDocumentRecord);
   };
@@ -47,17 +47,17 @@ export function createSqliteDocumentRepository(
   const getById = async (
     id: string,
   ): Promise<DocumentRecord | null> => {
-    const row = db
+    const rows = await db
       .select()
       .from(documents)
       .where(eq(documents.id, id))
-      .get();
+      .limit(1);
 
-    return row ? toDocumentRecord(row) : null;
+    return rows[0] ? toDocumentRecord(rows[0]) : null;
   };
 
   const create = async (input: DocumentRecord): Promise<void> => {
-    db.insert(documents)
+    await db.insert(documents)
       .values({
         id: input.id,
         userId: input.userId,
@@ -65,29 +65,29 @@ export function createSqliteDocumentRepository(
         format: input.format,
         author: input.author ?? null,
         sourceFilename: input.sourceFilename ?? null,
-      })
-      .run();
+      });
   };
 
   const deleteById = async (id: string): Promise<boolean> => {
-    const result = db
+    // `.returning()` rather than a driver-specific row count: better-sqlite3
+    // reports `changes`, D1 reports `meta.changes`, and this works on both.
+    const deleted = await db
       .delete(documents)
       .where(eq(documents.id, id))
-      .run();
+      .returning({ id: documents.id });
 
-    return result.changes > 0;
+    return deleted.length > 0;
   };
 
   const sections: DocumentSectionRepository = {
     listByDocument: async (
       documentId: string,
     ): Promise<readonly DocumentSectionRecord[]> => {
-      const rows = db
+      const rows = await db
         .select()
         .from(documentSections)
         .where(eq(documentSections.documentId, documentId))
-        .orderBy(documentSections.sortOrder)
-        .all();
+        .orderBy(documentSections.sortOrder);
 
       return rows.map(toSectionRecord);
     },
@@ -98,7 +98,10 @@ export function createSqliteDocumentRepository(
       if (input.length === 0) return;
 
       for (const section of input) {
-        db.insert(documentSections)
+        // Awaited, not just built: a drizzle query only runs when it is awaited
+        // or given a driver-specific terminator, and the terminators are the
+        // part that does not survive D1.
+        await db.insert(documentSections)
           .values({
             documentId: section.documentId,
             sectionId: section.sectionId,
@@ -116,8 +119,7 @@ export function createSqliteDocumentRepository(
               content: section.content,
               sortOrder: section.sortOrder,
             },
-          })
-          .run();
+          });
       }
     },
   };

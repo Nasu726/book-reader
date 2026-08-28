@@ -1,34 +1,29 @@
-import { cookies } from "next/headers";
 
-import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
+import { DEFAULT_HIGHLIGHT_COLOR, isHighlightColor } from "@/core/highlights/colors";
 import { parseSelectionLocation } from "@/core/selection/capture";
-import { createAuthService } from "@/server/auth/service";
-import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
-import { createSqliteDb } from "@/server/db/client";
+import { getCurrentUser } from "@/server/auth/current-session";
+import { chargeWrite } from "@/server/usage/write-budget";
+import { getDatabase, type Db } from "@/server/db/database";
+import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 
-function repository(database: ReturnType<typeof createSqliteDb>) {
-  return createSqliteHighlightRepository(createDrizzleFromSqlite(database));
+function repository(database: Db) {
+  return createSqliteHighlightRepository(database);
 }
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb();
-  const authService = createAuthService(database);
-  const session = authService.getSessionUser((await cookies()).get(SESSION_COOKIE_NAME)?.value);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
 
   const { id } = await context.params;
-  const document = await createSqliteDocumentRepository(
-    createDrizzleFromSqlite(database),
-  ).getById(id);
-  if (!document || document.userId !== session.userId) {
-    return Response.json({ error: "Document not found." }, { status: 404 });
+  if (!await requireOwnedDocument(database, id, session.userId)) {
+    return documentNotFound();
   }
 
   return Response.json({
@@ -40,23 +35,33 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb();
-  const authService = createAuthService(database);
-  const session = authService.getSessionUser((await cookies()).get(SESSION_COOKIE_NAME)?.value);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
+
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
 
   let input: {
     format?: unknown;
     location?: unknown;
     selectedText?: unknown;
     note?: unknown;
+    color?: unknown;
   };
   try {
     input = await request.json();
   } catch {
     return Response.json({ error: "Invalid highlight." }, { status: 400 });
+  }
+
+  // An absent colour is the default; a colour that is not one of ours is a
+  // mistake worth reporting, because it would silently save as something the
+  // reader never picked.
+  if (input.color !== undefined && !isHighlightColor(input.color)) {
+    return Response.json({ error: "Unknown highlight colour." }, { status: 400 });
   }
 
   if (
@@ -75,8 +80,13 @@ export async function POST(
   }
 
   const { id } = await context.params;
+  if (!await requireOwnedDocument(database, id, session.userId)) {
+    return documentNotFound();
+  }
+
   try {
     const highlight = await repository(database).create({
+      color: input.color ?? DEFAULT_HIGHLIGHT_COLOR,
       documentId: id,
       location: input.location,
       note: typeof input.note === "string" && input.note.trim() ? input.note : undefined,

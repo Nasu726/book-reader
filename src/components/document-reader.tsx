@@ -1,14 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PdfRenderer } from "./pdf-renderer";
 import { captureEpubSelection, type DocumentSelection } from "@/core/selection/capture";
+import { clearAllHighlights, paintHighlights, type PaintableHighlight } from "./highlight-paint";
+import { usePageShortcuts } from "./use-page-shortcuts";
 
 type DocumentReaderProps = {
   documentId: string;
   documentTitle?: string;
+  /** The uploaded filename, used to tell an untouched title from a rename. */
+  documentSourceFilename?: string;
   format: "epub" | "pdf";
+  /** Saved highlights, drawn onto the text as it renders. */
+  highlights?: readonly PaintableHighlight[];
   onSelectionChange?: (selection: DocumentSelection | null) => void;
 };
 
@@ -21,6 +27,34 @@ type ParsedEpub = {
     html?: string;
   }[];
 };
+
+/**
+ * Replaces the filename the import route stored with the book's own title.
+ *
+ * Only when the stored title is still exactly the filename stem: a title the
+ * reader chose by hand must survive every reopen.
+ */
+async function adoptBookTitle(
+  documentId: string,
+  bookTitle: string | undefined,
+  currentTitle: string,
+  sourceFilename: string | undefined,
+): Promise<void> {
+  const title = bookTitle?.trim();
+  const untouched = sourceFilename?.replace(/\.(epub|pdf)$/i, "");
+  if (!title || !untouched || currentTitle !== untouched || title === currentTitle) {
+    return;
+  }
+  try {
+    await fetch(`/api/documents/${documentId}`, {
+      body: JSON.stringify({ title }),
+      headers: { "content-type": "application/json" },
+      method: "PATCH",
+    });
+  } catch {
+    // The reader still works with the filename as its title.
+  }
+}
 
 function useDocumentProgress(documentId: string) {
   const [initialLocation, setInitialLocation] = useState<string | null | undefined>();
@@ -62,9 +96,12 @@ function useDocumentProgress(documentId: string) {
 export function DocumentReader({
   documentId,
   documentTitle = "",
+  documentSourceFilename,
   format,
+  highlights = [],
   onSelectionChange,
 }: DocumentReaderProps) {
+  const chapterRef = useRef<HTMLElement>(null);
   const [epub, setEpub] = useState<ParsedEpub | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
@@ -110,22 +147,46 @@ export function DocumentReader({
   // to fetch here; a missing document surfaces as the renderer's own error.
   const source = `/api/documents/${documentId}/source`;
 
+  const sectionCount = epub?.sections.length ?? 0;
+  function goToSection(nextIndex: number) {
+    if (nextIndex < 0 || nextIndex >= sectionCount) return;
+    setHasUserNavigated(true);
+    setSectionIndex(nextIndex);
+  }
+  // PDF pages are turned by the PDF renderer's own shortcuts.
+  // Omitted at the ends so the key press does nothing rather than re-rendering
+  // the section already showing.
+  usePageShortcuts({
+    enabled: format === "epub" && sectionCount > 0,
+    onNext: sectionIndex < sectionCount - 1
+      ? () => goToSection(sectionIndex + 1)
+      : undefined,
+    onPrevious: sectionIndex > 0 ? () => goToSection(sectionIndex - 1) : undefined,
+  });
+
   useEffect(() => {
     if (format !== "epub") return;
     let cancelled = false;
     async function parse() {
       try {
-        const response = await fetch(`/api/documents/${documentId}/parse`, { cache: "no-store" });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error);
-        if (!cancelled) setEpub(payload as ParsedEpub);
+        // Parsed here rather than on the server: a whole book does not fit in
+        // a Cloudflare Worker's 10ms CPU budget, and the browser has to build
+        // this DOM anyway to reflow the text.
+        const response = await fetch(source, { cache: "no-store" });
+        if (!response.ok) throw new Error("The document could not be opened.");
+        const bytes = await response.arrayBuffer();
+        const { parseEpubInBrowser } = await import("./epub-browser-parser");
+        const parsed = await parseEpubInBrowser(bytes, documentTitle || "document.epub");
+        if (cancelled) return;
+        setEpub(parsed as ParsedEpub);
+        void adoptBookTitle(documentId, parsed.title, documentTitle, documentSourceFilename);
       } catch {
         if (!cancelled) setError("The document could not be opened.");
       }
     }
     void parse();
     return () => { cancelled = true; };
-  }, [documentId, format]);
+  }, [documentId, documentSourceFilename, documentTitle, format, source]);
 
   useEffect(() => {
     if (format !== "epub") return;
@@ -144,6 +205,18 @@ export function DocumentReader({
     };
   }, [documentTitle, format, onSelectionChange]);
 
+  const section = epub?.sections[sectionIndex];
+  const sectionId = section?.id;
+  useEffect(() => {
+    const chapter = chapterRef.current;
+    if (format !== "epub" || !chapter || !sectionId) return;
+    paintHighlights(chapter, highlights, { format: "epub", sectionId });
+  }, [format, highlights, sectionId]);
+
+  // The registry outlives this component, so a document left open would keep
+  // colouring text in the next one.
+  useEffect(() => clearAllHighlights, []);
+
   useEffect(() => {
     if (format === "pdf" || !hasUserNavigated || !epub) return;
     const section = epub.sections[sectionIndex];
@@ -160,16 +233,15 @@ export function DocumentReader({
   if (error) return <div className="rounded-lg border border-red-300 p-3 text-sm" role="alert">{error}</div>;
   if (format === "epub") {
     if (!epub) return <p aria-live="polite">Opening…</p>;
-    const section = epub.sections[sectionIndex];
     if (!section) return <div role="alert">This EPUB has no readable sections.</div>;
     return (
       <section aria-label="EPUB reader" className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex === 0} onClick={() => { setHasUserNavigated(true); setSectionIndex(sectionIndex - 1); }} type="button">Previous</button>
+          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex === 0} onClick={() => goToSection(sectionIndex - 1)} type="button">Previous</button>
           <span className="text-sm">{sectionIndex + 1} / {epub.sections.length}</span>
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => { setHasUserNavigated(true); setSectionIndex(sectionIndex + 1); }} type="button">Next</button>
+          <button className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => goToSection(sectionIndex + 1)} type="button">Next</button>
         </div>
-        <article className="reader-prose max-w-prose rounded-xl border border-zinc-200 p-4 dark:border-zinc-800" data-reader-section={section.id}>
+        <article className="reader-prose max-w-prose rounded-xl border border-zinc-200 p-4 dark:border-zinc-800" data-reader-section={section.id} ref={chapterRef}>
           {/* The nav label is only shown when the chapter body carries no heading of its own. */}
           {section.title && !/<h[1-6]>/.test(section.html ?? "") && (
             <h2 className="mb-3 text-xl font-semibold">{section.title}</h2>
@@ -192,9 +264,13 @@ export function DocumentReader({
   }
 
   if (format === "pdf") {
+    // Waiting for the saved position means the first render already knows which
+    // page to show, instead of starting at page 1 and correcting itself.
+    if (initialLocation === undefined) return <p aria-live="polite">Opening…</p>;
     return (
       <PdfRenderer
         documentTitle={documentTitle}
+        highlights={highlights}
         initialLocation={initialLocation}
         onSelectionChange={(selection) => {
           setCapturedSelection(selection);

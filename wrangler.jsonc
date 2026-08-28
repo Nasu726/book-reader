@@ -1,0 +1,48 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "book-reader",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-27",
+  // nodejs_compat gives the Worker node:crypto, which the Access assertion
+  // check needs. global_fetch_strictly_public makes fetch() to this app's own
+  // hostname go back out through the edge, which is what OpenNext expects.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "book-reader",
+      "database_id": "c0ed3894-0dbf-4de3-b151-2bf35396d577",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENTS",
+      "bucket_name": "book-reader-documents"
+    }
+  ],
+  "vars": {
+    // Cloudflare Access authenticates before a request reaches this Worker and
+    // forwards a signed assertion; these two values are what the assertion is
+    // checked against. Neither is secret — the audience tag identifies the
+    // application, it does not authorise anything on its own.
+    //
+    // The tag is regenerated whenever the Access application is deleted and
+    // recreated — recreating the policy through the full Zero Trust UI did
+    // exactly that once. When sign-in loops back to the login page, compare
+    // this value against the `kid` in the Access redirect before looking
+    // anywhere else.
+    "CF_ACCESS_TEAM_DOMAIN": "https://nasu726.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "86696c7030019417f5c15a38f2be22d421d2b7cfafbb55c8a54269fc455778f5",
+    "AI_PROVIDER": "openrouter",
+    "AI_MODEL": "nvidia/nemotron-3-super-120b-a12b:free"
+  }
+  // OPENROUTER_API_KEY is a secret, not a var: `wrangler secret put`.
+}

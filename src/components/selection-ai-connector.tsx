@@ -1,22 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { AiAnswerPanel } from "./ai-answer-panel";
+import { useAiActions } from "./use-ai-actions";
 import { AppShell } from "./app-shell";
+import { SecondaryTabs, type SecondaryTab } from "./secondary-tabs";
+import { SelectionActions } from "./selection-actions";
 import { DocumentReader } from "./document-reader";
 import { DocumentNotes } from "./document-notes";
 import Link from "next/link";
+import { DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from "@/core/highlights/colors";
 import type { DocumentSelection } from "@/core/selection/capture";
 
 type SelectionAiConnectorProps = {
   documentId: string;
   documentFormat: "epub" | "pdf";
   documentTitle: string;
+  documentSourceFilename?: string;
+  /** Sign-out control, built on the server because only it knows how. */
+  account?: ReactNode;
   initialHighlights: readonly {
     id: string;
     note?: string;
     selectedText: string;
+    /** Needed to draw it: which page or chapter, and where in it. */
+    location: string;
+    color: HighlightColor;
   }[];
   initialVocabulary: readonly {
     id: string;
@@ -26,18 +36,31 @@ type SelectionAiConnectorProps = {
   }[];
 };
 
+/** Matches the swatches in the selection menu, so the list reads as the same thing. */
+const SWATCH_CLASS: Record<HighlightColor, string> = {
+  yellow: "bg-yellow-300",
+  green: "bg-emerald-300",
+  blue: "bg-blue-300",
+  pink: "bg-pink-300",
+};
+
 export function SelectionAiConnector({
   documentId,
   documentFormat,
   documentTitle,
+  documentSourceFilename,
+  account,
   initialHighlights,
   initialVocabulary,
 }: SelectionAiConnectorProps) {
   const [selection, setSelection] = useState<DocumentSelection | null>(null);
+  const [sheetSignal, setSheetSignal] = useState(0);
+  const [tab, setTab] = useState<SecondaryTab>("ai");
   const [highlightState, setHighlightState] = useState<"idle" | "saved" | "error">("idle");
   const [highlights, setHighlights] = useState(() => [...initialHighlights]);
   const [vocabulary, setVocabulary] = useState(() => [...initialVocabulary]);
   const [meaning, setMeaning] = useState("");
+  const conversation = useAiActions({ documentId, selection });
   const [vocabularyState, setVocabularyState] = useState<"idle" | "saved" | "error">("idle");
 
   async function deleteVocabularyEntry(entryId: string) {
@@ -93,10 +116,14 @@ export function SelectionAiConnector({
     }
   }
 
-  async function handleHighlightCreated(captured: DocumentSelection) {
+  async function handleHighlightCreated(
+    captured: DocumentSelection,
+    color: HighlightColor = DEFAULT_HIGHLIGHT_COLOR,
+  ) {
     try {
       const response = await fetch(`/api/documents/${documentId}/highlights`, {
         body: JSON.stringify({
+          color,
           format: captured.format,
           location: captured.location,
           selectedText: captured.text,
@@ -107,7 +134,12 @@ export function SelectionAiConnector({
       const payload = (await response.json()) as { highlight?: { id: string } };
       if (!response.ok || !payload.highlight) throw new Error("Save failed.");
       const savedHighlight = payload.highlight;
-      setHighlights((current) => [...current, { id: savedHighlight.id, selectedText: captured.text }]);
+      setHighlights((current) => [...current, {
+        color,
+        id: savedHighlight.id,
+        location: captured.location,
+        selectedText: captured.text,
+      }]);
       setHighlightState("saved");
       window.setTimeout(() => setHighlightState("idle"), 5000);
     } catch {
@@ -117,14 +149,42 @@ export function SelectionAiConnector({
 
   return (
     <AppShell
+      account={account}
+      openSecondarySignal={sheetSignal}
+      showTextSize={documentFormat === "epub"}
+      title={
+        <div className="min-w-0">
+          <Link className="text-sm text-zinc-600 hover:underline dark:text-zinc-400" href="/">
+            ← Library
+          </Link>
+          <h1 className="truncate text-lg font-semibold tracking-tight">{documentTitle}</h1>
+        </div>
+      }
       reader={
         <>
-          <Link className="inline-block text-sm" href="/">Back to library</Link>
-          <h1 className="text-3xl font-semibold tracking-tight">{documentTitle}</h1>
+          {/* The actions, offered against the passage itself. */}
+          <SelectionActions
+            onAction={(action) => {
+              // Started straight from the click. Routing it through a prop and
+              // an effect turned a user event into a state change, and made the
+              // same action twice in a row look like no change at all.
+              void conversation.run(action);
+              // The answer has somewhere to arrive: the AI tab, and on a phone
+              // the sheet that holds it.
+              setTab("ai");
+              setSheetSignal((current) => current + 1);
+            }}
+            onHighlight={(color) => {
+              if (selection) void handleHighlightCreated(selection, color);
+            }}
+            selection={selection}
+          />
           <DocumentReader
             documentId={documentId}
+            documentSourceFilename={documentSourceFilename}
             documentTitle={documentTitle}
             format={documentFormat}
+            highlights={highlights}
             onSelectionChange={(captured) => setSelection(captured)}
           />
           {highlightState !== "idle" && (
@@ -135,17 +195,40 @@ export function SelectionAiConnector({
               {highlightState === "saved" ? "Highlight saved." : "Highlight could not be saved."}
             </p>
           )}
-          <section aria-label="Saved highlights" className="space-y-2 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-            <h2 className="text-sm font-semibold">Saved highlights</h2>
+
+        </>
+      }
+      secondary={
+        <SecondaryTabs
+          active={tab}
+          ai={<AiAnswerPanel conversation={conversation} selection={selection} />}
+          onChange={setTab}
+          saved={<>
+          {/* A plain section rather than a disclosure: the tab it sits in is
+              already the thing that reveals it, and one of the two was a click
+              nobody asked for. */}
+          <section aria-label="Saved highlights" className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <h2 className="text-sm font-semibold">Highlights ({highlights.length})</h2>
+            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+              Passages you marked while reading. They stay with this document.
+            </p>
             {highlights.length === 0 ? (
-              <p className="text-sm">No saved highlights.</p>
+              <p className="mt-2 text-sm">
+                Select text in the document, then choose Highlight.
+              </p>
             ) : (
-              <ul className="space-y-3">
+              <ul className="mt-2 space-y-3">
                 {highlights.map((highlight) => (
                   <li className="flex items-start justify-between gap-3" key={highlight.id}>
-                    <div>
-                      <p className="text-sm">{highlight.selectedText}</p>
-                      {highlight.note && <p className="mt-1 text-xs">{highlight.note}</p>}
+                    <div className="flex items-start gap-2">
+                      <span
+                        aria-hidden
+                        className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ${SWATCH_CLASS[highlight.color]}`}
+                      />
+                      <div>
+                        <p className="text-sm">{highlight.selectedText}</p>
+                        {highlight.note && <p className="mt-1 text-xs">{highlight.note}</p>}
+                      </div>
                     </div>
                     <button
                       aria-label={`Delete highlight: ${highlight.selectedText}`}
@@ -160,15 +243,6 @@ export function SelectionAiConnector({
               </ul>
             )}
           </section>
-        </>
-      }
-      secondary={
-        <>
-          <AiAnswerPanel
-            documentId={documentId}
-            onHighlightCreated={handleHighlightCreated}
-            selection={selection}
-          />
           <DocumentNotes documentId={documentId} />
           <section aria-label="Saved vocabulary" className="mt-6 space-y-2 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
             <h2 className="text-sm font-semibold">Save vocabulary</h2>
@@ -219,7 +293,8 @@ export function SelectionAiConnector({
               </ul>
             )}
           </section>
-        </>
+          </>}
+        />
       }
     />
   );

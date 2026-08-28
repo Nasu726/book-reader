@@ -9,12 +9,39 @@ import {
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: /.*\.spec\.ts/,
   globalTeardown: "./tests/e2e/global-teardown.ts",
+  // Two at a time. Every reading test now renders PDF pages in a real browser,
+  // and several headless Chromium instances doing that at once starve the
+  // development server until uploads time out.
+  //
+  // The obvious answer — serve `next build` output instead — does not work:
+  // `next start` runs with NODE_ENV=production, so the session cookie is issued
+  // Secure and a browser will not keep it over the suite's plain HTTP. Making
+  // the Secure flag conditional would weaken the deployed cookie to speed up a
+  // test, which is the wrong trade.
+  workers: 2,
+
   use: {
     baseURL: "http://127.0.0.1:3100",
-    ...devices["Desktop Chrome"],
   },
+  projects: [
+    {
+      name: "desktop",
+      testMatch: /.*\.spec\.ts/,
+      testIgnore: /mobile\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // Chromium with a phone viewport, touch input, and mobile device pixel
+      // ratio. This guards the mobile *layout* only: iOS forces every browser
+      // onto WKWebView, so iOS Safari and iOS Chrome behaviour — selection
+      // handles, dvh against the collapsing toolbar, keyboard insets — is not
+      // reproduced here and still needs a real device (HUMAN-001).
+      name: "mobile-layout",
+      testMatch: /mobile\.spec\.ts/,
+      use: { ...devices["Pixel 7"] },
+    },
+  ],
   webServer: {
     command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
     env: {

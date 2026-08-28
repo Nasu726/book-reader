@@ -1,4 +1,4 @@
-import { Book, type NavItem } from "@likecoin/epub-ts/node";
+import type { Book, NavItem } from "@likecoin/epub-ts/node";
 
 import {
   DocumentParseError,
@@ -17,6 +17,19 @@ export type TextDomParserConstructor = new () => {
   parseFromString(markup: string, mimeType: string): TextDocument;
 };
 
+/**
+ * The epub-ts Book implementation to parse with.
+ *
+ * It is injected rather than imported so the same parsing logic can run in the
+ * browser, where the reader parses books now: a Cloudflare Worker on the free
+ * plan gets 10ms of CPU per request, which a whole book does not fit into, and
+ * keeping epub-ts out of the server bundle also keeps it under the 3 MiB limit.
+ */
+export type BookConstructor = new (
+  source: ArrayBuffer,
+  options?: { replacements?: string },
+) => Book;
+
 function flattenNavigationItems(items: readonly NavItem[]): NavItem[] {
   return items.flatMap((item) => [
     item,
@@ -26,9 +39,21 @@ function flattenNavigationItems(items: readonly NavItem[]): NavItem[] {
 
 export class EpubParser implements DocumentParser {
   readonly #domParser: TextDomParserConstructor;
+  readonly #Book: BookConstructor;
 
-  constructor(domParser: TextDomParserConstructor = globalThis.DOMParser) {
+  constructor(
+    domParser: TextDomParserConstructor = globalThis.DOMParser,
+    bookImplementation?: BookConstructor,
+  ) {
     this.#domParser = domParser;
+    if (!bookImplementation) {
+      throw new DocumentParseError({
+        filename: "",
+        format: "epub",
+        message: "An epub-ts Book implementation is required.",
+      });
+    }
+    this.#Book = bookImplementation;
   }
 
   supports(format: "epub" | "pdf"): boolean {
@@ -39,7 +64,7 @@ export class EpubParser implements DocumentParser {
     let book: Book | undefined;
     const openedPromises: Promise<unknown>[] = [];
     try {
-      const openingBook = new Book(source, { replacements: "none" });
+      const openingBook = new this.#Book(source, { replacements: "none" });
       book = openingBook;
       const opened = openingBook.opened;
       openedPromises.push(opened);

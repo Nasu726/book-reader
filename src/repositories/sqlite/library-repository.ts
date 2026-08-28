@@ -63,6 +63,14 @@ export function createSqliteLibraryRepository(db: Db): LibraryRepository {
     return result.length > 0;
   }
 
+  async function rename(id: string, userId: string, title: string): Promise<boolean> {
+    const result = await db.update(documents)
+      .set({ title, updatedAt: new Date() })
+      .where(and(eq(documents.id, id), eq(documents.userId, userId)))
+      .returning({ id: documents.id });
+    return result.length > 0;
+  }
+
   async function remove(id: string, userId: string): Promise<boolean> {
     const result = await db.delete(documents)
       .where(and(eq(documents.id, id), eq(documents.userId, userId)))
@@ -81,5 +89,5 @@ export function createSqliteLibraryRepository(db: Db): LibraryRepository {
     return { filename: document.sourceFilename ?? null, format: document.format, data: document.data };
   }
 
-  return { list, create, delete: remove, updateSource, updateSourceIfOwned, markOpened, getSource };
+  return { list, create, delete: remove, rename, updateSource, updateSourceIfOwned, markOpened, getSource };
 }

@@ -1,25 +1,25 @@
-import { cookies } from "next/headers";
 
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
-import { createAuthService } from "@/server/auth/service";
-import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
-import { createSqliteDb } from "@/server/db/client";
+import { getCurrentUser } from "@/server/auth/current-session";
+import { chargeWrite } from "@/server/usage/write-budget";
+import { getDatabase } from "@/server/db/database";
 
 export async function DELETE(
   _request: Request,
   context: { params: Promise<{ id: string; highlightId: string }> },
 ) {
-  const database = createSqliteDb();
-  const authService = createAuthService(database);
-  const session = authService.getSessionUser((await cookies()).get(SESSION_COOKIE_NAME)?.value);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
 
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
+
   const { highlightId } = await context.params;
   const deleted = await createSqliteHighlightRepository(
-    createDrizzleFromSqlite(database),
+    database,
   ).delete(highlightId, session.userId);
   if (!deleted) {
     return Response.json({ error: "Highlight not found." }, { status: 404 });

@@ -9,9 +9,11 @@
 ## 1. 対象プラットフォーム
 
 ### ENV-001 — iPhone Safari
-**MUST**
+**MUST（受け入れは延期）**
 
 最新の一般提供iOS上のSafariで主要ユーザーフローが動作すること。
+
+2026-08-27: 要件としては維持するが、MVP完成判定のブロッカーから外す。実機検証はHUMAN-001でしか行えず、待機が開発全体を止めるため。モバイルレイアウトの退行防止は自動検証を継続する。
 
 ### ENV-002 — Google Chrome
 **MUST**
@@ -689,8 +691,9 @@ Chrome latest stableで主要フローを検証する。
 - [x] AI失敗後もReaderを継続利用できる
 - [x] Provider / Modelを設定から変更できる
 - [x] API keyがclient bundleへ露出しない
-- [ ] iPhone Safariで主要フローが成立する
+- [ ] iPhone Safariで主要フローが成立する（HUMAN-001。2026-08-27にMVPブロッカーから除外）
 - [x] Chromeで主要フローが成立する
+- [x] モバイル幅でReader優先レイアウトが維持される（Chromium自動検証）
 - [x] lint / typecheck / tests / production buildが通る
 - [x] PDFのtext layerがcanvasと一致し、選択位置がずれない
 - [x] EPUB本文が見出し・段落構造を保って表示される

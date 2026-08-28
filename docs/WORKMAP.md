@@ -933,6 +933,70 @@ Evidence: The vocabulary schema stores arbitrary terms and phrases with meaning,
 
 ---
 
+## PROD-CF-001 — Cloudflare deployment target
+**Status:** IN_PROGRESS
+**Priority:** P0 before production
+**Depends on:** PROD-001
+
+### Decision
+
+2026-08-27: ユーザーがdeploy先をCloudflareに指定。Workers + D1 + R2、無料枠の範囲で運用する。PROD-001で「ユーザーが明示的に望むまで保留」としたstorage層移行を実施する。
+
+### 一次情報で確認した無料枠制約
+
+| 項目 | Workers Free |
+|---|---|
+| CPU時間 | 10ms / invocation |
+| Workerバンドル | 3 MiB (gzip後) |
+| リクエスト | 100,000 / 日 |
+| メモリ | 128 MB |
+| D1 | 5 GB、読み 5,000,000行/日、書き 100,000行/日 |
+| R2 | 10 GB、egress無料、Class A 1,000,000/月、Class B 10,000,000/月 |
+
+Next.js 16は `@opennextjs/cloudflare` が対応済み。`node:crypto` は `nodejs_compat` で全API利用可能（argon2、ed448、x448、DSA/DHのgenerateKeyPairを除く）。したがってscrypt認証は移行不要。
+
+### 移行が必要な箇所
+
+- `better-sqlite3` はネイティブaddonでWorkersでは動かない → D1 (`drizzle-orm/d1`)
+- `session-store.ts` が同期SQLite APIを直接使用 → D1は非同期なので認証経路を非同期化
+- filesystem `DocumentStorage` → R2 adapter（境界は実装済みなので差し替えのみ）
+- EPUBのサーバ側パース → ブラウザへ移す。10ms CPUで書籍1冊のパースは成立しない。同時にlinkedomとepub-tsがWorkerバンドルから外れ3 MiB制約も緩和される
+
+### Done when
+
+- Workers上で認証、import、PDF表示、EPUB表示、AI action、highlight、note、vocabulary、progressが動作する
+- 文書のbyte列がR2にあり、メタデータがD1にある
+- 無料枠の制約内で主要フローが完了する
+- ローカル開発（better-sqlite3 + filesystem）も引き続き動作する
+
+### Subtasks
+
+- PROD-CF-002 — EPUBパースをブラウザへ移す — **DONE**
+- PROD-CF-003 — Cloudflare Access認証（scryptの51〜79ms CPUを排除）— **DONE**
+- PROD-CF-004 — R2 document storage adapter — **DONE**
+- PROD-CF-005 — D1 repositories — **DONE**
+- PROD-CF-006 — OpenNext adapter、wrangler設定、deploy — **DONE**
+
+### 実測値
+
+| 項目 | 無料枠 | 実測 |
+|---|---|---|
+| Workerバンドル | 3 MiB (gzip) | **1.33 MiB** |
+| Access JWT検証 | CPU 10ms | **1.25 ms**（中央値） |
+| scrypt検証（参考・不採用） | CPU 10ms | 51〜79 ms |
+
+SSRのCPU実測はデプロイ後に取る。
+
+### デプロイ状況
+
+- URL: https://book-reader.e9gp1ant-1729.workers.dev
+- Cloudflare Access で Worker 単位に保護済み。未認証は Access のログインへ302され、アプリまで到達しない
+- 残り: `OPENROUTER_API_KEY` のsecret登録（未登録のためAIアクションは503）と、本人による本番動作確認
+
+人間側の待ち行列は `docs/HUMAN-TASKS.md` を参照。
+
+---
+
 ## PROD-002 — Backup / export
 **Status:** DONE
 **Priority:** P1 before production  
@@ -1010,6 +1074,80 @@ Evidence:
 - 上記すべてが修正されている
 - 各修正に、その欠陥が再発したとき赤くなる自動テストがある
 - text layer幾何とowner scopingはmutation testで検出を確認済み
+
+---
+
+## SAFE-001 — 無料枠を超える書き込みの拒否
+**Status:** DONE
+**Priority:** P1
+**Depends on:** PROD-CF-001
+
+### Goal
+
+誤操作・暴走・攻撃のいずれでも、D1無料枠（1日10万行）を使い切らないようにする。超過時は原因不明の500ではなく、意味のあるメッセージを返す。
+
+### Verify
+
+- `tests/unit/write-budget.test.mts` — 上限到達・人ごとの独立・UTC日での復帰・数えられないときの通過
+- `tests/unit/write-budget-coverage.test.mts` — 書き込みroute全件が `chargeWrite` を呼ぶ
+- mutation: guard を1箇所外すと coverage テストが赤、上限を off-by-one にすると budget テストが赤
+
+判断理由は `docs/DECISIONS.md` D-19。
+
+---
+
+## HILITE-002 — ハイライトの着色と色選択
+**Status:** DONE
+**Priority:** P1
+**Depends on:** HILITE-001
+
+### Goal
+
+保存したハイライトを本文に描く。色は4色から選ぶ。
+
+### Verify
+
+- `tests/unit/find-range.test.mts` — EPUBのオフセット解決（同じ語が2回出る本文を含む）、PDFの正規化検索（行またぎ・行末ハイフン）
+- `tests/e2e/highlight-colors.spec.ts` — 選択→着色、再読み込み後の再描画、EPUBのオフセット経路、未知の色の400、`::highlight` 規則がブラウザに届いていること
+- mutation: 描画呼び出しの削除・色検証の削除・境界解決の削除でそれぞれ赤
+
+判断理由は `docs/DECISIONS.md` D-20。
+
+---
+
+## HELP-001 — 操作マニュアル
+**Status:** DONE
+**Priority:** P1
+**Depends on:** QUALITY-001
+
+### Goal
+
+「ハイライトの付け方が分からん」「saved highlights とは何か」「Dark の横の % が何なのか」「EPUBというものを知らないのでテスト不可能」に、画面内で答える。
+
+### Verify
+
+- `tests/e2e/help.spec.ts` — 未サインインで開けること、ヘッダの `Help` から到達できること
+- mutation: ヘッダのリンク削除・`/help` 削除でそれぞれ赤
+
+判断理由は `docs/DECISIONS.md` D-21。
+
+---
+
+## DESK-002 — 右パネルのタブ分割
+**Status:** DONE
+**Priority:** P1
+**Depends on:** DESK-001
+
+### Goal
+
+AIとのやりとりと、読者が保存したもの（ハイライト・ノート・単語帳）を別のタブにする。別の機能なので混ぜない。
+
+### Verify
+
+- `tests/e2e/secondary-tabs.spec.ts` — 切り替え、書きかけのノートの保持、矢印キーがページを送らずタブを移ること、選択メニューからのAI操作でAIタブが前に出ること
+- mutation: `stopPropagation` の削除で矢印キーのテストが赤、`hidden` の削除で分離のテストが赤
+
+判断理由は `docs/DECISIONS.md` D-22。
 
 ---
 
@@ -1279,3 +1417,9 @@ YYYY-MM-DD — TASK-ID
 - Verification: lint, typecheck, 97 unit tests, 26 Chromium E2E tests, production Webpack build. Live smoke test passed against OpenRouter `nvidia/nemotron-3-super-120b-a12b:free`.
 - Important decision: every one of these shipped with a fully green suite. `pdf.spec.ts` and `ai-answer.spec.ts` had wrapped all assertions in `if (await locator.isVisible())`, which passes when the element is absent. Assertions are now unconditional, and the text-layer geometry check and owner scoping were confirmed by mutation — reintroducing each defect turns the corresponding test red.
 - Follow-up: iPhone Safari verification remains HUMAN-001. Streaming AI responses and EPUB image rendering are still unimplemented.
+
+2026-08-27 — PROD-CF-001 〜 PROD-CF-006
+- Result: Cloudflare へデプロイした。EPUBパースをブラウザへ移し、Access認証・R2ストレージ・D1リポジトリの各境界を実装し、OpenNextでWorkerとして公開した。
+- Verification: lint, typecheck, 119 unit tests, 39 Chromium E2E tests, production build。Worker preview で実バインディング動作を確認。デプロイ後の実URLに対し、未認証で `/` と `/api/documents` が Access のログインへ302されアプリに到達しないことを確認。
+- Important decision: 無料枠の CPU 10ms は I/O 待ちを含まないため AI 応答の遅さは問題にならないが、scrypt検証は実測51〜79msで収まらない。認証を Access へ委譲し、JWT検証の実測は中央値1.25ms。Workerバンドルは gzip 1360 KiB で上限3 MiBに収まった。判断理由は `docs/DECISIONS.md` D-1〜D-15。
+- Follow-up: `OPENROUTER_API_KEY` の secret 登録（H-5）と本人による本番動作確認（H-6b）。SSRのCPU実測は本番アクセス後に取る。

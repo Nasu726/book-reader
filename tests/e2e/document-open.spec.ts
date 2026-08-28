@@ -6,16 +6,16 @@ test("library links authenticated users to the document route", async ({ page })
   await login(page);
   const documentId = await importDocument(page, "linked.pdf", MULTIPAGE_PDF, "application/pdf");
 
+  // Each row carries an explicit Read control; the row itself is not a link.
   const library = page.getByRole("region", { name: "Library" });
-  await library.getByRole("link", { name: /linked/ }).click();
+  await library.locator("li").filter({ hasText: "linked" }).getByRole("link", { name: "Read" }).click();
   await expect(page).toHaveURL(`/documents/${documentId}`);
 });
 
 test("the library shows a useful empty state before anything is imported", async ({ page }) => {
   await login(page);
   const library = page.getByRole("region", { name: "Library" });
-  const links = await library.getByRole("link").count();
-  if (links === 0) {
+  if (await library.locator("li").count() === 0) {
     await expect(library).toContainText("No documents yet");
   }
 });
@@ -24,7 +24,6 @@ test("document sources and routes stay private to their owner", async ({ page })
   await login(page);
 
   expect((await page.request.get("/api/documents/missing-document/source")).status()).toBe(404);
-  expect((await page.request.get("/api/documents/missing-document/parse")).status()).toBe(404);
 
   // A signed-out client must not reach a real document either.
   const documentId = await importDocument(page, "private.pdf", MULTIPAGE_PDF, "application/pdf");
@@ -63,8 +62,12 @@ test("PDF selection exposes selectable text and captures normalized intent", asy
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(reader).toBeVisible({ timeout: 10_000 });
   const secondary = page.getByRole("complementary", { name: "AI and notes" });
-  await expect(secondary.getByRole("group", { name: "AI actions" })).toBeVisible();
-  await expect(secondary.getByRole("button", { name: "Highlight" })).toBeDisabled();
+  const actions = secondary.getByRole("group", { name: "AI actions" });
+  await expect(actions).toBeVisible();
+  // Nothing is selected, so no action has anything to act on.
+  for (const label of ["Explain", "Translate", "Simplify"]) {
+    await expect(actions.getByRole("button", { name: label, exact: true })).toBeDisabled();
+  }
   await expect(reader.getByText("Select PDF text to prepare it for AI actions.")).toBeVisible();
 });
 
@@ -82,14 +85,19 @@ test("PDF selection highlights persist and can be deleted", async ({ page }) => 
   });
   expect(created.status()).toBe(201);
 
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/documents/${documentId}`);
+  // Highlights live with the other annotations beside the text, not under it.
+  await page.getByRole("tab", { name: "Saved" }).click();
   const savedHighlights = page.getByRole("region", { name: "Saved highlights" });
   await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
   await page.reload();
+  // The pane opens on AI, so getting back to what was saved is a click.
+  await page.getByRole("tab", { name: "Saved" }).click();
   await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
 
   await savedHighlights.getByRole("button", { name: /Delete highlight/ }).click();
-  await expect(savedHighlights.getByText("No saved highlights.")).toBeVisible();
+  await expect(savedHighlights).toContainText("Highlights (0)");
 });
 
 test("uploads whose bytes do not match their declared type are rejected", async ({ page }) => {
@@ -109,4 +117,47 @@ test("uploads whose bytes do not match their declared type are rejected", async 
   const library = await page.request.get("/api/documents");
   const { documents } = (await library.json()) as { documents: { sourceFilename?: string }[] };
   expect(documents.some((document) => document.sourceFilename === "disguised.pdf")).toBe(false);
+});
+
+test("writes attached to a document require owning that document", async ({ page }) => {
+  await login(page);
+
+  // Each of these attaches a record to a document id. None may be accepted for
+  // a document the caller does not own — an unowned id must never reach a
+  // repository write.
+  const highlight = await page.request.post("/api/documents/not-my-document/highlights", {
+    data: {
+      format: "pdf",
+      location: JSON.stringify({ page: 1, source: "text-layer-viewport", version: 1 }),
+      selectedText: "Someone else's sentence.",
+    },
+  });
+  expect(highlight.status()).toBe(404);
+
+  const note = await page.request.post("/api/documents/not-my-document/note", {
+    data: { content: "Someone else's note." },
+  });
+  expect(note.status()).toBe(404);
+
+  const vocabulary = await page.request.post("/api/documents/not-my-document/vocabulary", {
+    data: {
+      format: "pdf",
+      location: JSON.stringify({ page: 1, source: "text-layer-viewport", version: 1 }),
+      meaning: "unauthorized",
+      selectedText: "Someone else's sentence.",
+      term: "unauthorized",
+    },
+  });
+  expect(vocabulary.status()).toBe(404);
+
+  const progress = await page.request.post("/api/documents/not-my-document/progress", {
+    data: { location: JSON.stringify({ page: 2, version: 1 }) },
+  });
+  expect(progress.status()).toBe(404);
+
+  // Nothing may have been written behind the rejected requests.
+  const documentId = await importDocument(page, "owned.pdf", MULTIPAGE_PDF, "application/pdf");
+  const highlights = await page.request.get(`/api/documents/${documentId}/highlights`);
+  const payload = (await highlights.json()) as { highlights: { selectedText: string }[] };
+  expect(payload.highlights).toEqual([]);
 });

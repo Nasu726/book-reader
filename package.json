@@ -16,18 +16,22 @@
     "test": "node --import tsx --test",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run lint && npm run typecheck && npm run test && npm run test:e2e && npm run build"
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run test:e2e && npm run build",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "check:access": "node --import tsx ./scripts/check-access-config.mts"
   },
   "dependencies": {
     "@likecoin/epub-ts": "^0.7.2",
     "better-sqlite3": "^13.0.3",
-    "linkedom": "^0.18.13",
-    "next": "16.3.2",
+    "next": "16.3.3",
     "pdfjs-dist": "^6.2.108",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.4",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^9.6.0",
@@ -36,10 +40,12 @@
     "@types/react-dom": "^19",
     "drizzle-orm": "^0.45.2",
     "eslint": "^9",
-    "eslint-config-next": "16.3.2",
+    "eslint-config-next": "16.3.3",
     "jszip": "3.10.1",
+    "linkedom": "^0.18.13",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.127.0"
   }
 }

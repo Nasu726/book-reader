@@ -4,250 +4,292 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getDocument,
   GlobalWorkerOptions,
-  TextLayer,
   version,
 } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 import { capturePdfSelection, type DocumentSelection } from "@/core/selection/capture";
-import { extractPdfText } from "@/core/documents/pdf-extraction";
 import { inferPaperStructure } from "@/core/documents/paper-structure";
+import type { PaintableHighlight } from "./highlight-paint";
+import { PdfPage, type PdfDocumentProxy } from "./pdf-page";
+import { usePageShortcuts } from "./use-page-shortcuts";
 
 GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${version}`;
 
+/** Fit-to-width is 1; the range covers small print and large-format scans. */
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
+
 type PdfRendererProps = {
   documentTitle?: string;
+  /** Saved highlights, drawn onto each page as it is rendered. */
+  highlights?: readonly PaintableHighlight[];
   source: string;
   initialLocation?: string | null;
   onLocationChange?: (location: string) => void;
   onSelectionChange?: (selection: DocumentSelection | null) => void;
 };
 
+function parsePage(location: string | null | undefined): number {
+  try {
+    if (!location) return 1;
+    const parsed = JSON.parse(location) as { page?: unknown; version?: unknown };
+    return parsed.version === 1 && Number.isInteger(parsed.page)
+      ? Math.max(1, parsed.page as number)
+      : 1;
+  } catch {
+    return 1;
+  }
+}
+
+/**
+ * A PDF as one scrolling column of pages.
+ *
+ * Pages used to be swapped one at a time into a single canvas. That made the
+ * page fit the width of a phone and therefore too small to read, turned normal
+ * reading into repeated button presses, and let one page's failed render leave
+ * an error over a page that had drawn perfectly well. A column of pages is what
+ * every other reader does, and it removes all three.
+ */
 export function PdfRenderer({
   documentTitle = "",
+  highlights = [],
   initialLocation,
   onLocationChange,
   onSelectionChange,
   source,
 }: PdfRendererProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const textLayerRef = useRef<HTMLDivElement>(null);
-  const [pageNumber, setPageNumber] = useState(1);
-  const parsedInitialPageNumber = (() => {
-    try {
-      if (!initialLocation) return 1;
-      const location = JSON.parse(initialLocation) as { page?: unknown; version?: unknown };
-      return location.version === 1 && Number.isInteger(location.page)
-        ? Math.max(1, location.page as number)
-        : 1;
-    } catch {
-      return 1;
-    }
-  })();
-  const [restoredInitialLocation, setRestoredInitialLocation] = useState<string | null | undefined>(undefined);
-  if (
-    initialLocation !== undefined &&
-    restoredInitialLocation !== initialLocation
-  ) {
-    setPageNumber(parsedInitialPageNumber);
-    setRestoredInitialLocation(initialLocation);
-  }
-
-  const [pageCount, setPageCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
   type PdfLoadingTask = ReturnType<typeof getDocument>;
-  type PdfDocument = Awaited<PdfLoadingTask["promise"]>;
-  const documentRef = useRef<PdfDocument | null>(null);
-  const loadingTaskRef = useRef<PdfLoadingTask | null>(null);
-  const pageAreaRef = useRef<HTMLDivElement>(null);
-  const [documentReady, setDocumentReady] = useState(false);
-  const extractedPageTextRef = useRef("");
-  const renderedWidthRef = useRef(0);
+
+  const [document_, setDocument] = useState<PdfDocumentProxy | null>(null);
+  const [pageCount, setPageCount] = useState(0);
+  const [aspectRatio, setAspectRatio] = useState(1.414);
+  const [error, setError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => parsePage(initialLocation));
+  const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
+
+  const columnRef = useRef<HTMLDivElement>(null);
+  const pageTextRef = useRef(new Map<number, string>());
+  const restoredRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    let task: PdfLoadingTask | null = null;
 
     async function open() {
       try {
         const response = await fetch(source);
         const data = await response.arrayBuffer();
-        const loadingTask = getDocument({ data, useSystemFonts: true });
-        const document = await loadingTask.promise;
+        task = getDocument({ data, useSystemFonts: true });
+        const opened = await task.promise;
         if (cancelled) {
-          void loadingTask.destroy();
+          void task.destroy();
           return;
         }
-        loadingTaskRef.current = loadingTask;
-        documentRef.current = document;
-        setPageCount(document.numPages);
-        setDocumentReady(true);
+        const first = await opened.getPage(1);
+        const size = first.getViewport({ scale: 1 });
+        setAspectRatio(size.height / size.width);
+        setPageCount(opened.numPages);
+        setDocument(opened);
       } catch {
-        setError("The PDF could not be opened.");
-      } finally {
-        setLoading(false);
+        if (!cancelled) setError("The PDF could not be opened.");
       }
     }
 
     void open();
     return () => {
       cancelled = true;
-      void loadingTaskRef.current?.destroy();
-      documentRef.current = null;
-      loadingTaskRef.current = null;
+      void task?.destroy();
     };
   }, [source]);
 
-  const renderPage = useCallback(async (target: number) => {
-    const document = documentRef.current;
-    const canvas = canvasRef.current;
-    const layer = textLayerRef.current;
-    if (!document || !canvas || !layer) {
-      return;
-    }
+  const scrollToPage = useCallback((target: number) => {
+    const column = columnRef.current;
+    if (!column) return;
     const bounded = Math.min(pageCount || 1, Math.max(1, target));
-    setPageNumber(bounded);
-    setError(null);
-    try {
-      const page = await document.getPage(bounded);
-      const context = canvas.getContext("2d");
-      if (!context) {
-        throw new Error("Canvas rendering is unavailable.");
-      }
-
-      // The canvas and the text layer must share one display scale, or the
-      // selectable text drifts away from the glyphs painted on the canvas.
-      const unscaled = page.getViewport({ scale: 1 });
-      const availableWidth = pageAreaRef.current?.clientWidth || unscaled.width;
-      const cssScale = availableWidth / unscaled.width;
-      const viewport = page.getViewport({ scale: cssScale });
-      const devicePixelRatio = window.devicePixelRatio || 1;
-
-      canvas.width = Math.floor(viewport.width * devicePixelRatio);
-      canvas.height = Math.floor(viewport.height * devicePixelRatio);
-      canvas.style.width = `${Math.floor(viewport.width)}px`;
-      canvas.style.height = `${Math.floor(viewport.height)}px`;
-      renderedWidthRef.current = Math.floor(availableWidth);
-      await page.render({
-        canvas,
-        viewport: page.getViewport({ scale: cssScale * devicePixelRatio }),
-      }).promise;
-
-      const textContent = await page.getTextContent();
-      try {
-        extractedPageTextRef.current = extractPdfText(textContent.items as unknown as Parameters<typeof extractPdfText>[0]);
-      } catch {
-        extractedPageTextRef.current = "";
-      }
-      layer.replaceChildren();
-      layer.style.setProperty("--scale-factor", String(cssScale));
-      layer.style.setProperty("--user-unit", "1");
-      layer.style.setProperty("--total-scale-factor", "calc(var(--scale-factor) * var(--user-unit))");
-      layer.style.setProperty("--scale-round-x", "1px");
-      layer.style.setProperty("--scale-round-y", "1px");
-      Object.assign(layer.style, {
-        inset: "0",
-        position: "absolute",
-      } satisfies Partial<CSSStyleDeclaration>);
-      const textLayer = new TextLayer({
-        container: layer,
-        textContentSource: textContent,
-        viewport,
-      });
-      await textLayer.render();
-      page.cleanup();
-    } catch {
-      setError("This PDF page could not be rendered.");
-    }
+    column
+      .querySelector(`[data-page-number="${bounded}"]`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [pageCount]);
 
+  // Put the reader back where they were, then start watching where they go.
+  //
+  // Both in one effect and in that order: the observer reports whatever is on
+  // screen, so if it started first it would immediately overwrite the restored
+  // page with page 1. The scroll is instant rather than smooth for the same
+  // reason — a scroll still in flight is a scroll the observer misreads.
   useEffect(() => {
-    if (documentReady && pageCount > 0) {
-      void renderPage(pageNumber);
+    const column = columnRef.current;
+    if (!column || !pageCount) return;
+
+    if (!restoredRef.current) {
+      restoredRef.current = true;
+      const page = parsePage(initialLocation);
+      if (page > 1) {
+        column
+          .querySelector(`[data-page-number="${page}"]`)
+          ?.scrollIntoView({ block: "start", behavior: "auto" });
+      }
     }
-  }, [documentReady, pageCount, pageNumber, renderPage]);
 
-  // Rotating a phone or changing the reader font size resizes the page area.
-  // Re-render at the new width so the text layer keeps matching the canvas.
-  useEffect(() => {
-    const pageArea = pageAreaRef.current;
-    if (!pageArea || !documentReady) return;
-    const observer = new ResizeObserver(() => {
-      const width = Math.floor(pageArea.clientWidth);
-      if (!width || width === renderedWidthRef.current) return;
-      renderedWidthRef.current = width;
-      void renderPage(pageNumber);
-    });
-    observer.observe(pageArea);
+    // The callback only reports pages whose visibility changed, so the set of
+    // everything currently on screen is kept here. Choosing the topmost from a
+    // single callback's entries meant scrolling back to page 1 left the number
+    // reading 2, because only page 2's entry had changed.
+    const onScreen = new Map<number, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const page = Number(entry.target.getAttribute("data-page-number"));
+          if (!Number.isInteger(page)) continue;
+          if (entry.isIntersecting) {
+            onScreen.set(page, entry.boundingClientRect.top);
+          } else {
+            onScreen.delete(page);
+          }
+        }
+        const topmost = [...onScreen.entries()].sort((a, b) => a[1] - b[1])[0];
+        if (topmost) setCurrentPage(topmost[0]);
+      },
+      { root: column.closest("[data-reader-scroll]"), threshold: 0.01 },
+    );
+    for (const page of column.querySelectorAll("[data-page-number]")) {
+      observer.observe(page);
+    }
     return () => observer.disconnect();
-  }, [documentReady, pageNumber, renderPage]);
+  }, [initialLocation, pageCount]);
+
+  // Saved only once the page actually changes. Reporting the restored page
+  // straight after mount wrote a row that said nothing new, and a test waiting
+  // for "the progress request" could catch that one instead of the real move.
+  // It also spends a write against D1's daily budget for no reason.
+  const savedPageRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!pageCount || !onLocationChange) return;
+    if (savedPageRef.current === null) {
+      savedPageRef.current = currentPage;
+      return;
+    }
+    if (savedPageRef.current === currentPage) return;
+    savedPageRef.current = currentPage;
+    onLocationChange(JSON.stringify({ page: currentPage, version: 1 }));
+  }, [currentPage, onLocationChange, pageCount]);
+
+  // Nothing happens at the ends. Clamping inside scrollToPage still scrolled to
+  // the page already showing, which costs a smooth scroll and a re-render for a
+  // key press that should have done nothing.
+  usePageShortcuts({
+    enabled: pageCount > 0,
+    onNext: currentPage < pageCount ? () => scrollToPage(currentPage + 1) : undefined,
+    onPrevious: currentPage > 1 ? () => scrollToPage(currentPage - 1) : undefined,
+  });
 
   useEffect(() => {
-    if (!documentReady || !onLocationChange) return;
-    onLocationChange(JSON.stringify({ page: pageNumber, version: 1 }));
-  }, [documentReady, onLocationChange, pageNumber]);
+    const column = columnRef.current;
+    if (!column) return;
 
-  useEffect(() => {
     const updateSelection = () => {
       const selection = window.getSelection();
+      const pageText = pageTextRef.current.get(currentPage) ?? "";
       let paperStructure: ReturnType<typeof inferPaperStructure> | undefined;
       try {
-        const pageText = extractedPageTextRef.current || pageArea?.textContent || "";
         paperStructure = pageText.trim() ? inferPaperStructure(pageText) : undefined;
       } catch {
         paperStructure = undefined;
       }
-      const captured = selection ? capturePdfSelection(selection, pageNumber, {
-        documentTitle,
-        pageText: extractedPageTextRef.current || pageArea?.textContent || "",
-        paperStructure,
-      }) : null;
+      const captured = selection
+        ? capturePdfSelection(selection, currentPage, { documentTitle, pageText, paperStructure })
+        : null;
       setCapturedSelection(captured);
       onSelectionChange?.(captured);
     };
-    const pageArea = pageAreaRef.current;
-    pageArea?.addEventListener("mouseup", updateSelection);
-    pageArea?.addEventListener("touchend", updateSelection);
+
+    column.addEventListener("mouseup", updateSelection);
+    column.addEventListener("touchend", updateSelection);
     return () => {
-      pageArea?.removeEventListener("mouseup", updateSelection);
-      pageArea?.removeEventListener("touchend", updateSelection);
+      column.removeEventListener("mouseup", updateSelection);
+      column.removeEventListener("touchend", updateSelection);
     };
-  }, [documentTitle, onSelectionChange, pageNumber]);
+  }, [currentPage, documentTitle, onSelectionChange]);
+
+  const rememberPageText = useCallback((page: number, text: string) => {
+    pageTextRef.current.set(page, text);
+  }, []);
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-300 p-3 text-sm" role="alert">{error}</div>
+    );
+  }
 
   return (
-    <section aria-label="PDF reader" className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <button
-          className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
-          disabled={loading || pageNumber <= 1}
-          onClick={() => void renderPage(pageNumber - 1)}
-          type="button"
-        >
-          Previous
-        </button>
-        <span aria-live="polite" className="text-sm">Page {pageNumber}{pageCount ? ` / ${pageCount}` : ""}</span>
-        <button
-          className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
-          disabled={loading || pageNumber >= pageCount}
-          onClick={() => void renderPage(pageNumber + 1)}
-          type="button"
-        >
-          Next
-        </button>
-      </div>
-      <div className="relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800" ref={pageAreaRef}>
-        <canvas ref={canvasRef} />
-        <div className="textLayer" ref={textLayerRef} />
-      </div>
-      {error && (
-        <div className="space-y-2 rounded-lg border border-red-300 p-3 text-sm" role="alert">
-          <p>{error}</p>
-          <button className="min-h-10 rounded bg-zinc-900 px-3 text-white" onClick={() => void renderPage(pageNumber)} type="button">
-            Retry
+    <section aria-label="PDF reader">
+      <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-white/90 px-3 py-2 backdrop-blur sm:border-0 sm:px-0 dark:border-zinc-800 dark:bg-zinc-950/90">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-zinc-600 dark:text-zinc-400">Page</span>
+          <input
+            aria-label="Page number"
+            className="min-h-11 w-16 rounded-lg border border-zinc-300 px-2 text-center tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+            max={pageCount || 1}
+            min={1}
+            onChange={(event) => {
+              const page = Number(event.target.value);
+              if (Number.isInteger(page) && page >= 1 && page <= pageCount) scrollToPage(page);
+            }}
+            type="number"
+            value={currentPage}
+          />
+          <span aria-live="polite" className="text-zinc-600 tabular-nums dark:text-zinc-400">
+            of {pageCount || "…"}
+          </span>
+        </label>
+        <div aria-label="Page zoom" className="ml-auto flex items-center gap-1" role="group">
+          <button
+            aria-label="Zoom out"
+            className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            disabled={zoom <= MIN_ZOOM}
+            onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Math.round((current - 0.25) * 100) / 100))}
+            type="button"
+          >
+            −
+          </button>
+          <button
+            aria-label={`Zoom, currently ${Math.round(zoom * 100)} percent. Reset to fit width`}
+            className="min-h-11 rounded-lg border border-zinc-300 px-2 text-sm tabular-nums dark:border-zinc-700"
+            onClick={() => setZoom(1)}
+            type="button"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            aria-label="Zoom in"
+            className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm dark:border-zinc-700"
+            disabled={zoom >= MAX_ZOOM}
+            onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Math.round((current + 0.25) * 100) / 100))}
+            type="button"
+          >
+            +
           </button>
         </div>
-      )}
-      <section aria-label="PDF selection preview" className="rounded-xl border border-zinc-200 p-3 text-sm dark:border-zinc-800">
+      </div>
+
+      <div className="space-y-4 sm:space-y-6" ref={columnRef}>
+        {document_ && pageCount > 0
+          ? Array.from({ length: pageCount }, (_, index) => (
+            <PdfPage
+              aspectRatio={aspectRatio}
+              document={document_}
+              highlights={highlights}
+              key={index + 1}
+              onTextExtracted={rememberPageText}
+              pageNumber={index + 1}
+              zoom={zoom}
+            />
+          ))
+          : <p aria-live="polite" className="text-sm">Opening…</p>}
+      </div>
+
+      <section aria-label="PDF selection preview" className="mx-3 mt-4 rounded-xl border border-zinc-200 p-3 text-sm sm:mx-0 dark:border-zinc-800">
         {capturedSelection?.text || "Select PDF text to prepare it for AI actions."}
       </section>
     </section>

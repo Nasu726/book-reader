@@ -1,41 +1,28 @@
-import { cookies } from "next/headers";
 
-import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { createSqliteVocabularyRepository } from "@/repositories/sqlite/vocabulary-repository";
 import { parseSelectionLocation } from "@/core/selection/capture";
-import { createAuthService } from "@/server/auth/service";
-import { SESSION_COOKIE_NAME } from "@/server/auth/session-store";
-import { createDrizzleFromSqlite } from "@/server/db/database-bridge";
-import { createSqliteDb } from "@/server/db/client";
+import { getCurrentUser } from "@/server/auth/current-session";
+import { chargeWrite } from "@/server/usage/write-budget";
+import { getDatabase, type Db } from "@/server/db/database";
+import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 
-function repository(database: ReturnType<typeof createSqliteDb>) {
-  return createSqliteVocabularyRepository(createDrizzleFromSqlite(database));
-}
-
-async function authenticate(database: ReturnType<typeof createSqliteDb>) {
-  return createAuthService(database).getSessionUser(
-    (await cookies()).get(SESSION_COOKIE_NAME)?.value,
-  );
-}
-
-async function documentForUser(database: ReturnType<typeof createSqliteDb>, id: string, userId: string) {
-  const document = await createSqliteDocumentRepository(createDrizzleFromSqlite(database)).getById(id);
-  return document?.userId === userId ? document : null;
+function repository(database: Db) {
+  return createSqliteVocabularyRepository(database);
 }
 
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb();
-  const session = await authenticate(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
 
   const { id } = await context.params;
-  if (!await documentForUser(database, id, session.userId)) {
-    return Response.json({ error: "Document not found." }, { status: 404 });
+  if (!await requireOwnedDocument(database, id, session.userId)) {
+    return documentNotFound();
   }
   return Response.json({ vocabulary: await repository(database).listByDocument(id, session.userId) });
 }
@@ -44,11 +31,14 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const database = createSqliteDb();
-  const session = await authenticate(database);
+  const database = await getDatabase();
+  const session = await getCurrentUser();
   if (!session) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
   }
+
+  const overBudget = await chargeWrite(database, session.userId);
+  if (overBudget) return overBudget;
 
   let input: {
     format?: unknown;
@@ -80,8 +70,8 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  if (!await documentForUser(database, id, session.userId)) {
-    return Response.json({ error: "Document not found." }, { status: 404 });
+  if (!await requireOwnedDocument(database, id, session.userId)) {
+    return documentNotFound();
   }
 
   try {

@@ -479,14 +479,25 @@ SafariとChromeではselection、scroll、viewport、PWA挙動が異なる。
 2. AI interaction
 3. Context quality
 4. Reliability
-5. Mobile UX
-6. Chrome / desktop UX
+5. Desktop Chrome UX
+6. Mobile UX
 7. Paper support
 8. Language learning
 9. Knowledge system
 ```
 
 新機能が1〜6を悪化させる場合は、原則として新機能を後回しにする。
+
+### 2026-08-27 — Desktop firstへの入れ替え
+
+5と6を入れ替えた。理由は、iPhone実機検証（HUMAN-001）が人間にしか実行できず、それを待つ間に開発全体が止まるため。
+
+- 目的は **iPhone対応の放棄ではなく、iPhone対応の待ちで開発を止めないこと**
+- 既存のモバイル対応（Reader優先の1ペイン、AIドロワー、タッチ操作、PWA）はすべて維持する。退行させたら不合格とする
+- 当面はデスクトップChromeで「毎日使える」品質に到達させ、デプロイまで進める
+- モバイルはChromiumのモバイル幅プロジェクトでレイアウト退行のみ自動検証する
+- iOS上のChromeはWKWebViewであり、Chromiumではない。したがってモバイル幅Chromiumで検証できるのはレイアウトだけで、選択ハンドル、`dvh`とツールバー、キーボード押し上げ等のエンジン挙動はiPhone実機を待つ
+- `Mobile first, Chrome compatible` は当面 `Desktop Chrome first, mobile layout preserved` として運用する
 
 ---
 

@@ -64,9 +64,14 @@ export function migrate(database: SqliteMigratable) {
       location TEXT NOT NULL,
       selected_text TEXT NOT NULL,
       note TEXT,
+      color TEXT NOT NULL DEFAULT 'yellow',
       created_at INTEGER NOT NULL
     )
   `);
+  const highlightColumns = db.prepare("PRAGMA table_info(highlights)").all() as { name: string }[];
+  if (!highlightColumns.some((column) => column.name === "color")) {
+    db.exec("ALTER TABLE highlights ADD COLUMN color TEXT NOT NULL DEFAULT 'yellow'");
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
@@ -93,6 +98,14 @@ export function migrate(database: SqliteMigratable) {
       source_text TEXT NOT NULL,
       location TEXT NOT NULL,
       created_at INTEGER NOT NULL
+    )
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS usage_counters (
+      user_id TEXT NOT NULL,
+      day TEXT NOT NULL,
+      writes INTEGER NOT NULL,
+      PRIMARY KEY (user_id, day)
     )
   `);
   db.exec(`

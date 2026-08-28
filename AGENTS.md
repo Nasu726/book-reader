@@ -14,7 +14,9 @@
 2. `docs/SPEC.md`
 3. `docs/WORKMAP.md`
 4. 必要な範囲の `docs/PLAN.md`
-5. 現在のコード、tests、git status
+5. `docs/HUMAN-TASKS.md`（人間待ちで詰まっている作業の確認）
+6. `docs/DECISIONS.md`（変更しようとしている箇所の判断理由）
+7. 現在のコード、tests、git status
 
 役割:
 
@@ -22,6 +24,8 @@
 - `docs/SPEC.md`: 実装すべき仕様。機能要件のsource of truth
 - `docs/WORKMAP.md`: Task、依存関係、現在状態のsource of truth
 - `AGENTS.md`: 作業方法・判断規約
+- `docs/HUMAN-TASKS.md`: 人間にしか実行できない作業の待ち行列。エージェントがブロックされたら、推測で進めずここへ項目を追加する
+- `docs/DECISIONS.md`: 設計判断のWhy。コードにはHowとWhatしか残らないため、遠回りに見える実装の理由と、それを覆す条件をここへ書く
 
 矛盾する場合の優先順位:
 
@@ -203,6 +207,7 @@ Task完了前に自分のdiffを確認する。
 - testsが新挙動をカバーしているか
 - dead code / debug logが残っていないか
 - docs / WORKMAP更新が必要か
+- 「なぜそうしたか」がコードから読み取れない判断を含む場合、`docs/DECISIONS.md` へ追記したか
 
 ---
 
