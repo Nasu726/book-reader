@@ -4,7 +4,7 @@ name: Deploy
 #
 # Dormant until CLOUDFLARE_API_TOKEN exists: without it every push to main
 # would end in a red run for a step that was never going to work. See
-# docs/HUMAN-TASKS.md, task H-6.
+# docs/HUMAN-TASKS.md, task H-9.
 on:
   push:
     branches:
@@ -26,7 +26,7 @@ jobs:
 
       - if: steps.credentials.outputs.present != 'true'
         name: Explain the skip
-        run: echo "::notice::CLOUDFLARE_API_TOKEN is not set, so this deploy was skipped. See docs/HUMAN-TASKS.md, task H-6."
+        run: echo "::notice::CLOUDFLARE_API_TOKEN is not set, so this deploy was skipped. See docs/HUMAN-TASKS.md, task H-9."
 
       - if: steps.credentials.outputs.present == 'true'
         uses: actions/checkout@v4

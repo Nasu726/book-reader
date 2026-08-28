@@ -294,6 +294,20 @@ Access導入でscryptの問題は消えるが、SSRの分は実測しないと�
 
 **判断が必要になったら**: デプロイ後の実測値をエージェントが提示する。それを見て決める。
 
+### 確認済み: 超過しても勝手に課金されない（2026-08-29 に一次情報で確認）
+
+無料枠を超えたときに起きるのは**課金ではなくエラー**。
+
+- CPU 10ms 超過 → **Error 1102 “Worker exceeded resource limits”**。ダッシュボードの Metrics > Errors に "Exceeded CPU Time Limits" として出る
+- 1日10万リクエスト超過 → fail open ならWorkerを迂回、fail closed なら **1027 エラーページ**
+- 一次情報の表現: 制限は毎日00:00 UTCにリセットされ、超えると「further operations of that type will fail with an error」
+
+有料への移行は**ダッシュボードでの明示的な操作**（Workers & Pages でプランを変更）が必要で、自動アップグレードの記述は無い。ドメイン購入やZero Trust無料プランでカードを登録していても、それだけでWorkersが課金対象になることはない。
+
+出典: https://developers.cloudflare.com/workers/platform/limits/ 、 https://developers.cloudflare.com/workers/platform/pricing/
+
+つまり**無課金で続けられる**。超過したときの症状は「一部のリクエストが失敗する」であって、請求ではない。心配すべきは金額ではなく可用性。
+
 ---
 
 ## 補足: エージェントに渡してよい情報 / いけない情報
@@ -312,10 +326,12 @@ Access導入でscryptの問題は消えるが、SSRの分は実測しないと�
 
 ---
 
-## H-6. GitHub から自動デプロイするための認証情報
+## H-9. GitHub Actions から自動デプロイするための Cloudflare APIトークン
 
 **Status:** TODO
 **なぜ人間なのか:** APIトークンの発行はCloudflareダッシュボードでの操作であり、値はシークレット。エージェントが持ってはいけない。
+
+**これは GitHub のキーではない。** 必要なのは **Cloudflare の API トークン**で、用途は「GitHub Actions が Cloudflare に対してデプロイする権限」。GitHub 側は、そのトークンを保管する場所（Secrets）を提供するだけ。GitHubへのアクセス権はワークフローが最初から持っている。
 
 `.github/workflows/deploy.yml` は main への push でデプロイするが、`CLOUDFLARE_API_TOKEN` が無い間は**何もせず緑で終わる**（未設定を理由にCIを赤くしない）。
 
