@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { AiAnswerPanel } from "./ai-answer-panel";
 import { useAiActions } from "./use-ai-actions";
@@ -10,6 +10,7 @@ import { SelectionActions } from "./selection-actions";
 import { DocumentReader } from "./document-reader";
 import { DocumentNotes } from "./document-notes";
 import { useDocumentNote } from "./use-document-note";
+import { getStoredPdfView, serverPdfView, subscribe } from "./reader-preferences";
 import Link from "next/link";
 import { DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from "@/core/highlights/colors";
 import type { DocumentSelection } from "@/core/selection/capture";
@@ -66,6 +67,8 @@ export function SelectionAiConnector({
   const [visibleText, setVisibleText] = useState("");
   const conversation = useAiActions({ documentExcerpt: visibleText, documentId, selection });
   const note = useDocumentNote(documentId);
+  // Reflowed text can be resized; a drawn page has zoom instead.
+  const pdfView = useSyncExternalStore(subscribe, getStoredPdfView, serverPdfView);
   const [vocabularyState, setVocabularyState] = useState<"idle" |"saved" |"error">("idle");
 
   async function deleteVocabularyEntry(entryId: string) {
@@ -156,7 +159,7 @@ export function SelectionAiConnector({
     <AppShell
       account={account}
       openSecondarySignal={sheetSignal}
-      showTextSize={documentFormat === "epub"}
+      showTextSize={documentFormat === "epub" || pdfView === "text"}
       title={
         <div className="min-w-0">
           <Link className="text-sm text-ink-quiet hover:underline" href="/">

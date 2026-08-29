@@ -72,6 +72,17 @@ export default function HelpPage() {
           <p>
             PDFは全ページが縦に並ぶ。上の <strong>Page</strong> 欄に番号を入れればその
             ページへ飛ぶ。<strong>Zoom</strong> は 50〜300%で、%の数字を押すと画面幅に戻る。
+            拡大は画面の中央に向かって行われ、はみ出したぶんは左右にスクロールできる。
+          </p>
+          <p>
+            PDFには読み方が2つある。<strong>Pages</strong> は紙をそのまま描く（図・表・
+            段組みが元のまま）。<strong>Text</strong> は本文だけを取り出して流し込む
+            ——<strong>文字が選びやすくなり、文字サイズも変えられる</strong>が、
+            レイアウトは失われる。上のボタンで切り替える。選んだ側は記憶される。
+          </p>
+          <p>
+            ハイライトは<strong>どちらの表示で付けても両方に出る</strong>。印は
+            見せ方ではなく文章に付いているため。
           </p>
           <p>
             EPUBは <strong>Previous</strong> / <strong>Next</strong> で章を移動する。

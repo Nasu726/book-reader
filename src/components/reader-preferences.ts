@@ -66,6 +66,29 @@ export function setStoredFontSize(size: number): void {
   notify();
 }
 
+export const PDF_VIEW_STORAGE_KEY = "book-reader-pdf-view";
+
+/**
+ * How a PDF is shown: as its pages, or as the text taken off them.
+ *
+ * A preference rather than per-document state. Which of the two a reader gets
+ * on with is about them, not about the book, and having to choose again on
+ * every open is how a second way of reading goes unused.
+ */
+export type PdfView = "pages" | "text";
+
+export function getStoredPdfView(): PdfView {
+  return localStorage.getItem(PDF_VIEW_STORAGE_KEY) === "text" ? "text" : "pages";
+}
+
+/** The page as printed, until someone says otherwise. */
+export const serverPdfView = (): PdfView => "pages";
+
+export function setStoredPdfView(view: PdfView): void {
+  localStorage.setItem(PDF_VIEW_STORAGE_KEY, view);
+  notify();
+}
+
 export function applyThemeToDocument(theme: ReaderTheme): void {
   // Both classes are explicit: `dark` drives Tailwind's dark variant, and
   // `light` is what lets someone on a dark system choose the light theme.

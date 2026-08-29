@@ -138,7 +138,6 @@ test("typing a follow-up question never turns the page", async ({ page }) => {
   const documentId = await importDocument(page, "typing.pdf", MULTIPAGE_PDF, "application/pdf");
   await page.goto(`/documents/${documentId}`);
 
-  const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(controls(page).getByText("of 2")).toBeVisible({ timeout: 10_000 });
 
   const question = page.getByLabel("Ask about this passage");
@@ -216,4 +215,127 @@ test("a large PDF is fetched in pieces rather than all at once", async ({ page }
   expect(statuses).toContain(206);
   expect(rangedBytes).toBeGreaterThan(0);
   expect(rangedBytes).toBeLessThan(file.byteLength / 2);
+});
+
+test("a PDF can be read as text as well as as pages", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  const documentId = await importDocument(page, "as-text.pdf", MULTIPAGE_PDF, "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+
+  const reader = page.getByRole("region", { name: "PDF reader" });
+  await expect(reader).toBeVisible({ timeout: 15_000 });
+  // The page at the top of the pane is the page you are on, however short it
+  // is. Counting the page under the middle reads the next one down as soon as
+  // a page is shorter than the screen, which in the text view is most of them.
+  await expect(page.getByRole("spinbutton", { name: "Page number" })).toHaveValue("1");
+  // Pages first: what a PDF is, until someone asks for something else.
+  await expect(reader.locator("canvas")).not.toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Page zoom" })).toBeVisible();
+
+  await controls(page).getByRole("button", { name: "Text" }).click();
+
+  // Real prose in the document, not spans laid over a picture of a page.
+  const firstPage = reader.locator('[data-page-number="1"]');
+  await expect(firstPage.locator("p").first())
+    .toHaveText("The Structure of Scientific Revolutions", { timeout: 15_000 });
+  await expect(reader.locator("canvas")).toHaveCount(0);
+  await expect(reader.locator(".textLayer")).toHaveCount(0);
+  // The paragraph that runs across four printed lines is one paragraph.
+  await expect(firstPage.locator("p").nth(3))
+    .toContainText("could produce a decisive transformation");
+
+  await expect(reader.locator('[data-page-number="2"] p').first())
+    .toBeVisible({ timeout: 15_000 });
+
+  // Page one is short enough that everything below the middle of the screen is
+  // already page two, and the reader is still on page one: it is what they are
+  // looking at. Counting from the middle reads two here.
+  await expect(page.getByRole("spinbutton", { name: "Page number" })).toHaveValue("1");
+
+  // Zoom belongs to the printed page; reflowed text is resized instead.
+  await expect(page.getByRole("group", { name: "Page zoom" })).toBeHidden();
+  await expect(page.getByRole("group", { name: "Text size" })).toBeVisible();
+
+  // And the choice is remembered, or nobody would use the second way twice.
+  await page.reload();
+  await expect(reader.locator('[data-page-number="1"] p').first())
+    .toHaveText("The Structure of Scientific Revolutions", { timeout: 15_000 });
+});
+
+test("a passage selected in the text view is highlighted in both views", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  const documentId = await importDocument(page, "text-marks.pdf", MULTIPAGE_PDF, "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
+  await controls(page).getByRole("button", { name: "Text" }).click();
+  await expect(page.locator('[data-page-number="1"] p').first())
+    .toHaveText("The Structure of Scientific Revolutions", { timeout: 15_000 });
+
+  await page.evaluate(() => {
+    const paragraph = document.querySelector('[data-page-number="1"] p')!;
+    const range = document.createRange();
+    range.selectNodeContents(paragraph.firstChild!);
+    const selected = window.getSelection();
+    selected?.removeAllRanges();
+    selected?.addRange(range);
+    paragraph.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+  await page.getByRole("button", { name: "Highlight in green" }).click();
+  await expect(page.getByText("Highlight saved.")).toBeVisible({ timeout: 15_000 });
+
+  // Filed under the page it is on. It used to be filed under whichever page
+  // was in front of the reader, which in the text view is the next one down as
+  // soon as a page is short enough to leave the middle of the pane past it.
+  const saved = await page.request.get(`/api/documents/${documentId}/highlights`);
+  const { highlights } = (await saved.json()) as { highlights: { location: string }[] };
+  expect(JSON.parse(highlights[0].location).page).toBe(1);
+
+  const painted = () => page.evaluate(() => {
+    const registered = CSS.highlights.get("book-reader-green");
+    return registered ? [...registered].map((range) => range.toString()) : null;
+  });
+  await expect.poll(painted).toEqual(["The Structure of Scientific Revolutions"]);
+
+  // The mark is on the passage, not on the way it happened to be shown.
+  await controls(page).getByRole("button", { name: "Pages" }).click();
+  await page.waitForFunction(
+    () => document.querySelectorAll(".textLayer span").length > 0,
+    undefined,
+    { timeout: 15_000 },
+  );
+  await expect.poll(painted, { timeout: 15_000 })
+    .toEqual(["The Structure of Scientific Revolutions"]);
+});
+
+test("the page number keeps up in the text view", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  const documentId = await importDocument(
+    page,
+    "text-count.pdf",
+    buildPdf(8, 0, 12),
+    "application/pdf",
+  );
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
+  await controls(page).getByRole("button", { name: "Text" }).click();
+  await expect(page.locator('[data-page-number="1"] p').first()).toBeVisible({ timeout: 15_000 });
+
+  // Switching views replaces every page element. The observer watching them has
+  // to be pointed at the new ones, or it goes on watching what React threw away
+  // and the number sits wherever it happened to stand.
+  await page.evaluate(() => {
+    const scroller = document.querySelector("[data-reader-scroll]") as HTMLElement;
+    const fifth = document.querySelector('[data-page-number="5"]') as HTMLElement;
+    scroller.scrollTop += fifth.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+  });
+  await expect.poll(
+    async () => page.getByRole("spinbutton", { name: "Page number" }).inputValue(),
+    { timeout: 15_000 },
+  ).toBe("5");
 });

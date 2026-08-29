@@ -110,7 +110,7 @@ export async function scrollReaderToEnd(page: Page): Promise<void> {
  * Memory behaviour only shows up over a document long enough to scroll through:
  * two pages fit in a phone's canvas budget however carelessly they are handled.
  */
-export function buildPdf(pageCount: number, paddingPerPage = 0): Buffer {
+export function buildPdf(pageCount: number, paddingPerPage = 0, linesPerPage = 1): Buffer {
   const objects: string[] = [];
   const pageIds = Array.from({ length: pageCount }, (_, index) => 3 + index);
   const fontId = 3 + pageCount;
@@ -129,7 +129,14 @@ export function buildPdf(pageCount: number, paddingPerPage = 0): Buffer {
     const filler = paddingPerPage > 0
       ? `\n% ${"filler ".repeat(Math.ceil(paddingPerPage / 7))}`
       : "";
-    const stream = `BT\n/F1 24 Tf\n1 0 0 1 60 700 Tm\n(Page ${index + 1} of ${pageCount}) Tj\nET${filler}`;
+    const lines = [
+      `(Page ${index + 1} of ${pageCount}) Tj T*`,
+      ...Array.from(
+        { length: Math.max(0, linesPerPage - 1) },
+        (_, line) => `(Line ${line + 1} of page ${index + 1}, long enough to run the width) Tj T*`,
+      ),
+    ].join("\n");
+    const stream = `BT\n/F1 14 Tf\n1 0 0 1 60 720 Tm\n20 TL\n${lines}\nET${filler}`;
     objects[id] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
   });
 

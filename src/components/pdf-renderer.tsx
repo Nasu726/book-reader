@@ -20,6 +20,8 @@ import { capturePdfSelection, type DocumentSelection } from "@/core/selection/ca
 import { inferPaperStructure } from "@/core/documents/paper-structure";
 import type { PaintableHighlight } from "./highlight-paint";
 import { PdfPage, type PdfDocumentProxy } from "./pdf-page";
+import { PdfTextPage } from "./pdf-text-page";
+import { getStoredPdfView, serverPdfView, setStoredPdfView, subscribe } from "./reader-preferences";
 import { usePageShortcuts } from "./use-page-shortcuts";
 
 GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${version}`;
@@ -27,6 +29,14 @@ GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${version}`;
 // Before pdf.js reads anything: it iterates a stream to collect a page's text,
 // and Safari has no async iterator on ReadableStream to iterate it with.
 installStreamAsyncIterator();
+
+/** Which page a selection is on, from where the selection actually is. */
+function pageOfSelection(selection: Selection | null): number | null {
+  const node = selection?.anchorNode;
+  const element = node?.nodeType === 1 ? node as Element : node?.parentElement;
+  const page = Number(element?.closest("[data-page-number]")?.getAttribute("data-page-number"));
+  return Number.isInteger(page) ? page : null;
+}
 
 /**
  * The toolbar host never changes once the shell has rendered, so there is
@@ -102,6 +112,10 @@ export function PdfRenderer({
    * the book is a toolbar you have to go and find. Found after mounting, since
    * the shell renders before what it contains.
    */
+  // Pages as printed, or the text taken off them. A preference, so the choice
+  // survives closing the book.
+  const view = useSyncExternalStore(subscribe, getStoredPdfView, serverPdfView);
+
   const toolbarHost = useSyncExternalStore(
     subscribeToNothing,
     () => document.querySelector("[data-reader-toolbar]"),
@@ -239,34 +253,31 @@ export function PdfRenderer({
     if (!scroller) return;
 
     /*
-     * The page you are reading is the one under the middle of the pane.
+     * Which page the reader is on, measured rather than remembered.
      *
-     * It used to be the topmost page with any part of it showing, decided from
-     * rectangles the observer had measured when visibility last changed. Zoom
-     * broke both halves of that: a page three times the width of the screen
-     * shows a much smaller fraction of itself, so pages far above still
-     * counted, and a rectangle measured on the last change is stale by the time
-     * scrolling has moved it.
-     *
-     * The observer now only keeps track of which pages are worth measuring.
+     * It used to be decided from rectangles the observer had recorded when
+     * visibility last changed, which is stale by the time scrolling has moved
+     * them, and from a threshold that a page three times the width of the
+     * screen never reached. The observer now only keeps track of which pages
+     * are worth measuring; the measuring happens as the reader scrolls.
      */
     const onScreen = new Set<Element>();
     let frame = 0;
 
     function pickCurrentPage() {
       frame = 0;
-      const middle = scroller!.getBoundingClientRect().top + scroller!.clientHeight / 2;
-      let best: { page: number; distance: number } | null = null;
+      const paneTop = scroller!.getBoundingClientRect().top;
+      let best: { page: number; top: number } | null = null;
       for (const element of onScreen) {
-        const box = element.getBoundingClientRect();
         const page = Number(element.getAttribute("data-page-number"));
         if (!Number.isInteger(page)) continue;
-        // Zero when the middle of the pane is inside this page, and otherwise
-        // how far it is from it — so the nearest page wins at the seams.
-        const distance = box.top > middle
-          ? box.top - middle
-          : box.bottom < middle ? middle - box.bottom : 0;
-        if (!best || distance < best.distance) best = { distance, page };
+        const box = element.getBoundingClientRect();
+        // The page you are reading is the one at the top of the pane: you are
+        // on it until it has gone past. Choosing the page under the middle
+        // instead reads the next one down whenever a page is shorter than the
+        // screen, which in the text view is most of them.
+        if (box.bottom <= paneTop + 1) continue;
+        if (!best || box.top < best.top) best = { page, top: box.top };
       }
       if (best) setCurrentPage(best.page);
     }
@@ -289,12 +300,22 @@ export function PdfRenderer({
       observer.observe(page);
     }
     scroller.addEventListener("scroll", schedule, { passive: true });
+    // Pages change height under the reader: text arrives after the page is on
+    // screen, and a drawn page replaces its reserved space. Without this the
+    // count is whatever was true when the page was first seen.
+    const resize = new ResizeObserver(schedule);
+    resize.observe(column);
     return () => {
       observer.disconnect();
+      resize.disconnect();
       scroller.removeEventListener("scroll", schedule);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [initialLocation, pageCount]);
+  // The view is a dependency because it decides which elements exist to watch:
+  // switching it replaces every page in the column. Measured, the count keeps
+  // up without this as well — so it is here for the observer to be pointed at
+  // the elements it is meant to watch, not to fix an observed fault.
+  }, [initialLocation, pageCount, view]);
 
   // Saved only once the page actually changes. Reporting the restored page
   // straight after mount wrote a row that said nothing new, and a test waiting
@@ -327,7 +348,12 @@ export function PdfRenderer({
 
     const updateSelection = () => {
       const selection = window.getSelection();
-      const pageText = pageTextRef.current.get(currentPage) ?? "";
+      // The page a passage belongs to is the page it is on, not the page in
+      // front of the reader. They part company as soon as two pages share the
+      // screen — and in the text view, where a short page leaves the middle of
+      // the pane showing the next one, they part company immediately.
+      const page = pageOfSelection(selection) ?? currentPage;
+      const pageText = pageTextRef.current.get(page) ?? "";
       let paperStructure: ReturnType<typeof inferPaperStructure> | undefined;
       try {
         paperStructure = pageText.trim() ? inferPaperStructure(pageText) : undefined;
@@ -335,7 +361,7 @@ export function PdfRenderer({
         paperStructure = undefined;
       }
       const captured = selection
-        ? capturePdfSelection(selection, currentPage, { documentTitle, pageText, paperStructure })
+        ? capturePdfSelection(selection, page, { documentTitle, pageText, paperStructure })
         : null;
       setCapturedSelection(captured);
       onSelectionChange?.(captured);
@@ -397,7 +423,23 @@ export function PdfRenderer({
               of {pageCount || "…"}
             </span>
           </label>
-          <div aria-label="Page zoom" className="ml-auto flex items-center gap-1" role="group">
+          <div aria-label="Reading view" className="ml-auto flex items-center gap-1" role="group">
+            {([["pages", "Pages"], ["text", "Text"]] as const).map(([candidate, label]) => (
+              <button
+                aria-pressed={view === candidate}
+                className={`border-edge min-h-11 rounded-lg border px-3 text-xs tracking-wide uppercase transition-colors duration-(--fast) ${
+                  view === candidate ? "bg-marker border-marker text-ink-on-marker" : "text-ink-quiet hover:text-ink"
+                }`}
+                key={candidate}
+                onClick={() => setStoredPdfView(candidate)}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {view === "pages" && (
+          <div aria-label="Page zoom" className="flex items-center gap-1" role="group">
             <button
               aria-label="Zoom out"
               className="border-edge min-h-11 rounded-lg border px-3 text-sm"
@@ -425,6 +467,7 @@ export function PdfRenderer({
               +
             </button>
           </div>
+          )}
         </div>,
         toolbarHost,
       )}
@@ -432,16 +475,26 @@ export function PdfRenderer({
       <div className="flex flex-col gap-4 sm:gap-6" ref={columnRef}>
         {document_ && pageCount > 0
           ? Array.from({ length: pageCount }, (_, index) => (
-            <PdfPage
-              aspectRatio={aspectRatio}
-              containerWidth={containerWidth}
-              document={document_}
-              highlights={highlights}
-              key={index + 1}
-              onTextExtracted={rememberPageText}
-              pageNumber={index + 1}
-              zoom={zoom}
-            />
+            view === "text" ? (
+              <PdfTextPage
+                document={document_}
+                highlights={highlights}
+                key={index + 1}
+                onTextExtracted={rememberPageText}
+                pageNumber={index + 1}
+              />
+            ) : (
+              <PdfPage
+                aspectRatio={aspectRatio}
+                containerWidth={containerWidth}
+                document={document_}
+                highlights={highlights}
+                key={index + 1}
+                onTextExtracted={rememberPageText}
+                pageNumber={index + 1}
+                zoom={zoom}
+              />
+            )
           ))
           : <p aria-live="polite" className="text-sm">Opening…</p>}
       </div>
