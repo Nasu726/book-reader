@@ -989,13 +989,14 @@ SSRのCPU実測はデプロイ後に取る。
 
 ### デプロイ状況
 
-最終デプロイ: 2026-08-28、main の `c8444eb` から。
+最終デプロイ: 2026-08-29、main の `021c9ff` から（Version `00c9fee9`）。
 
 - URL: https://book-reader.nasu.uk（`https://book-reader.e9gp1ant-1729.workers.dev` も同じWorker）
 - Cloudflare Access で Worker 単位に保護済み。未認証は Access のログインへ302され、アプリまで到達しない。`/help` も同様にAccessの内側にある（アプリ自身は認証を要求しないが、エッジで保護される）
 - `npm run check:access` — audience 一致を確認済み
 - D1 のスキーマは `0003` まで remote へ適用済み（`usage_counters`、`highlights.color`）
-- デプロイはローカルの wrangler から実行した。**GitHub Actions からの自動デプロイは `docs/HUMAN-TASKS.md` の H-6 待ち**（APIトークンが必要）
+- デプロイはローカルの wrangler から実行した。**GitHub Actions からの自動デプロイは `docs/HUMAN-TASKS.md` の H-9 待ち**（Cloudflare の APIトークンが必要）
+- E2E のスマホ用プロジェクトは iPhone 17 の実寸・dpr3。**実 WebKit で走らせるには `docs/HUMAN-TASKS.md` の H-10**（システムライブラリの導入、sudo が必要）
 - 残り: 本人による本番動作確認。Access のポリシーが1アドレスのみ許可のため、エージェントはサインインできない
 
 人間側の待ち行列は `docs/HUMAN-TASKS.md` を参照。
@@ -1269,6 +1270,25 @@ pdf.js の text layer は、本文をなぞれるようにするための**透�
 - mutation: 解放を外すと 1,881,360 px が残って赤
 
 描画タスクのキャンセル漏れ（再描画時の二重描画で例外）も同時に修正。
+
+---
+
+## MOBILE-001 — シートをスワイプで閉じる
+**Status:** DONE
+**Priority:** P1
+**Depends on:** DESIGN-001
+
+### Goal
+
+上端のグリップを下へドラッグしてシートを閉じられるようにし、Close ボタンを削除する。
+
+### Verify
+
+- `tests/e2e/mobile.spec.ts` — 十分なスワイプで閉じること、ゆっくりした小さな引きでは閉じないこと
+- mutation: しきい値を無効化すると前者が赤、`travelled > 0` にすると後者が赤
+- Escape と背景タップでも閉じられる（スワイプできない読者のため）
+
+判断理由は `docs/DECISIONS.md` D-27。
 
 ---
 
