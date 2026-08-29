@@ -6,6 +6,7 @@ import {
   GlobalWorkerOptions,
   version,
 } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { installStreamAsyncIterator } from "./stream-async-iterator";
 
 import { capturePdfSelection, type DocumentSelection } from "@/core/selection/capture";
 import { inferPaperStructure } from "@/core/documents/paper-structure";
@@ -14,6 +15,10 @@ import { PdfPage, type PdfDocumentProxy } from "./pdf-page";
 import { usePageShortcuts } from "./use-page-shortcuts";
 
 GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${version}`;
+
+// Before pdf.js reads anything: it iterates a stream to collect a page's text,
+// and Safari has no async iterator on ReadableStream to iterate it with.
+installStreamAsyncIterator();
 
 /** Fit-to-width is 1; the range covers small print and large-format scans. */
 const MIN_ZOOM = 0.5;

@@ -3,8 +3,13 @@ import {
   GlobalWorkerOptions,
   version,
 } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { installStreamAsyncIterator } from "@/components/stream-async-iterator";
 
 GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${version}`;
+
+// Before pdf.js reads anything: it iterates a stream to collect a page's text,
+// and Safari has no async iterator on ReadableStream to iterate it with.
+installStreamAsyncIterator();
 
 export async function extractNormalizedPdfText(
   data: ArrayBuffer,

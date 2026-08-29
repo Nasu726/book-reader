@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { getDocument, TextLayer } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 import { extractPdfText } from "@/core/documents/pdf-extraction";
+import { installStreamAsyncIterator } from "./stream-async-iterator";
 import { clearHighlights, paintHighlights, type PaintableHighlight } from "./highlight-paint";
+
+// This is where getTextContent is called, and getTextContent is what iterates
+// a stream. Installing it here as well as in the renderer costs nothing — the
+// check is for a property that either exists or does not.
+installStreamAsyncIterator();
 
 /**
  * What went wrong, in enough detail to act on.

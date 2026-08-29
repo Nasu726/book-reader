@@ -1408,29 +1408,48 @@ iOS Safari は16px未満のフィールドにフォーカスするとページ�
 
 ---
 
-## PDFWORKER-001 — worker のバージョン固定と失敗の診断
-**Status:** IN_PROGRESS
+## PDFWORKER-001 — iPhoneでPDFの本文が読めない
+**Status:** DONE
 **Priority:** P0
 **Depends on:** PDFRANGE-002
 
 ### 報告
 
-iPhone で `undefined is not a function (near '...t of e...')` が Try again の上に出る。Safari 形式のメッセージで、最小化コード中の `for (t of e)` — 反復できないものを反復している。
+iPhone で Try again の上に:
 
-### 調べて分かったこと
+```
+While reading the text: undefined is not a function (near '...t of e...')
+getTextContent@.../chunks/51fb665c-....js:45:101561
+```
 
-- **リーダーの実装にプラットフォーム分岐は無い**。`pdf-page` / `pdf-renderer` / `document-reader` / `highlight-paint` / `find-range` に `matchMedia` も `userAgent` も無く、PC用とスマホ用の処理は存在しない。違うのはブラウザエンジン（iOSは常にWebKit）であって、こちらのコードではない
-- 範囲取得の退路（PDFRANGE-002）が入った版でも失敗している。つまり**文書の取得ではなく描画で落ちている**
-- `public/pdf.worker.min.mjs` は**手でコピーして commit された 1.3MB のファイル**だった。インストール済みパッケージと一致する保証が無く、ずれれば今回とまったく同じ症状になる。いまは偶然一致していた
+### 原因
 
-### やったこと
+**Safari は `ReadableStream` の非同期イテレーションを実装していない。**
 
-- worker をビルド時に node_modules からコピーする形に変え、一致をテストで守る（D-35）
-- 失敗した**段階**とスタックの先頭フレームを画面に出す（D-36）
+pdf.js はページの本文をこう集める（`legacy/build/pdf.mjs` 22166行）:
 
-### 残っていること
+```js
+for await (const value of readableStream) { … }   // getTextContent
+```
 
-原因は未特定。次に実機で失敗したときのメッセージ（段階名とフレーム）待ち。`docs/HUMAN-TASKS.md` H-10（WebKit の E2E）が入れば手元で再現できる。
+Chrome と Firefox は何年も前に実装しているが、WebKit は未実装のまま。`Symbol.asyncIterator` が存在しないので `for await` がそれを呼ぼうとして落ちる。ページの取得も描画も成功したあとで失敗するため、症状は「描画できない」に見えていた。
+
+**ページ数もファイルサイズも無関係**で、1ページのPDFでも必ず起きる。メモリや取得方法をいくら直しても消えなかったのはこのため。
+
+### 解決
+
+`src/components/stream-async-iterator.ts` が、機能が無いときだけ `ReadableStream.prototype[Symbol.asyncIterator]` を実装する。回避ではなく**欠けている標準機能の実装**として置く。
+
+### Verify
+
+- `tests/unit/stream-async-iterator.test.mts` — 機能を消した環境で `for await` が落ちること、入れれば通ること、途中で抜けてもストリームがロックされたままにならないこと、既にある環境では何も置き換えないこと
+- `tests/unit/pdf-worker.test.mts` — 配信するworkerがパッケージ同梱のものと同一で、メイン側も legacy build を使っていること
+
+### 途中で分かった別の問題（同時に修正）
+
+`public/pdf.worker.min.mjs` が手でコピーしてcommitされた1.3MBのファイルで、インストール済みパッケージと一致する保証が無かった。ずれれば今回とよく似た症状になる。ビルド時のコピーに変え、テストで守る（D-35）。
+
+判断理由は `docs/DECISIONS.md` D-35、D-36、D-37。
 
 ---
 
