@@ -177,16 +177,16 @@ export function AppShell({
           aria-modal={sheetOpen || undefined}
           ref={sheetRef}
           className={[
-"bg-paper flex flex-col",
+            "bg-paper flex flex-col",
             // Phone: a sheet parked below the edge until it is asked for.
-"fixed inset-x-0 bottom-0 z-40 max-h-[72dvh] rounded-t-2xl p-(--gutter) shadow-2xl",
-"transition-[transform,visibility] duration-(--slow) ease-(--ease) motion-reduce:transition-none",
+            "fixed inset-x-0 bottom-0 z-40 max-h-[72dvh] rounded-t-2xl p-(--gutter) shadow-2xl",
+            "transition-[transform,visibility] duration-(--slow) ease-(--ease) motion-reduce:transition-none",
             // Parked off-screen is not the same as absent: an element that is
             // merely translated away still answers to a screen reader and to a
             // test asking whether the pane is showing.
             sheetOpen ? "translate-y-0 visible" : "invisible translate-y-full",
             // Wide screen: an ordinary column, no transform, always present.
-"lg:visible lg:static lg:z-auto lg:max-h-none lg:w-[380px] lg:shrink-0 lg:translate-y-0",
+            "lg:visible lg:static lg:z-auto lg:max-h-none lg:w-[380px] lg:shrink-0 lg:translate-y-0",
             // The pane itself never scrolls. What has more than fits — the
             // transcript, the list of saved things — scrolls inside its own
             // box, so the controls stay put and the whole column does not
@@ -194,8 +194,8 @@ export function AppShell({
             //
             // On a wide screen it is the margin of the page: one hairline, no
             // card, no shadow, no second border inside the first.
-"lg:border-rule lg:overflow-hidden lg:rounded-none lg:border-l lg:p-(--gutter)",
-"lg:shadow-none lg:transition-none",
+            "lg:border-rule lg:overflow-hidden lg:rounded-none lg:border-l lg:p-(--gutter)",
+            "lg:shadow-none lg:transition-none",
           ].join(" ")}
           role={sheetOpen ? "dialog" : undefined}
         >

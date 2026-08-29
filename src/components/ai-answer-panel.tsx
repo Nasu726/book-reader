@@ -7,12 +7,12 @@ import { AnswerText } from "./answer-text";
 import type { AiConversation } from "./use-ai-actions";
 
 const TARGET_LANGUAGES = [
-"Japanese",
-"English",
-"French",
-"Portuguese",
-"Simplified Chinese",
-"Spanish",
+  "Japanese",
+  "English",
+  "French",
+  "Portuguese",
+  "Simplified Chinese",
+  "Spanish",
 ] as const;
 
 /** The passage the question before this one was about. */
