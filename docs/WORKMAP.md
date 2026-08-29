@@ -1408,6 +1408,32 @@ iOS Safari は16px未満のフィールドにフォーカスするとページ�
 
 ---
 
+## PDFWORKER-001 — worker のバージョン固定と失敗の診断
+**Status:** IN_PROGRESS
+**Priority:** P0
+**Depends on:** PDFRANGE-002
+
+### 報告
+
+iPhone で `undefined is not a function (near '...t of e...')` が Try again の上に出る。Safari 形式のメッセージで、最小化コード中の `for (t of e)` — 反復できないものを反復している。
+
+### 調べて分かったこと
+
+- **リーダーの実装にプラットフォーム分岐は無い**。`pdf-page` / `pdf-renderer` / `document-reader` / `highlight-paint` / `find-range` に `matchMedia` も `userAgent` も無く、PC用とスマホ用の処理は存在しない。違うのはブラウザエンジン（iOSは常にWebKit）であって、こちらのコードではない
+- 範囲取得の退路（PDFRANGE-002）が入った版でも失敗している。つまり**文書の取得ではなく描画で落ちている**
+- `public/pdf.worker.min.mjs` は**手でコピーして commit された 1.3MB のファイル**だった。インストール済みパッケージと一致する保証が無く、ずれれば今回とまったく同じ症状になる。いまは偶然一致していた
+
+### やったこと
+
+- worker をビルド時に node_modules からコピーする形に変え、一致をテストで守る（D-35）
+- 失敗した**段階**とスタックの先頭フレームを画面に出す（D-36）
+
+### 残っていること
+
+原因は未特定。次に実機で失敗したときのメッセージ（段階名とフレーム）待ち。`docs/HUMAN-TASKS.md` H-10（WebKit の E2E）が入れば手元で再現できる。
+
+---
+
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
 **Priority:** P0 before final v0.1 sign-off  

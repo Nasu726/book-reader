@@ -53,3 +53,6 @@ next-env.d.ts
 
 # local data: the SQLite database and the bytes of every imported document
 /data/
+
+# Copied from pdfjs-dist at build time by scripts/copy-pdf-worker.mjs.
+public/pdf.worker.min.mjs

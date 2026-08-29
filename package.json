@@ -6,6 +6,10 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "pdf-worker": "node ./scripts/copy-pdf-worker.mjs",
+    "predev": "npm run pdf-worker",
+    "prebuild": "npm run pdf-worker",
+    "postinstall": "npm run pdf-worker",
     "dev": "next dev",
     "build": "next build --webpack",
     "db:migrate": "node --import tsx ./src/server/db/migrate.ts",
@@ -17,9 +21,9 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run test:e2e && npm run build",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:build": "npm run pdf-worker && opennextjs-cloudflare build",
+    "cf:preview": "npm run pdf-worker && opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "npm run pdf-worker && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "check:access": "node --import tsx ./scripts/check-access-config.mts"
   },
   "dependencies": {

@@ -6,6 +6,22 @@ import { getDocument, TextLayer } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { extractPdfText } from "@/core/documents/pdf-extraction";
 import { clearHighlights, paintHighlights, type PaintableHighlight } from "./highlight-paint";
 
+/**
+ * What went wrong, in enough detail to act on.
+ *
+ * A minified stack frame is not for the reader — it is for whoever they report
+ * this to. "This page could not be drawn" with a Try again that fails the same
+ * way gives nobody anything to work with, and the fault has so far only ever
+ * appeared on a device that cannot be attached to a debugger.
+ */
+function describeFailure(stage: string, cause: unknown): string {
+  const message = cause instanceof Error && cause.message ? cause.message : String(cause);
+  const frame = cause instanceof Error
+    ? (cause.stack ?? "").split("\n").map((line) => line.trim()).find((line) => line && line !== message)
+    : undefined;
+  return [`While ${stage}: ${message}`, frame].filter(Boolean).join("\n");
+}
+
 /** Derived from pdf.js rather than described by hand, so the calls stay honest. */
 export type PdfDocumentProxy = Awaited<ReturnType<typeof getDocument>["promise"]>;
 
@@ -101,6 +117,10 @@ export function PdfPage({
     if (!canvas || !layer || !container) return;
 
     let cancelled = false;
+    // Which step was running when it went wrong. A message on its own does not
+    // say whether the page failed to arrive, to paint, or to become selectable,
+    // and those are three different faults with three different causes.
+    let stage = "loading the page";
     // pdf.js refuses to draw onto a canvas another render is still using, so a
     // resize or a zoom arriving mid-draw would throw and leave the page showing
     // an error it could not recover from.
@@ -110,6 +130,7 @@ export function PdfPage({
       try {
         const page = await pdfDocument.getPage(pageNumber);
         if (cancelled) return;
+        stage = "measuring the page";
 
         // The canvas and the text layer must share one display scale, or the
         // selectable text drifts away from the glyphs on the canvas.
@@ -123,6 +144,7 @@ export function PdfPage({
         canvas!.height = Math.floor(viewport.height * devicePixelRatio);
         canvas!.style.width = `${Math.floor(viewport.width)}px`;
         canvas!.style.height = `${Math.floor(viewport.height)}px`;
+        stage = "drawing the page";
         task = page.render({
           canvas: canvas!,
           viewport: page.getViewport({ scale: cssScale * devicePixelRatio }),
@@ -131,6 +153,7 @@ export function PdfPage({
         task = null;
         if (cancelled) return;
 
+        stage = "reading the text";
         const textContent = await page.getTextContent();
         if (cancelled) return;
 
@@ -144,6 +167,7 @@ export function PdfPage({
           // page from being readable.
         }
 
+        stage = "placing the selectable text";
         layer!.replaceChildren();
         layer!.style.setProperty("--scale-factor", String(cssScale));
         layer!.style.setProperty("--user-unit", "1");
@@ -165,7 +189,7 @@ export function PdfPage({
         // Carried to the screen rather than swallowed. "This page could not be
         // drawn" with a button that fails the same way tells a reader nothing
         // and leaves nobody anything to report.
-        setError(cause instanceof Error && cause.message ? cause.message : "Unknown error.");
+        setError(describeFailure(stage, cause));
       }
     }
 
@@ -220,7 +244,9 @@ export function PdfPage({
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-paper/90 text-sm" role="alert">
           <p>Page {pageNumber} could not be drawn.</p>
-          <p className="text-ink-quiet max-w-[36ch] text-center text-xs">{error}</p>
+          <p className="text-ink-quiet max-w-[40ch] text-center text-xs break-words whitespace-pre-line">
+            {error}
+          </p>
           <button
             className="min-h-10 rounded bg-ink px-3 text-white"
             onClick={() => { setError(null); setAttempt((current) => current + 1); }}
