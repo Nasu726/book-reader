@@ -3,9 +3,11 @@ import { mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import { Readable } from "node:stream";
 
-import type {
-  DocumentStorage,
-  StoredDocumentSource,
+import {
+  clampRange,
+  type ByteRange,
+  type DocumentStorage,
+  type StoredDocumentSource,
 } from "@/core/documents/storage";
 
 const FILE_PREFIX = "file:";
@@ -16,16 +18,19 @@ function isSafeKey(key: string): boolean {
   return /^[A-Za-z0-9_-]{1,128}$/.test(key);
 }
 
-function decodeDataUrl(reference: string): StoredDocumentSource | null {
+function decodeDataUrl(reference: string, range?: ByteRange): StoredDocumentSource | null {
   const separator = reference.indexOf(",");
   if (separator < 0) return null;
   const header = reference.slice(DATA_PREFIX.length, separator);
   if (!header.endsWith(";base64")) return null;
   const bytes = Buffer.from(reference.slice(separator + 1), "base64");
+  const wanted = range ? clampRange(range, bytes.byteLength) : null;
+  const slice = wanted ? bytes.subarray(wanted.start, wanted.end + 1) : bytes;
   return {
     contentType: header.slice(0, -";base64".length) || "application/octet-stream",
     size: bytes.byteLength,
-    stream: new Response(bytes).body as ReadableStream<Uint8Array>,
+    ...(wanted && { range: wanted }),
+    stream: new Response(slice).body as ReadableStream<Uint8Array>,
   };
 }
 
@@ -48,9 +53,9 @@ export function createFilesystemDocumentStorage(
     return `${FILE_PREFIX}${key}:${contentType}`;
   }
 
-  async function get(reference: string): Promise<StoredDocumentSource | null> {
+  async function get(reference: string, range?: ByteRange): Promise<StoredDocumentSource | null> {
     // Documents imported before the storage boundary existed are still inline.
-    if (reference.startsWith(DATA_PREFIX)) return decodeDataUrl(reference);
+    if (reference.startsWith(DATA_PREFIX)) return decodeDataUrl(reference, range);
     if (!reference.startsWith(FILE_PREFIX)) return null;
 
     const rest = reference.slice(FILE_PREFIX.length);
@@ -64,11 +69,16 @@ export function createFilesystemDocumentStorage(
 
     try {
       const stats = await stat(target);
+      const wanted = range ? clampRange(range, stats.size) : null;
       return {
         contentType,
         size: stats.size,
+        ...(wanted && { range: wanted }),
         stream: Readable.toWeb(
-          createReadStream(target),
+          // createReadStream's end is inclusive, which is what a byte range means.
+          wanted
+            ? createReadStream(target, { start: wanted.start, end: wanted.end })
+            : createReadStream(target),
         ) as ReadableStream<Uint8Array>,
       };
     } catch {

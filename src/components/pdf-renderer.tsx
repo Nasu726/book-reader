@@ -78,9 +78,24 @@ export function PdfRenderer({
 
     async function open() {
       try {
-        const response = await fetch(source);
-        const data = await response.arrayBuffer();
-        task = getDocument({ data, useSystemFonts: true });
+        // Opened by URL, not by handing pdf.js a buffer of the whole file.
+        //
+        // Fetching the document into an ArrayBuffer meant a phone held every
+        // byte of a large PDF in memory before it could draw a single page, and
+        // iOS answers that by reloading the tab — which looks like a document
+        // that loads for ever. By URL, pdf.js asks the server for the few
+        // kilobytes each page needs, and disableAutoFetch stops it quietly
+        // pulling down the rest in the background.
+        task = getDocument({
+          disableAutoFetch: true,
+          // Without this pdf.js opens a stream over the whole file as well, and
+          // on a fast connection that stream simply wins: the entire document
+          // arrives anyway. Ranges only are what keeps a phone's memory bounded.
+          disableStream: true,
+          rangeChunkSize: 65_536,
+          url: source,
+          useSystemFonts: true,
+        });
         const opened = await task.promise;
         if (cancelled) {
           void task.destroy();
@@ -161,7 +176,7 @@ export function PdfRenderer({
 
   // Saved only once the page actually changes. Reporting the restored page
   // straight after mount wrote a row that said nothing new, and a test waiting
-  // for"the progress request" could catch that one instead of the real move.
+  // for "the progress request" could catch that one instead of the real move.
   // It also spends a write against D1's daily budget for no reason.
   const savedPageRef = useRef<number | null>(null);
   useEffect(() => {
@@ -229,7 +244,7 @@ export function PdfRenderer({
           <span className="text-ink-quiet">Page</span>
           <input
             aria-label="Page number"
-            className="min-h-11 w-16 rounded-lg border border-rule px-2 text-center tabular-nums"
+            className="border-edge bg-field min-h-11 w-16 rounded-lg border px-2 text-center tabular-nums"
             max={pageCount || 1}
             min={1}
             onChange={(event) => {
@@ -240,13 +255,13 @@ export function PdfRenderer({
             value={currentPage}
           />
           <span aria-live="polite" className="text-ink-quiet tabular-nums">
-            of {pageCount ||"…"}
+            of {pageCount || "…"}
           </span>
         </label>
         <div aria-label="Page zoom" className="ml-auto flex items-center gap-1" role="group">
           <button
             aria-label="Zoom out"
-            className="min-h-11 rounded-lg border border-rule px-3 text-sm"
+            className="border-edge min-h-11 rounded-lg border px-3 text-sm"
             disabled={zoom <= MIN_ZOOM}
             onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Math.round((current - 0.25) * 100) / 100))}
             type="button"
@@ -255,7 +270,7 @@ export function PdfRenderer({
           </button>
           <button
             aria-label={`Zoom, currently ${Math.round(zoom * 100)} percent. Reset to fit width`}
-            className="min-h-11 rounded-lg border border-rule px-2 text-sm tabular-nums"
+            className="border-edge min-h-11 rounded-lg border px-2 text-sm tabular-nums"
             onClick={() => setZoom(1)}
             type="button"
           >
@@ -263,7 +278,7 @@ export function PdfRenderer({
           </button>
           <button
             aria-label="Zoom in"
-            className="min-h-11 rounded-lg border border-rule px-3 text-sm"
+            className="border-edge min-h-11 rounded-lg border px-3 text-sm"
             disabled={zoom >= MAX_ZOOM}
             onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Math.round((current + 0.25) * 100) / 100))}
             type="button"

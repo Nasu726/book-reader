@@ -29,7 +29,7 @@ export default function LoginPage() {
           <label className="block text-sm font-medium" htmlFor="username">Username</label>
           <input
             autoComplete="username"
-            className="w-full rounded-lg border border-rule px-3 py-2"
+            className="border-edge bg-field w-full rounded-lg border px-3 py-2"
             id="username"
             name="username"
             required
@@ -40,7 +40,7 @@ export default function LoginPage() {
           <label className="block text-sm font-medium" htmlFor="password">Password</label>
           <input
             autoComplete="current-password"
-            className="w-full rounded-lg border border-rule px-3 py-2"
+            className="border-edge bg-field w-full rounded-lg border px-3 py-2"
             id="password"
             name="password"
             required

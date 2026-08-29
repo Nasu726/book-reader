@@ -234,7 +234,7 @@ export function SelectionAiConnector({
                     </div>
                     <button
                       aria-label={`Delete highlight: ${highlight.selectedText}`}
-                      className="min-h-9 shrink-0 rounded-lg border border-rule px-2 text-xs"
+                      className="border-edge min-h-9 shrink-0 rounded-lg border px-2 text-xs"
                       onClick={() => void deleteHighlight(highlight.id)}
                       type="button"
                     >
@@ -253,7 +253,7 @@ export function SelectionAiConnector({
             </p>
             <label className="block text-sm font-medium" htmlFor="vocabulary-meaning">Meaning</label>
             <textarea
-              className="min-h-20 w-full rounded-lg border border-rule p-3 text-sm"
+              className="border-edge bg-field min-h-20 w-full rounded-lg border p-3 text-sm"
               id="vocabulary-meaning"
               onChange={(event) => {
                 setMeaning(event.target.value);
@@ -284,7 +284,7 @@ export function SelectionAiConnector({
                     </div>
                     <button
                       aria-label={`Delete vocabulary entry: ${entry.term}`}
-                      className="min-h-9 shrink-0 rounded-lg border border-rule px-2 text-xs"
+                      className="border-edge min-h-9 shrink-0 rounded-lg border px-2 text-xs"
                       onClick={() => void deleteVocabularyEntry(entry.id)}
                       type="button"
                     >

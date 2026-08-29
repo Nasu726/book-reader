@@ -177,7 +177,7 @@ export function DocumentReader({
         if (!response.ok) throw new Error("The document could not be opened.");
         const bytes = await response.arrayBuffer();
         const { parseEpubInBrowser } = await import("./epub-browser-parser");
-        const parsed = await parseEpubInBrowser(bytes, documentTitle ||"document.epub");
+        const parsed = await parseEpubInBrowser(bytes, documentTitle || "document.epub");
         if (cancelled) return;
         setEpub(parsed as ParsedEpub);
         void adoptBookTitle(documentId, parsed.title, documentTitle, documentSourceFilename);
@@ -191,7 +191,7 @@ export function DocumentReader({
 
   // Listened for on the book, not on the whole document.
   //
-  // On `document`, every click in the pane beside the text also reported"no
+  // On `document`, every click in the pane beside the text also reported "no
   // selection", so choosing an action there threw away the passage it was
   // about. Scoped here, letting go of a passage is something the reader does in
   // the book — which is exactly when the composer should stop offering it.
@@ -245,9 +245,9 @@ export function DocumentReader({
     return (
       <section aria-label="EPUB reader" className="space-y-4" ref={readerRef}>
         <div className="flex items-center justify-between gap-2">
-          <button className="min-h-11 rounded-lg border border-rule px-3 text-sm" disabled={sectionIndex === 0} onClick={() => goToSection(sectionIndex - 1)} type="button">Previous</button>
+          <button className="border-edge min-h-11 rounded-lg border px-3 text-sm" disabled={sectionIndex === 0} onClick={() => goToSection(sectionIndex - 1)} type="button">Previous</button>
           <span className="text-sm">{sectionIndex + 1} / {epub.sections.length}</span>
-          <button className="min-h-11 rounded-lg border border-rule px-3 text-sm" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => goToSection(sectionIndex + 1)} type="button">Next</button>
+          <button className="border-edge min-h-11 rounded-lg border px-3 text-sm" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => goToSection(sectionIndex + 1)} type="button">Next</button>
         </div>
         <article className="reader-prose max-w-prose rounded-xl border border-rule p-4" data-reader-section={section.id} ref={chapterRef}>
           {/* The nav label is only shown when the chapter body carries no heading of its own. */}

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
+import { buildPdf, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
 
 test("PDF renders with navigation and selectable text", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -167,4 +167,42 @@ test("arrow keys do nothing at the first and last page", async ({ page }) => {
   await page.waitForTimeout(400);
   expect(Math.abs(await scrollTop() - atEnd)).toBeLessThanOrEqual(2);
   await expect(pageNumber).toHaveValue("2");
+});
+
+test("a large PDF is fetched in pieces rather than all at once", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+
+  const file = buildPdf(60, 4_000);
+  expect(file.byteLength).toBeGreaterThan(200_000);
+  const documentId = await importDocument(page, "ranged.pdf", file, "application/pdf");
+
+  const statuses: number[] = [];
+  let rangedBytes = 0;
+  page.on("response", (response) => {
+    if (!response.url().includes(`/documents/${documentId}/source`)) return;
+    statuses.push(response.status());
+    // Only the ranges. The viewer opens one full request to learn the length
+    // and abandons it, so counting what that one declared would count bytes
+    // that never crossed the wire.
+    if (response.status() === 206) {
+      rangedBytes += Number(response.headers()["content-length"] ?? 0);
+    }
+  });
+
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
+  await page.waitForFunction(
+    () => document.querySelectorAll(".textLayer span").length > 0,
+    undefined,
+    { timeout: 15_000 },
+  );
+
+  // Answered as ranges, and only the part the first pages need. Handing the
+  // viewer the whole file is what made a phone reload the tab before it could
+  // draw anything.
+  expect(statuses).toContain(206);
+  expect(rangedBytes).toBeGreaterThan(0);
+  expect(rangedBytes).toBeLessThan(file.byteLength / 2);
 });

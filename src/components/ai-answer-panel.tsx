@@ -138,9 +138,11 @@ export function AiAnswerPanel({
         )}
       </div>
 
-      {/* The one box on the panel, and the only thing that sends. */}
+      {/* The only thing that sends. A divider rather than a box around
+          everything: the field below carries its own edge, and a box inside a
+          box makes it harder, not easier, to see where typing happens. */}
       <form
-        className="border-rule bg-paper-raised focus-within:border-marker mt-3 shrink-0 space-y-2 rounded-xl border p-2 transition-colors duration-(--fast)"
+        className="border-rule mt-3 shrink-0 space-y-2 border-t pt-3"
         onSubmit={(event) => {
           event.preventDefault();
           submit();
@@ -151,8 +153,10 @@ export function AiAnswerPanel({
             {COMMAND_ACTIONS.map((action) => (
               <button
                 aria-label={`Insert /${action}`}
-                className={`min-h-9 shrink-0 rounded-lg px-2 text-xs tracking-wide uppercase transition-colors duration-(--fast) ${
-                  command.action === action ? "bg-marker text-ink-on-marker" : "text-ink-quiet hover:text-ink"
+                className={`border-edge min-h-9 shrink-0 rounded-lg border px-2 text-xs tracking-wide uppercase transition-colors duration-(--fast) ${
+                  command.action === action
+                    ? "bg-marker border-marker text-ink-on-marker"
+                    : "text-ink-quiet hover:text-ink"
                 }`}
                 key={action}
                 // Writing the command rather than sending it: one control
@@ -197,18 +201,20 @@ export function AiAnswerPanel({
           </label>
         )}
 
-        {/* What the command will act on, shown where the command is written. */}
+        {/* What the command will act on, shown where the command is written.
+            A question needs no passage, so this says what is missing only when
+            something is. */}
         <p className="text-ink-quiet border-rule border-l-2 pl-2 text-sm">
-          {subject ? excerpt(subject.text) : "No passage selected"}
+          {subject ? excerpt(subject.text) : "No passage selected — questions still work"}
         </p>
 
-        <div className="flex gap-2">
+        <div className="border-edge bg-field focus-within:border-marker flex gap-2 rounded-lg border p-1 transition-colors duration-(--fast)">
           <label className="sr-only" htmlFor="ai-follow-up">Ask about this passage</label>
           <input
-            className="min-h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
+            className="min-h-11 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
             id="ai-follow-up"
             onChange={(event) => setQuestion(event.target.value)}
-            placeholder={needsPassage ? "Select a passage in the book first" : "Ask, or press an action above"}
+            placeholder={needsPassage ? "Select a passage to use this command" : "Ask about this book"}
             ref={inputRef}
             value={question}
           />

@@ -1,6 +1,8 @@
-import type {
-  DocumentStorage,
-  StoredDocumentSource,
+import {
+  clampRange,
+  type ByteRange,
+  type DocumentStorage,
+  type StoredDocumentSource,
 } from "@/core/documents/storage";
 
 /**
@@ -15,8 +17,12 @@ export type R2BucketLike = {
     value: ArrayBuffer | ArrayBufferView,
     options?: { httpMetadata?: { contentType?: string } },
   ): Promise<unknown>;
-  get(key: string): Promise<{
+  get(
+    key: string,
+    options?: { range?: { offset: number; length: number } },
+  ): Promise<{
     body: ReadableStream<Uint8Array> | null;
+    /** The size of the whole object, not of the slice returned. */
     size: number;
     httpMetadata?: { contentType?: string };
   } | null>;
@@ -31,16 +37,19 @@ function isSafeKey(key: string): boolean {
   return /^[A-Za-z0-9_-]{1,128}$/.test(key);
 }
 
-function decodeDataUrl(reference: string): StoredDocumentSource | null {
+function decodeDataUrl(reference: string, range?: ByteRange): StoredDocumentSource | null {
   const separator = reference.indexOf(",");
   if (separator < 0) return null;
   const header = reference.slice(DATA_PREFIX.length, separator);
   if (!header.endsWith(";base64")) return null;
   const bytes = Buffer.from(reference.slice(separator + 1), "base64");
+  const wanted = range ? clampRange(range, bytes.byteLength) : null;
+  const slice = wanted ? bytes.subarray(wanted.start, wanted.end + 1) : bytes;
   return {
     contentType: header.slice(0, -";base64".length) || "application/octet-stream",
     size: bytes.byteLength,
-    stream: new Response(bytes).body as ReadableStream<Uint8Array>,
+    ...(wanted && { range: wanted }),
+    stream: new Response(slice).body as ReadableStream<Uint8Array>,
   };
 }
 
@@ -58,9 +67,9 @@ export function createR2DocumentStorage(bucket: R2BucketLike): DocumentStorage {
     return `${R2_PREFIX}${key}:${contentType}`;
   }
 
-  async function get(reference: string): Promise<StoredDocumentSource | null> {
+  async function get(reference: string, range?: ByteRange): Promise<StoredDocumentSource | null> {
     // Documents imported before the storage boundary existed are still inline.
-    if (reference.startsWith(DATA_PREFIX)) return decodeDataUrl(reference);
+    if (reference.startsWith(DATA_PREFIX)) return decodeDataUrl(reference, range);
     if (!reference.startsWith(R2_PREFIX)) return null;
 
     const rest = reference.slice(R2_PREFIX.length);
@@ -69,13 +78,19 @@ export function createR2DocumentStorage(bucket: R2BucketLike): DocumentStorage {
     const declaredContentType = separator < 0 ? "" : rest.slice(separator + 1);
     if (!isSafeKey(key)) return null;
 
-    const object = await bucket.get(key);
+    // Asked for as an offset and a length, which is how R2 names a range; the
+    // total size comes back on the object either way.
+    const object = await bucket.get(key, range && {
+      range: { length: range.end - range.start + 1, offset: range.start },
+    });
     if (!object?.body) return null;
+    const wanted = range ? clampRange(range, object.size) : null;
     return {
       contentType: object.httpMetadata?.contentType
         || declaredContentType
         || "application/octet-stream",
       size: object.size,
+      ...(wanted && { range: wanted }),
       stream: object.body,
     };
   }

@@ -1292,6 +1292,46 @@ pdf.js の text layer は、本文をなぞれるようにするための**透�
 
 ---
 
+## PDFRANGE-001 — PDFを範囲取得にする
+**Status:** DONE
+**Priority:** P0
+**Depends on:** PDFMEM-001
+
+### 問題
+
+iPhone で大きなPDFが開けず「無限リトライ」になる。PCでは正常。
+
+### 原因
+
+`fetch` → `arrayBuffer()` でファイル全体を1つのバッファに載せてから pdf.js へ渡していた。iOS はメモリ不足でタブを再読み込みするため、外からは読み込みが終わらないように見える。
+
+### Verify
+
+- `tests/e2e/pdf.spec.ts` — 260KBのPDFで 206 が返り、範囲で受け取るバイト数がファイルの半分未満
+- mutation: `accept-ranges` を外すと 200 のみになって赤
+
+判断理由は `docs/DECISIONS.md` D-28。
+
+---
+
+## A11Y-001 — 操作の境界とダークテーマのコントラスト
+**Status:** DONE
+**Priority:** P0
+**Depends on:** DESIGN-001
+
+### 問題
+
+「ダークモードの視認性が悪い」「入力欄やボタンの範囲が分かりづらい」。実測すると枠線は **1.26:1 / 1.29:1** で、事実上見えていなかった。
+
+### Verify
+
+- `tests/unit/palette-contrast.test.mts` — 本文 7:1、副次テキスト 4.5:1、操作の縁 3:1、マーカー上の文字 4.5:1、ダークの2宣言の一致
+- mutation: `--edge` を元の値に戻すと赤
+
+判断理由は `docs/DECISIONS.md` D-30。
+
+---
+
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
 **Priority:** P0 before final v0.1 sign-off  

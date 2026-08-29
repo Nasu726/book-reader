@@ -26,7 +26,7 @@ type PdfPageProps = {
  *
  * Each page owns its own canvas, text layer, and error state. A single shared
  * error state let a failed render overwrite a successful one, which is how a
- * page that was plainly visible on screen still carried"This PDF page could
+ * page that was plainly visible on screen still carried "This PDF page could
  * not be rendered" with a Retry button that changed nothing.
  */
 export function PdfPage({

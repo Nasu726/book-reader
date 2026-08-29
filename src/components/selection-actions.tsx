@@ -75,7 +75,7 @@ function useEdgeAwarePlacement(left: number) {
 /**
  * The actions, offered where the reader is already looking.
  *
- * They existed only in the pane beside the text, which is why"how do I add a
+ * They existed only in the pane beside the text, which is why "how do I add a
  * highlight" was a fair question: nothing near the passage said it was
  * possible. A control that appears against the selection answers that without a
  * manual.
@@ -106,7 +106,7 @@ export function SelectionActions({
   return (
     <div
       aria-label="Actions for the selected text"
-      className="fixed z-40 flex max-w-[calc(100vw-16px)] flex-wrap items-center justify-center gap-1 rounded-xl border-rule bg-paper-raised border p-1 shadow-lg"
+      className="border-edge bg-paper-raised fixed z-40 flex max-w-[calc(100vw-16px)] flex-wrap items-center justify-center gap-1 rounded-xl border p-1 shadow-lg"
       ref={keepOnScreen}
       role="group"
       style={{

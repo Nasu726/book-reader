@@ -93,6 +93,9 @@ const ACTION_INSTRUCTIONS: Record<AiAction, string> = {
 };
 
 function actionInstruction(input: AiActionInput): string {
+  if (input.action === "ask" && !input.selectedText.trim()) {
+    return "Answer the user's question about the document being read.";
+  }
   if (input.action === "translate") {
     // The source language is left unstated unless the reader names one. Someone
     // reading in several languages does not want English assumed, and "from
@@ -133,8 +136,20 @@ export function buildPrompt(input: AiActionInput): {
   prompt: string;
   context: string;
 } {
-  if (!input.selectedText.trim()) {
-    throw new AiActionError("empty_selection", "Select some text first.");
+  const selected = input.selectedText.trim();
+  const asked = input.userQuestion?.trim();
+
+  // A question about the book needs no passage. Explaining, translating and
+  // simplifying do: there is nothing to act on otherwise. Requiring a selection
+  // for all four meant a reader could not ask "what is this chapter about"
+  // without first picking a sentence at random to attach it to.
+  if (!selected && !(input.action === "ask" && asked)) {
+    throw new AiActionError(
+      "empty_selection",
+      input.action === "ask"
+        ? "Type a question, or select a passage."
+        : "Select a passage in the book first.",
+    );
   }
 
   const instruction = actionInstruction(input);
@@ -144,11 +159,11 @@ export function buildPrompt(input: AiActionInput): {
   if (input.responseLanguage && input.action !== "translate") {
     promptParts.push(`Respond in ${input.responseLanguage}.`);
   }
-  if (input.action === "ask" && input.userQuestion) {
-    promptParts.push(`Question: ${input.userQuestion}`);
+  if (input.action === "ask" && asked) {
+    promptParts.push(`Question: ${asked}`);
   }
-  promptParts.push("Selected text:", input.selectedText.trim());
-  const sectionTitle = findPaperSectionTitle(input.paperStructure, input.selectedText);
+  if (selected) promptParts.push("Selected text:", selected);
+  const sectionTitle = findPaperSectionTitle(input.paperStructure, selected);
 
   return {
     prompt: promptParts.join("\n"),

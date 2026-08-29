@@ -158,3 +158,36 @@ test("empty selections are rejected before provider calls", async () => {
     },
   );
 });
+
+test("a question needs no passage, but the other actions do", async () => {
+  const provider = { generate: async () => ({ content: "Answered." }) };
+
+  // Asking about the book at large is a reasonable thing to want.
+  assert.equal(
+    await runAiAction(provider, {
+      action: "ask",
+      selectedText: "",
+      userQuestion: "What is this chapter about?",
+    }),
+    "Answered.",
+  );
+
+  // Nothing to explain, and saying so is more use than a generic failure.
+  await assert.rejects(
+    runAiAction(provider, { action: "explain", selectedText: "" }),
+    (error: AiActionError) => {
+      assert.equal(error.code, "empty_selection");
+      assert.match(error.message, /Select a passage/);
+      return true;
+    },
+  );
+
+  // A question with neither a passage nor a question is not a request.
+  await assert.rejects(
+    runAiAction(provider, { action: "ask", selectedText: "", userQuestion: "   " }),
+    (error: AiActionError) => {
+      assert.match(error.message, /Type a question/);
+      return true;
+    },
+  );
+});

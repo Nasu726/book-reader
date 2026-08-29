@@ -110,7 +110,7 @@ export async function scrollReaderToEnd(page: Page): Promise<void> {
  * Memory behaviour only shows up over a document long enough to scroll through:
  * two pages fit in a phone's canvas budget however carelessly they are handled.
  */
-export function buildPdf(pageCount: number): Buffer {
+export function buildPdf(pageCount: number, paddingPerPage = 0): Buffer {
   const objects: string[] = [];
   const pageIds = Array.from({ length: pageCount }, (_, index) => 3 + index);
   const fontId = 3 + pageCount;
@@ -124,7 +124,12 @@ export function buildPdf(pageCount: number): Buffer {
   });
   objects[fontId] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
   contentIds.forEach((id, index) => {
-    const stream = `BT\n/F1 24 Tf\n1 0 0 1 60 700 Tm\n(Page ${index + 1} of ${pageCount}) Tj\nET`;
+    // Padded so the file is large enough for range requests to be worth making:
+    // pdf.js fetches whole anything smaller than one chunk.
+    const filler = paddingPerPage > 0
+      ? `\n% ${"filler ".repeat(Math.ceil(paddingPerPage / 7))}`
+      : "";
+    const stream = `BT\n/F1 24 Tf\n1 0 0 1 60 700 Tm\n(Page ${index + 1} of ${pageCount}) Tj\nET${filler}`;
     objects[id] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
   });
 

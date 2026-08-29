@@ -9,7 +9,7 @@ export function DocumentNotes({ note }: { note: DocumentNote }) {
     <section aria-label="Document notes" className="space-y-2 rounded-xl border-rule border p-3">
       <label className="block text-sm font-medium" htmlFor="document-note">Document note</label>
       <textarea
-        className="min-h-32 w-full rounded-lg border border-rule p-3 text-sm"
+        className="border-edge bg-field min-h-32 w-full rounded-lg border p-3 text-sm"
         id="document-note"
         onChange={(event) => edit(event.target.value)}
         placeholder="Write notes about this document."

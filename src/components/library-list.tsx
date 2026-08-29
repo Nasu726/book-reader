@@ -98,7 +98,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                   <input
                     aria-label="Title"
                     autoFocus
-                    className="min-h-11 min-w-0 flex-1 rounded-lg border border-rule px-3"
+                    className="border-edge bg-field min-h-11 min-w-0 flex-1 rounded-lg border px-3"
                     id={`rename-${document.id}`}
                     onChange={(event) => setDraftTitle(event.target.value)}
                     value={draftTitle}
@@ -111,7 +111,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                     Save
                   </button>
                   <button
-                    className="min-h-11 rounded-lg border border-rule px-4 text-sm"
+                    className="border-edge min-h-11 rounded-lg border px-4 text-sm"
                     onClick={() => setRenaming(null)}
                     type="button"
                   >
@@ -139,7 +139,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                   </a>
                   <button
                     aria-label={`Rename ${document.title}`}
-                    className="min-h-11 rounded-lg border border-rule px-3 text-sm"
+                    className="border-edge min-h-11 rounded-lg border px-3 text-sm"
                     onClick={() => {
                       setRenaming(document.id);
                       setDraftTitle(document.title);
@@ -150,7 +150,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                   </button>
                   <button
                     aria-label={`Remove ${document.title}`}
-                    className="min-h-11 rounded-lg border border-rule px-3 text-sm"
+                    className="border-edge min-h-11 rounded-lg border px-3 text-sm"
                     disabled={busy === document.id}
                     onClick={() => void remove(document.id, document.title)}
                     type="button"

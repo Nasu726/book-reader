@@ -97,7 +97,7 @@ export function AnswerText({ children }: { children: string }) {
         const key = `block-${index}`;
         if (block.type === "heading") {
           const level = Math.min(block.level + 2, 6);
-          const Heading = `h${level}` as"h3" |"h4" |"h5" |"h6";
+          const Heading = `h${level}` as "h3" | "h4" | "h5" | "h6";
           return (
             <Heading className="font-semibold" key={key}>
               {renderInline(block.text, key)}

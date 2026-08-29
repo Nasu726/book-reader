@@ -21,7 +21,19 @@
   --paper-raised: #ffffff;
   --ink: #171614;
   --ink-quiet: #6b6862;
-  --rule: #e5e1d9;
+  /*
+   * Two kinds of line, because they answer to different rules.
+   *
+   * A divider separates one thing from another and may be quiet. The edge of
+   * something you can press or type into is not decoration: it says where the
+   * control begins, and it has to reach 3:1 against the paper to do that. One
+   * token for both left every input and button outlined at 1.26:1 — a boundary
+   * nobody could see, in either theme.
+   */
+  --rule: #dcd8d0;
+  --edge: #8f8981;
+  /* Where text is typed, told apart from the paper it sits on. */
+  --field: #ffffff;
 
   /* The accent is the highlighter — the one mark the reader actually makes in
      the text. It marks the active tab, the focused field, and nothing else. */
@@ -81,6 +93,8 @@
   --color-ink: var(--ink);
   --color-ink-quiet: var(--ink-quiet);
   --color-rule: var(--rule);
+  --color-edge: var(--edge);
+  --color-field: var(--field);
   --color-marker: var(--marker);
   --color-ink-on-marker: var(--ink-on-marker);
   --font-prose: var(--font-prose);
@@ -95,7 +109,9 @@
     --paper-raised: #1b1a18;
     --ink: #e9e6df;
     --ink-quiet: #918c83;
-    --rule: #2b2926;
+    --rule: #3a3733;
+    --edge: #6b6763;
+    --field: #1f1e1c;
     --highlight-yellow: rgb(250 204 21 / 0.32);
     --highlight-green: rgb(52 211 153 / 0.3);
     --highlight-blue: rgb(96 165 250 / 0.34);
@@ -108,7 +124,9 @@
   --paper-raised: #1b1a18;
   --ink: #e9e6df;
   --ink-quiet: #918c83;
-  --rule: #2b2926;
+  --rule: #3a3733;
+  --edge: #6b6763;
+  --field: #1f1e1c;
   --highlight-yellow: rgb(250 204 21 / 0.32);
   --highlight-green: rgb(52 211 153 / 0.3);
   --highlight-blue: rgb(96 165 250 / 0.34);
