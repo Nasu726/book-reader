@@ -159,3 +159,30 @@ test("a small tug on the sheet does not throw it away", async ({ page }) => {
 
   await expect(drawer).toBeVisible();
 });
+
+test("nothing you type into is small enough to make iOS zoom", async ({ page }) => {
+  await login(page);
+  const documentId = await importDocument(
+    page,
+    "typing.epub",
+    await buildEpub(),
+    "application/epub+zip",
+  );
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Ask AI", exact: true }).tap();
+  await page.getByRole("tab", { name: "Notes" }).tap();
+
+  // Below 16px, Safari magnifies the page on focus and never zooms back out.
+  // Polled, because the development server styles the document after it is
+  // interactive and an unstyled field reports the browser default.
+  await expect.poll(async () => page.evaluate(() => {
+    const small: string[] = [];
+    for (const field of document.querySelectorAll("input, textarea, select")) {
+      const size = Number.parseFloat(getComputedStyle(field).fontSize);
+      const hidden = field.getBoundingClientRect().height === 0;
+      if (!hidden && size < 16) small.push(`${field.tagName}#${field.id || "?"} ${size}px`);
+    }
+    return small;
+  }), { timeout: 10_000 }).toEqual([]);
+});

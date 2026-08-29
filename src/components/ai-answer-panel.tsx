@@ -148,8 +148,8 @@ export function AiAnswerPanel({
           submit();
         }}
       >
-        <div className="flex items-center gap-1">
-          <div aria-label="AI actions" className="flex min-w-0 gap-1" role="group">
+        <div className="flex flex-wrap items-center gap-1">
+          <div aria-label="AI actions" className="flex gap-1" role="group">
             {COMMAND_ACTIONS.map((action) => (
               <button
                 aria-label={`Insert /${action}`}
@@ -173,13 +173,16 @@ export function AiAnswerPanel({
               </button>
             ))}
           </div>
+          {/* Named for what it removes, and standing with the other controls
+              rather than pushed to the far edge where it read as the odd one
+              out that clears something unspecified. */}
           {turns.length > 0 && (
             <button
-              className="text-ink-quiet hover:text-ink ml-auto min-h-9 shrink-0 text-xs tracking-wide uppercase transition-colors duration-(--fast)"
+              className="text-ink-quiet hover:text-ink min-h-9 shrink-0 px-2 text-xs tracking-wide uppercase transition-colors duration-(--fast)"
               onClick={() => void clear()}
               type="button"
             >
-              Clear
+              Clear conversation
             </button>
           )}
         </div>
@@ -189,7 +192,7 @@ export function AiAnswerPanel({
             Into
             <select
               aria-label="Translate into"
-              className="text-ink min-h-9 min-w-0 flex-1 bg-transparent text-xs"
+              className="text-ink min-h-9 min-w-0 flex-1 bg-transparent text-base"
               disabled={loading}
               onChange={(event) => setLanguage(event.target.value)}
               value={language}
@@ -211,7 +214,7 @@ export function AiAnswerPanel({
         <div className="border-edge bg-field focus-within:border-marker flex gap-2 rounded-lg border p-1 transition-colors duration-(--fast)">
           <label className="sr-only" htmlFor="ai-follow-up">Ask about this passage</label>
           <input
-            className="min-h-11 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
+            className="min-h-11 min-w-0 flex-1 bg-transparent px-2 text-base outline-none"
             id="ai-follow-up"
             onChange={(event) => setQuestion(event.target.value)}
             placeholder={needsPassage ? "Select a passage to use this command" : "Ask about this book"}

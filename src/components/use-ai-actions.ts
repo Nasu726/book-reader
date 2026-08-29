@@ -66,10 +66,13 @@ export type AiConversation = ReturnType<typeof useAiActions>;
  * twice in a row indistinguishable from no action at all.
  */
 export function useAiActions({
+  documentExcerpt,
   documentId,
   provider,
   selection,
 }: {
+  /** What the reader is looking at, for questions with nothing selected. */
+  documentExcerpt?: string;
   documentId?: string;
   provider?: AiProvider;
   selection: DocumentSelection | null;
@@ -151,6 +154,7 @@ export function useAiActions({
         }),
         {
           action: nextAction,
+          documentExcerpt,
           documentTitle: subject?.documentTitle,
           paperStructure: subject?.paperStructure,
           surroundingText: subject?.surroundingText,
@@ -175,7 +179,7 @@ export function useAiActions({
       abortControllerRef.current = null;
       setLoading(false);
     }
-  }, [documentId, language, provider, question, subject]);
+  }, [documentExcerpt, documentId, language, provider, question, subject]);
 
   const clear = useCallback(async () => {
     if (!documentId) return;

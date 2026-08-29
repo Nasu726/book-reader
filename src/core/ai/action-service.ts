@@ -5,6 +5,9 @@ import {
   generateWithTimeout,
 } from "./provider.ts";
 
+/** The most of the open page that is worth spending on one question. */
+const MAX_EXCERPT_CHARACTERS = 4_000;
+
 export const AI_ACTIONS = [
   "explain",
   "translate",
@@ -79,6 +82,18 @@ export type AiActionInput = {
   /** The language answers come back in. Not defaulted here: the reader chooses. */
   responseLanguage?: string;
   documentTitle?: string;
+  /**
+   * What the reader is looking at: the current page, or the current chapter.
+   *
+   * Sent when nothing is selected, which is the only time a question has
+   * nothing else to stand on. Asking "how does this encoder work" used to reach
+   * the model with the title and no text at all, and the answer was a polite
+   * request to paste the document in.
+   *
+   * The page rather than the book. A paper of forty pages would spend the
+   * context window on itself and leave nothing for the conversation.
+   */
+  documentExcerpt?: string;
   paperStructure?: PaperStructure;
   surroundingText?: { before?: string; after?: string };
   sourceLanguage?: string;
@@ -165,10 +180,16 @@ export function buildPrompt(input: AiActionInput): {
   if (selected) promptParts.push("Selected text:", selected);
   const sectionTitle = findPaperSectionTitle(input.paperStructure, selected);
 
+  // Enough to answer from, far short of what a chapter would cost.
+  const excerpt = !selected && input.documentExcerpt?.trim()
+    ? input.documentExcerpt.trim().slice(0, MAX_EXCERPT_CHARACTERS)
+    : "";
+
   return {
     prompt: promptParts.join("\n"),
     context: [
       input.documentTitle && `Document: ${input.documentTitle}`,
+      excerpt && `What the reader is looking at:\n${excerpt}`,
       input.paperStructure?.title && `Paper title: ${input.paperStructure.title}`,
       sectionTitle && `Section: ${sectionTitle}`,
       input.paperStructure?.abstract && `Abstract: ${input.paperStructure.abstract}`,

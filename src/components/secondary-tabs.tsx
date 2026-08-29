@@ -2,35 +2,34 @@
 
 import { useRef, type ReactNode } from "react";
 
-export type SecondaryTab ="ai" |"saved";
+export type SecondaryTab = "ai" | "notes" | "highlights";
 
 const TABS: { id: SecondaryTab; label: string }[] = [
   { id: "ai", label: "AI" },
-  { id: "saved", label: "Saved" },
+  { id: "notes", label: "Notes" },
+  { id: "highlights", label: "Marks" },
 ];
 
 /**
- * Splits the pane beside the text into what the AI is doing and what the reader
- * has saved.
+ * Splits the pane beside the text into three things that are not each other.
  *
- * They were stacked, so the highlights, the note, and the vocabulary form sat
- * below an answer that could be any length — reachable only by scrolling past
- * it. They are not part of asking a question, either: a highlight is kept
- * whether or not a model was ever involved.
+ * The conversation, what the reader wrote, and what the reader marked. They
+ * were stacked in one column at first, so the note and the vocabulary sat below
+ * an answer of unpredictable length; putting the marks in with them only moved
+ * the problem, because a book with thirty highlights pushed the note off the
+ * bottom instead.
  *
- * Both panels stay mounted and one is hidden, so switching tabs does not throw
- * away a half-typed meaning or scroll an answer back to the top.
+ * Every panel stays mounted and the others are hidden, so switching tabs does
+ * not throw away a half-typed meaning or scroll an answer back to the top.
  */
 export function SecondaryTabs({
   active,
   onChange,
-  ai,
-  saved,
+  panels,
 }: {
   active: SecondaryTab;
   onChange: (tab: SecondaryTab) => void;
-  ai: ReactNode;
-  saved: ReactNode;
+  panels: Record<SecondaryTab, ReactNode>;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -91,7 +90,7 @@ export function SecondaryTabs({
           // that follows the tabs for anyone arriving by keyboard.
           tabIndex={active === tab.id ? 0 : -1}
         >
-          {tab.id === "ai" ? ai : saved}
+          {panels[tab.id]}
         </div>
       ))}
     </div>

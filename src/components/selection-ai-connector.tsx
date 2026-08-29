@@ -61,7 +61,10 @@ export function SelectionAiConnector({
   const [highlights, setHighlights] = useState(() => [...initialHighlights]);
   const [vocabulary, setVocabulary] = useState(() => [...initialVocabulary]);
   const [meaning, setMeaning] = useState("");
-  const conversation = useAiActions({ documentId, selection });
+  // What the reader is looking at, so a question with nothing selected still
+  // has the page to stand on.
+  const [visibleText, setVisibleText] = useState("");
+  const conversation = useAiActions({ documentExcerpt: visibleText, documentId, selection });
   const note = useDocumentNote(documentId);
   const [vocabularyState, setVocabularyState] = useState<"idle" |"saved" |"error">("idle");
 
@@ -188,6 +191,7 @@ export function SelectionAiConnector({
             format={documentFormat}
             highlights={highlights}
             onSelectionChange={(captured) => setSelection(captured)}
+            onVisibleTextChange={setVisibleText}
           />
           {highlightState !== "idle" && (
             <p
@@ -203,20 +207,21 @@ export function SelectionAiConnector({
       secondary={
         <SecondaryTabs
           active={tab}
-          ai={<AiAnswerPanel conversation={conversation} onSaveToNotes={note.append} />}
           onChange={setTab}
-          saved={<>
-          {/* A plain section rather than a disclosure: the tab it sits in is
-              already the thing that reveals it, and one of the two was a click
-              nobody asked for. */}
-          <section aria-label="Saved highlights" className="rounded-xl border-rule border p-3">
-            <h2 className="text-sm font-semibold">Highlights ({highlights.length})</h2>
-            <p className="mt-1 text-xs text-ink-quiet">
-              Passages you marked while reading. They stay with this document.
+          panels={{
+            ai: <AiAnswerPanel conversation={conversation} onSaveToNotes={note.append} />,
+            highlights: <>
+          {/* No box and no heading: the tab is already what reveals this, and
+              a panel that repeats its own tab's name says nothing. */}
+          <section aria-label="Saved highlights">
+            <p className="text-ink-quiet text-xs">
+              {highlights.length === 0
+                ? "Passages you mark stay with this document."
+                : `${highlights.length} marked in this document.`}
             </p>
             {highlights.length === 0 ? (
               <p className="mt-2 text-sm">
-                Select text in the document, then choose Highlight.
+                Select a passage in the book, then choose a colour.
               </p>
             ) : (
               <ul className="mt-2 space-y-3">
@@ -245,15 +250,17 @@ export function SelectionAiConnector({
               </ul>
             )}
           </section>
+            </>,
+            notes: <>
           <DocumentNotes note={note} />
-          <section aria-label="Saved vocabulary" className="mt-6 space-y-2 rounded-xl border-rule border p-3">
-            <h2 className="text-sm font-semibold">Save vocabulary</h2>
+          <section aria-label="Saved vocabulary" className="border-rule mt-6 space-y-2 border-t pt-4">
+            <h2 className="text-xs tracking-wide uppercase">Vocabulary</h2>
             <p className="text-xs text-ink-quiet">
               {selection ? `Selected source: ${selection.text}` : "Select text first."}
             </p>
             <label className="block text-sm font-medium" htmlFor="vocabulary-meaning">Meaning</label>
             <textarea
-              className="border-edge bg-field min-h-20 w-full rounded-lg border p-3 text-sm"
+              className="border-edge bg-field min-h-20 w-full rounded-lg border p-3 text-base"
               id="vocabulary-meaning"
               onChange={(event) => {
                 setMeaning(event.target.value);
@@ -295,7 +302,8 @@ export function SelectionAiConnector({
               </ul>
             )}
           </section>
-          </>}
+            </>,
+          }}
         />
       }
     />

@@ -45,7 +45,7 @@ export function PdfPage({
   // re-draw — a resize, a zoom — is something the highlights can react to.
   const [layerVersion, setLayerVersion] = useState(0);
   const drawn = layerVersion > 0;
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   // Draw a page when it comes within a screen of the viewport, so scrolling
@@ -156,12 +156,16 @@ export function PdfPage({
           viewport,
         }).render();
         page.cleanup();
-        if (!cancelled) { setError(false); setLayerVersion((current) => current + 1); }
+        if (!cancelled) { setError(null); setLayerVersion((current) => current + 1); }
       } catch (cause) {
         // A cancelled render rejects on its way out. That is this component
         // tidying up, not a page that failed to draw.
         const name = (cause as { name?: string } | null)?.name;
-        if (!cancelled && name !== "RenderingCancelledException") setError(true);
+        if (cancelled || name === "RenderingCancelledException") return;
+        // Carried to the screen rather than swallowed. "This page could not be
+        // drawn" with a button that fails the same way tells a reader nothing
+        // and leaves nobody anything to report.
+        setError(cause instanceof Error && cause.message ? cause.message : "Unknown error.");
       }
     }
 
@@ -216,9 +220,10 @@ export function PdfPage({
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-paper/90 text-sm" role="alert">
           <p>Page {pageNumber} could not be drawn.</p>
+          <p className="text-ink-quiet max-w-[36ch] text-center text-xs">{error}</p>
           <button
             className="min-h-10 rounded bg-ink px-3 text-white"
-            onClick={() => { setError(false); setAttempt((current) => current + 1); }}
+            onClick={() => { setError(null); setAttempt((current) => current + 1); }}
             type="button"
           >
             Try again

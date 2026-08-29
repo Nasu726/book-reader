@@ -191,3 +191,42 @@ test("a question needs no passage, but the other actions do", async () => {
     },
   );
 });
+
+test("a question with nothing selected is grounded in the open page", () => {
+  const page = "Attention is all you need. The encoder maps a sequence of symbols.";
+  const { context } = buildPrompt({
+    action: "ask",
+    documentExcerpt: page,
+    documentTitle: "Transformers",
+    selectedText: "",
+    userQuestion: "How does the encoder work?",
+  });
+
+  // Otherwise the model is handed a title and asked about text it cannot see,
+  // and answers by asking for the document to be pasted in.
+  assert.match(context, /What the reader is looking at:/);
+  assert.match(context, /The encoder maps a sequence of symbols\./);
+});
+
+test("a selected passage carries itself, so the page is not sent as well", () => {
+  const { context } = buildPrompt({
+    action: "ask",
+    documentExcerpt: "The whole page, several thousand characters of it.",
+    selectedText: "one sentence",
+    userQuestion: "What does this mean?",
+  });
+
+  // The passage and the text around it are already there; adding the page would
+  // spend the context window twice on the same thing.
+  assert.doesNotMatch(context, /What the reader is looking at:/);
+});
+
+test("the open page is truncated rather than sent whole", () => {
+  const { context } = buildPrompt({
+    action: "ask",
+    documentExcerpt: "x".repeat(20_000),
+    selectedText: "",
+    userQuestion: "What is this about?",
+  });
+  assert.ok(context.length < 5_000, `context was ${context.length} characters`);
+});

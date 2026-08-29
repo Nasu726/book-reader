@@ -80,7 +80,7 @@ test("the conversation can be thrown away", async ({ page }) => {
   await runAction(page, "explain");
   await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(1, { timeout: 15_000 });
 
-  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await page.getByRole("button", { name: "Clear conversation" }).click();
   await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(0);
 
   // Asked of the server, not of the screen. An empty transcript is also what
@@ -106,7 +106,7 @@ test("an answer worth keeping goes into the document note", async ({ page }) => 
   await expect(page.getByRole("button", { name: "Saved to notes" })).toBeVisible();
 
   await page.reload();
-  await page.getByRole("tab", { name: "Saved" }).click();
+  await page.getByRole("tab", { name: "Notes" }).click();
   await expect(page.getByRole("textbox", { name: "Document note" }))
     .toHaveValue(/Mock AI response\./, { timeout: 15_000 });
 });

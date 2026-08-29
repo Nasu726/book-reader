@@ -95,16 +95,16 @@ test("PDF selection highlights persist and can be deleted", async ({ page }) => 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/documents/${documentId}`);
   // Highlights live with the other annotations beside the text, not under it.
-  await page.getByRole("tab", { name: "Saved" }).click();
+  await page.getByRole("tab", { name: "Marks" }).click();
   const savedHighlights = page.getByRole("region", { name: "Saved highlights" });
   await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
   await page.reload();
-  // The pane opens on AI, so getting back to what was saved is a click.
-  await page.getByRole("tab", { name: "Saved" }).click();
+  // The pane opens on AI, so getting back to the marks is a click.
+  await page.getByRole("tab", { name: "Marks" }).click();
   await expect(savedHighlights.getByText("A Role for History")).toBeVisible();
 
   await savedHighlights.getByRole("button", { name: /Delete highlight/ }).click();
-  await expect(savedHighlights).toContainText("Highlights (0)");
+  await expect(savedHighlights).toContainText("Passages you mark stay with this document.");
 });
 
 test("uploads whose bytes do not match their declared type are rejected", async ({ page }) => {

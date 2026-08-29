@@ -74,7 +74,7 @@ test("a note can be written, read back, and cleared", async ({ page }) => {
   await page.goto(`/documents/${documentId}`);
 
   // The note lives with the other things the reader keeps, one tab over.
-  const openSaved = async () => page.getByRole("tab", { name: "Saved" }).click();
+  const openSaved = async () => page.getByRole("tab", { name: "Notes" }).click();
   await openSaved();
   // Nothing is stored yet, so there is nothing to clear and nothing to save.
   const saveNote = page.getByRole("button", { name: "Save note" });

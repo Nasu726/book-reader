@@ -149,6 +149,18 @@ p, li, blockquote {
   font-family: var(--font-prose);
 }
 
+/*
+ * Nothing you type into is set below 16px.
+ *
+ * iOS Safari zooms the whole page in when a focused field's text is smaller
+ * than that, and it does not zoom back out afterwards: typing a question left
+ * the reader looking at a magnified corner of the book. The fields are short,
+ * so full-size text costs nothing.
+ */
+input, textarea, select {
+  font-size: max(1rem, 1em);
+}
+
 /* One visible focus treatment, in the app's own accent. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--marker);

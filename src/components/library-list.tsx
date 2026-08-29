@@ -98,7 +98,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                   <input
                     aria-label="Title"
                     autoFocus
-                    className="border-edge bg-field min-h-11 min-w-0 flex-1 rounded-lg border px-3"
+                    className="border-edge bg-field min-h-11 min-w-0 flex-1 rounded-lg border px-3 text-base"
                     id={`rename-${document.id}`}
                     onChange={(event) => setDraftTitle(event.target.value)}
                     value={draftTitle}

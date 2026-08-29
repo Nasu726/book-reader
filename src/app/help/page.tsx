@@ -70,7 +70,10 @@ export default function HelpPage() {
           </p>
           <p>
             右のパネル（スマホでは右下の <strong>Ask AI</strong> で下から出てくる。
-            上端の横棒を下へスワイプすると戻る）の <strong>AI</strong> タブは
+            上端の横棒を下へスワイプすると戻る）は <strong>AI</strong> /
+            <strong>Notes</strong> / <strong>Marks</strong> の3つに分かれている。
+            会話・自分で書いたもの・本文に付けた印は別のものなので、混ざらない。
+            <strong>AI</strong> タブは
             <strong>1本の会話</strong>になっている。Explain も Translate も質問も、
             同じ流れに上から順に積まれる。前の回答が消えることはない。
           </p>
@@ -90,8 +93,12 @@ export default function HelpPage() {
           </ul>
           <p>
             入力欄のすぐ上に、<strong>いまどの文章が対象か</strong>が出ている。
-            本文の選択を解除すると <strong>No passage selected</strong> に変わり、
-            コマンドは送れなくなる。パネル側のボタンを押しても選択は外れない。
+            本文の選択を解除すると <strong>No passage selected</strong> に変わる。
+            この状態でも<strong>質問はできる</strong> — そのときは
+            <strong>いま開いているページ（EPUBなら章）の本文</strong>が一緒に送られる。
+            本を丸ごと送ると会話の余地が無くなるので、送るのは目の前の1ページ分だけ。
+            コマンド（<code>/explain</code> など）は対象が要るので、選択するまで送れない。
+            パネル側のボタンを押しても選択は外れない。
           </p>
           <ul>
             <li>
@@ -100,7 +107,7 @@ export default function HelpPage() {
               残したいものだけこうして拾う
             </li>
             <li>
-              <strong>Clear</strong> で会話をまるごと消す。会話は文書ごとに保存され、
+              <strong>Clear conversation</strong> で会話をまるごと消す。会話は文書ごとに保存され、
               次に開くと続きから見える
             </li>
           </ul>
@@ -115,12 +122,12 @@ export default function HelpPage() {
           </p>
           <ul>
             <li>
-              <strong>Highlights</strong> — 付箋。選択メニューの丸い色を押すと、
-              <strong>本文にその色が付く</strong>。一覧は <strong>Highlights</strong> の中で、
+              <strong>Marks</strong> タブ — 付箋。選択メニューの丸い色を押すと、
+              <strong>本文にその色が付く</strong>。一覧はこのタブにあり、
               <strong>Delete</strong> で消える。色を変えたいときは消してもう一度付ける
             </li>
             <li>
-              <strong>Document note</strong> — その本に1つだけの自由なメモ。書いて
+              <strong>Notes</strong> タブの <strong>Document note</strong> — その本に1つだけの自由なメモ。書いて
               <strong>Save note</strong>。空にして保存すると消える。
               AIの回答の <strong>Save to notes</strong> もここに書き足される
             </li>

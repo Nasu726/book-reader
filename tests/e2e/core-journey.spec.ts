@@ -71,7 +71,7 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   await expect(page.getByText("Highlight saved.")).toBeVisible({ timeout: 15_000 });
 
   // What the reader keeps lives in its own tab, away from the AI's answers.
-  await page.getByRole("tab", { name: "Saved" }).click();
+  await page.getByRole("tab", { name: "Notes" }).click();
   const note = page.getByRole("textbox", { name: "Document note" });
   await note.fill("Persisted document note.");
   await page.getByRole("button", { name: "Save note" }).click();
@@ -82,9 +82,11 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   await expect(page.getByText("Vocabulary saved.")).toBeVisible({ timeout: 15_000 });
 
   await page.reload();
-  await page.getByRole("tab", { name: "Saved" }).click();
+  await page.getByRole("tab", { name: "Marks" }).click();
   await expect(page.getByRole("region", { name: "Saved highlights" })
     .getByText("Structure of Scientific Revolutions")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Notes" }).click();
   await expect(page.getByRole("textbox", { name: "Document note" })).toHaveValue("Persisted document note.");
   const savedVocabulary = page.getByRole("region", { name: "Saved vocabulary" }).locator("li");
   await expect(savedVocabulary).toHaveCount(1);

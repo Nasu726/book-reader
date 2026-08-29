@@ -27,6 +27,8 @@ type PdfRendererProps = {
   initialLocation?: string | null;
   onLocationChange?: (location: string) => void;
   onSelectionChange?: (selection: DocumentSelection | null) => void;
+  /** The text of the page in view, for questions that have nothing selected. */
+  onVisibleTextChange?: (text: string) => void;
 };
 
 function parsePage(location: string | null | undefined): number {
@@ -56,6 +58,7 @@ export function PdfRenderer({
   initialLocation,
   onLocationChange,
   onSelectionChange,
+  onVisibleTextChange,
   source,
 }: PdfRendererProps) {
   type PdfLoadingTask = ReturnType<typeof getDocument>;
@@ -76,39 +79,63 @@ export function PdfRenderer({
     let cancelled = false;
     let task: PdfLoadingTask | null = null;
 
-    async function open() {
-      try {
-        // Opened by URL, not by handing pdf.js a buffer of the whole file.
-        //
-        // Fetching the document into an ArrayBuffer meant a phone held every
-        // byte of a large PDF in memory before it could draw a single page, and
-        // iOS answers that by reloading the tab — which looks like a document
-        // that loads for ever. By URL, pdf.js asks the server for the few
-        // kilobytes each page needs, and disableAutoFetch stops it quietly
-        // pulling down the rest in the background.
-        task = getDocument({
+    /**
+     * Opens the document, by range if the connection allows it.
+     *
+     * Ranges are what let a phone open a large book at all: handing pdf.js the
+     * whole file as one buffer is how iOS ends up reloading the tab. But a
+     * range request has more that can go wrong than a plain download — a proxy
+     * that strips the header, a runtime that will not answer 206 — and when it
+     * does go wrong every page fails to draw and offers a Try again that fails
+     * the same way. So the whole file is the fallback, not the default.
+     */
+    async function openBy(mode: "ranges" | "whole"): Promise<PdfDocumentProxy> {
+      task = mode === "ranges"
+        ? getDocument({
           disableAutoFetch: true,
           // Without this pdf.js opens a stream over the whole file as well, and
           // on a fast connection that stream simply wins: the entire document
-          // arrives anyway. Ranges only are what keeps a phone's memory bounded.
+          // arrives anyway. Ranges only are what keeps memory bounded.
           disableStream: true,
           rangeChunkSize: 65_536,
           url: source,
           useSystemFonts: true,
-        });
-        const opened = await task.promise;
-        if (cancelled) {
-          void task.destroy();
+        })
+        : getDocument({ url: source, useSystemFonts: true });
+      const opened = await task.promise;
+      // numPages is known from the first chunk, which proves nothing about
+      // whether the rest can be fetched. Reading a page is the real test.
+      await opened.getPage(1);
+      return opened;
+    }
+
+    async function open() {
+      let opened: PdfDocumentProxy;
+      try {
+        opened = await openBy("ranges");
+      } catch (cause) {
+        if (cancelled) return;
+        console.warn("Falling back to fetching the whole PDF:", cause);
+        try {
+          opened = await openBy("whole");
+        } catch (fallbackCause) {
+          if (!cancelled) {
+            setError(fallbackCause instanceof Error && fallbackCause.message
+              ? `The PDF could not be opened. ${fallbackCause.message}`
+              : "The PDF could not be opened.");
+          }
           return;
         }
-        const first = await opened.getPage(1);
-        const size = first.getViewport({ scale: 1 });
-        setAspectRatio(size.height / size.width);
-        setPageCount(opened.numPages);
-        setDocument(opened);
-      } catch {
-        if (!cancelled) setError("The PDF could not be opened.");
       }
+      if (cancelled) {
+        void task?.destroy();
+        return;
+      }
+      const first = await opened.getPage(1);
+      const size = first.getViewport({ scale: 1 });
+      setAspectRatio(size.height / size.width);
+      setPageCount(opened.numPages);
+      setDocument(opened);
     }
 
     void open();
@@ -227,9 +254,21 @@ export function PdfRenderer({
     };
   }, [currentPage, documentTitle, onSelectionChange]);
 
+  // Counted so the effect below has something to react to: the text of a page
+  // arrives after the page is already on screen, and a ref changing is not a
+  // reason for anything to run again.
+  const [extracted, setExtracted] = useState(0);
+
   const rememberPageText = useCallback((page: number, text: string) => {
     pageTextRef.current.set(page, text);
+    setExtracted((current) => current + 1);
   }, []);
+
+  // What the reader is looking at, reported when the page changes and again
+  // when that page's text is finally known.
+  useEffect(() => {
+    onVisibleTextChange?.(pageTextRef.current.get(currentPage) ?? "");
+  }, [currentPage, extracted, onVisibleTextChange]);
 
   if (error) {
     return (
@@ -244,7 +283,7 @@ export function PdfRenderer({
           <span className="text-ink-quiet">Page</span>
           <input
             aria-label="Page number"
-            className="border-edge bg-field min-h-11 w-16 rounded-lg border px-2 text-center tabular-nums"
+            className="border-edge bg-field min-h-11 w-16 rounded-lg border px-2 text-center text-base tabular-nums"
             max={pageCount || 1}
             min={1}
             onChange={(event) => {
