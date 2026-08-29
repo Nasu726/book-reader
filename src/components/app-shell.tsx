@@ -132,13 +132,22 @@ export function AppShell({
 
       {/* The sheet and its margin, divided by one line. */}
       <div className="flex min-h-0 flex-1">
-        <main
-          aria-label="Reader"
-          className="min-w-0 flex-1 overflow-y-auto px-(--gutter) py-(--gutter)"
-          data-reader-scroll
-        >
-          {reader}
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/*
+            Where a reader puts its own controls, outside the pane that
+            scrolls. A toolbar inside it was pinned vertically and nothing
+            else, so zooming a page past the width of the screen slid the page
+            number off to the left along with the rest of the book.
+          */}
+          <div className="border-rule empty:hidden shrink-0 border-b" data-reader-toolbar />
+          <main
+            aria-label="Reader"
+            className="min-w-0 flex-1 overflow-y-auto px-(--gutter) py-(--gutter)"
+            data-reader-scroll
+          >
+            {reader}
+          </main>
+        </div>
 
         {secondary && !sheetOpen && (
           <button

@@ -186,3 +186,83 @@ test("nothing you type into is small enough to make iOS zoom", async ({ page }) 
     return small;
   }), { timeout: 10_000 }).toEqual([]);
 });
+
+test("zooming grows the page from the middle and can be scrolled to either edge", async ({ page }) => {
+  test.setTimeout(90_000);
+  await login(page);
+  const documentId = await importDocument(page, "zoom.pdf", buildPdf(4), "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
+  await page.waitForFunction(
+    () => document.querySelectorAll(".textLayer span").length > 0,
+    undefined,
+    { timeout: 15_000 },
+  );
+
+  const pane = () => page.evaluate(() => {
+    const scroller = document.querySelector("[data-reader-scroll]") as HTMLElement;
+    const first = document.querySelector('[data-page-number="1"]') as HTMLElement;
+    return {
+      clientWidth: scroller.clientWidth,
+      scrollWidth: scroller.scrollWidth,
+      scrollLeft: scroller.scrollLeft,
+      pageWidth: first.getBoundingClientRect().width,
+      pageLeft: first.getBoundingClientRect().left,
+    };
+  });
+
+  // At 100% a page fits, and nothing scrolls sideways.
+  const fitted = await pane();
+  expect(fitted.scrollWidth).toBeLessThanOrEqual(fitted.clientWidth + 1);
+
+  for (let step = 0; step < 4; step += 1) {
+    await page.getByRole("button", { name: "Zoom in" }).tap();
+  }
+  await expect(page.getByRole("group", { name: "Page zoom" })).toContainText("200%");
+
+  const zoomed = await pane();
+  expect(zoomed.pageWidth).toBeGreaterThan(fitted.pageWidth * 1.8);
+  // Grown from the middle, not from the left corner: the text of a page runs
+  // down its centre, and anchoring at the left put the reader in the margin.
+  expect(zoomed.scrollLeft).toBeGreaterThan(0);
+  const centred = (zoomed.scrollWidth - zoomed.clientWidth) / 2;
+  expect(Math.abs(zoomed.scrollLeft - centred)).toBeLessThan(4);
+
+  // Both edges are reachable. Centring a flex item with align-items instead of
+  // auto margins leaves the overflowing side unscrollable.
+  await page.evaluate(() => {
+    const scroller = document.querySelector("[data-reader-scroll]") as HTMLElement;
+    scroller.scrollLeft = 0;
+  });
+  expect((await pane()).pageLeft).toBeGreaterThanOrEqual(-1);
+  await page.evaluate(() => {
+    const scroller = document.querySelector("[data-reader-scroll]") as HTMLElement;
+    scroller.scrollLeft = scroller.scrollWidth;
+  });
+  const atRight = await pane();
+  expect(atRight.pageLeft + atRight.pageWidth).toBeLessThanOrEqual(atRight.clientWidth + 1);
+});
+
+test("the page count follows the page under the middle of the pane, zoomed or not", async ({ page }) => {
+  test.setTimeout(90_000);
+  await login(page);
+  const documentId = await importDocument(page, "zoom-count.pdf", buildPdf(6), "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+  const pageNumber = page.getByRole("spinbutton", { name: "Page number" });
+  await expect(pageNumber).toHaveValue("1", { timeout: 15_000 });
+
+  for (let step = 0; step < 4; step += 1) {
+    await page.getByRole("button", { name: "Zoom in" }).tap();
+  }
+
+  // A zoomed page shows a much smaller fraction of itself, which is what used
+  // to leave the count reading a page that had long since scrolled away.
+  await scrollReaderToEnd(page);
+  await expect.poll(async () => pageNumber.inputValue(), { timeout: 15_000 }).toBe("6");
+
+  await page.evaluate(() => {
+    const scroller = document.querySelector("[data-reader-scroll]") as HTMLElement;
+    scroller.scrollTop = 0;
+  });
+  await expect.poll(async () => pageNumber.inputValue(), { timeout: 15_000 }).toBe("1");
+});

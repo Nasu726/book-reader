@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   getDocument,
   GlobalWorkerOptions,
@@ -19,6 +27,13 @@ GlobalWorkerOptions.workerSrc = `/pdf.worker.min.mjs?v=${version}`;
 // Before pdf.js reads anything: it iterates a stream to collect a page's text,
 // and Safari has no async iterator on ReadableStream to iterate it with.
 installStreamAsyncIterator();
+
+/**
+ * The toolbar host never changes once the shell has rendered, so there is
+ * nothing to subscribe to — this reads a stable node from outside React, which
+ * is what useSyncExternalStore is for.
+ */
+const subscribeToNothing = () => () => {};
 
 /** Fit-to-width is 1; the range covers small print and large-format scans. */
 const MIN_ZOOM = 0.5;
@@ -77,6 +92,21 @@ export function PdfRenderer({
   const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
 
   const columnRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  /**
+   * The strip above the reading pane, which this reader fills.
+   *
+   * Rendered through it rather than inside the pane, because the pane scrolls
+   * in both directions once a page is zoomed and a toolbar that scrolls with
+   * the book is a toolbar you have to go and find. Found after mounting, since
+   * the shell renders before what it contains.
+   */
+  const toolbarHost = useSyncExternalStore(
+    subscribeToNothing,
+    () => document.querySelector("[data-reader-toolbar]"),
+    () => null,
+  );
   const pageTextRef = useRef(new Map<number, string>());
   const restoredRef = useRef(false);
 
@@ -150,6 +180,32 @@ export function PdfRenderer({
     };
   }, [source]);
 
+  // The column keeps its width however far a page overflows it, so it is the
+  // one thing here that can be measured without the zoom measuring itself.
+  useEffect(() => {
+    const column = columnRef.current;
+    if (!column) return;
+    const measure = () => setContainerWidth(column.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(column);
+    return () => observer.disconnect();
+  }, []);
+
+  /**
+   * Zooming grows the page from the middle of the screen.
+   *
+   * It grew from the top left, which put the reader in the margin of a page
+   * whose text runs down the centre. Because a page is now sized from the zoom
+   * rather than from whatever was last painted, the new width is known in the
+   * same frame and the column can be re-centred before anything is drawn.
+   */
+  useLayoutEffect(() => {
+    const scroller = columnRef.current?.closest("[data-reader-scroll]");
+    if (!scroller) return;
+    scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
+  }, [zoom, containerWidth]);
+
   const scrollToPage = useCallback((target: number) => {
     const column = columnRef.current;
     if (!column) return;
@@ -179,31 +235,65 @@ export function PdfRenderer({
       }
     }
 
-    // The callback only reports pages whose visibility changed, so the set of
-    // everything currently on screen is kept here. Choosing the topmost from a
-    // single callback's entries meant scrolling back to page 1 left the number
-    // reading 2, because only page 2's entry had changed.
-    const onScreen = new Map<number, number>();
+    const scroller = column.closest("[data-reader-scroll]");
+    if (!scroller) return;
+
+    /*
+     * The page you are reading is the one under the middle of the pane.
+     *
+     * It used to be the topmost page with any part of it showing, decided from
+     * rectangles the observer had measured when visibility last changed. Zoom
+     * broke both halves of that: a page three times the width of the screen
+     * shows a much smaller fraction of itself, so pages far above still
+     * counted, and a rectangle measured on the last change is stale by the time
+     * scrolling has moved it.
+     *
+     * The observer now only keeps track of which pages are worth measuring.
+     */
+    const onScreen = new Set<Element>();
+    let frame = 0;
+
+    function pickCurrentPage() {
+      frame = 0;
+      const middle = scroller!.getBoundingClientRect().top + scroller!.clientHeight / 2;
+      let best: { page: number; distance: number } | null = null;
+      for (const element of onScreen) {
+        const box = element.getBoundingClientRect();
+        const page = Number(element.getAttribute("data-page-number"));
+        if (!Number.isInteger(page)) continue;
+        // Zero when the middle of the pane is inside this page, and otherwise
+        // how far it is from it — so the nearest page wins at the seams.
+        const distance = box.top > middle
+          ? box.top - middle
+          : box.bottom < middle ? middle - box.bottom : 0;
+        if (!best || distance < best.distance) best = { distance, page };
+      }
+      if (best) setCurrentPage(best.page);
+    }
+
+    function schedule() {
+      frame ||= requestAnimationFrame(pickCurrentPage);
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          const page = Number(entry.target.getAttribute("data-page-number"));
-          if (!Number.isInteger(page)) continue;
-          if (entry.isIntersecting) {
-            onScreen.set(page, entry.boundingClientRect.top);
-          } else {
-            onScreen.delete(page);
-          }
+          if (entry.isIntersecting) onScreen.add(entry.target);
+          else onScreen.delete(entry.target);
         }
-        const topmost = [...onScreen.entries()].sort((a, b) => a[1] - b[1])[0];
-        if (topmost) setCurrentPage(topmost[0]);
+        schedule();
       },
-      { root: column.closest("[data-reader-scroll]"), threshold: 0.01 },
+      { root: scroller },
     );
     for (const page of column.querySelectorAll("[data-page-number]")) {
       observer.observe(page);
     }
-    return () => observer.disconnect();
+    scroller.addEventListener("scroll", schedule, { passive: true });
+    return () => {
+      observer.disconnect();
+      scroller.removeEventListener("scroll", schedule);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [initialLocation, pageCount]);
 
   // Saved only once the page actually changes. Reporting the restored page
@@ -283,60 +373,68 @@ export function PdfRenderer({
 
   return (
     <section aria-label="PDF reader">
-      <div className="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-2 border-b border-rule bg-paper/90 px-3 py-2 backdrop-blur sm:border-0 sm:px-0 /90">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-ink-quiet">Page</span>
-          <input
-            aria-label="Page number"
-            className="border-edge bg-field min-h-11 w-16 rounded-lg border px-2 text-center text-base tabular-nums"
-            max={pageCount || 1}
-            min={1}
-            onChange={(event) => {
-              const page = Number(event.target.value);
-              if (Number.isInteger(page) && page >= 1 && page <= pageCount) scrollToPage(page);
-            }}
-            type="number"
-            value={currentPage}
-          />
-          <span aria-live="polite" className="text-ink-quiet tabular-nums">
-            of {pageCount || "…"}
-          </span>
-        </label>
-        <div aria-label="Page zoom" className="ml-auto flex items-center gap-1" role="group">
-          <button
-            aria-label="Zoom out"
-            className="border-edge min-h-11 rounded-lg border px-3 text-sm"
-            disabled={zoom <= MIN_ZOOM}
-            onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Math.round((current - 0.25) * 100) / 100))}
-            type="button"
-          >
-            −
-          </button>
-          <button
-            aria-label={`Zoom, currently ${Math.round(zoom * 100)} percent. Reset to fit width`}
-            className="border-edge min-h-11 rounded-lg border px-2 text-sm tabular-nums"
-            onClick={() => setZoom(1)}
-            type="button"
-          >
-            {Math.round(zoom * 100)}%
-          </button>
-          <button
-            aria-label="Zoom in"
-            className="border-edge min-h-11 rounded-lg border px-3 text-sm"
-            disabled={zoom >= MAX_ZOOM}
-            onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Math.round((current + 0.25) * 100) / 100))}
-            type="button"
-          >
-            +
-          </button>
-        </div>
-      </div>
+      {toolbarHost && createPortal(
+        <div
+          aria-label="PDF controls"
+          className="flex flex-wrap items-center gap-2 px-(--gutter) py-2"
+          role="group"
+        >
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-ink-quiet">Page</span>
+            <input
+              aria-label="Page number"
+              className="border-edge bg-field min-h-11 w-16 rounded-lg border px-2 text-center text-base tabular-nums"
+              max={pageCount || 1}
+              min={1}
+              onChange={(event) => {
+                const page = Number(event.target.value);
+                if (Number.isInteger(page) && page >= 1 && page <= pageCount) scrollToPage(page);
+              }}
+              type="number"
+              value={currentPage}
+            />
+            <span aria-live="polite" className="text-ink-quiet tabular-nums">
+              of {pageCount || "…"}
+            </span>
+          </label>
+          <div aria-label="Page zoom" className="ml-auto flex items-center gap-1" role="group">
+            <button
+              aria-label="Zoom out"
+              className="border-edge min-h-11 rounded-lg border px-3 text-sm"
+              disabled={zoom <= MIN_ZOOM}
+              onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Math.round((current - 0.25) * 100) / 100))}
+              type="button"
+            >
+              −
+            </button>
+            <button
+              aria-label={`Zoom, currently ${Math.round(zoom * 100)} percent. Reset to fit width`}
+              className="border-edge min-h-11 rounded-lg border px-2 text-sm tabular-nums"
+              onClick={() => setZoom(1)}
+              type="button"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              aria-label="Zoom in"
+              className="border-edge min-h-11 rounded-lg border px-3 text-sm"
+              disabled={zoom >= MAX_ZOOM}
+              onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Math.round((current + 0.25) * 100) / 100))}
+              type="button"
+            >
+              +
+            </button>
+          </div>
+        </div>,
+        toolbarHost,
+      )}
 
-      <div className="space-y-4 sm:space-y-6" ref={columnRef}>
+      <div className="flex flex-col gap-4 sm:gap-6" ref={columnRef}>
         {document_ && pageCount > 0
           ? Array.from({ length: pageCount }, (_, index) => (
             <PdfPage
               aspectRatio={aspectRatio}
+              containerWidth={containerWidth}
               document={document_}
               highlights={highlights}
               key={index + 1}

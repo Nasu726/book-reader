@@ -30,13 +30,30 @@ export default function HelpPage() {
         </div>
       }
       reader={
-        <article className="reader-prose mx-auto max-w-prose px-4 pb-16 sm:px-0">
+        <article className="reader-prose mx-auto max-w-prose px-4 pb-24 sm:px-0" id="top">
           <p>
             PDFとEPUBを読み、気になった文章をその場でAIに聞くための個人用リーダー。
             保存したものはすべて本ごとに紐づき、開き直せば元の場所に残っている。
           </p>
 
-          <h2>本を追加する・消す</h2>
+
+          {/* A manual is read by looking things up, not from the top. Without
+              this the only way to find the part about EPUBs was to scroll past
+              everything else and recognise it going by. */}
+          <nav aria-label="Contents" className="border-rule text-ink-quiet my-6 border-y py-4 text-sm">
+            <ol className="space-y-1">
+              <li><a className="hover:text-ink underline underline-offset-4" href="#add">本を追加する・消す</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#read">読む</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#ask">文章を選んでAIに聞く</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#saved">保存されるもの3種と、その居場所</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#keyboard">キーボード</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#display">表示の設定</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#epub">EPUBとは何か</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#trouble">うまくいかないとき</a></li>
+            </ol>
+          </nav>
+
+          <h2 className="scroll-mt-4" id="add">本を追加する・消す</h2>
           <p>
             ライブラリの <strong>Add a book</strong> を押すとファイル選択が開く。
             選んだ時点で送信が始まるので、他に押すボタンは無い。PDFまたはEPUB、100MBまで。
@@ -51,7 +68,7 @@ export default function HelpPage() {
             </li>
           </ul>
 
-          <h2>読む</h2>
+          <h2 className="scroll-mt-4" id="read">読む</h2>
           <p>
             PDFは全ページが縦に並ぶ。上の <strong>Page</strong> 欄に番号を入れればその
             ページへ飛ぶ。<strong>Zoom</strong> は 50〜300%で、%の数字を押すと画面幅に戻る。
@@ -63,7 +80,7 @@ export default function HelpPage() {
             <strong>読書位置は自動で保存される</strong>ので、閉じて開き直すと続きから始まる。
           </p>
 
-          <h2>文章を選んでAIに聞く</h2>
+          <h2 className="scroll-mt-4" id="ask">文章を選んでAIに聞く</h2>
           <p>
             本文をなぞって選択すると、<strong>選択したところのすぐそばに小さなメニューが出る</strong>。
             Explain / Translate / Simplify と、ハイライト用の丸い色。
@@ -113,7 +130,7 @@ export default function HelpPage() {
           </ul>
           <p>訳元の言語は指定しない（英語とは限らないため）。答えは日本語で返る。</p>
 
-          <h2>保存されるもの3種と、その居場所</h2>
+          <h2 className="scroll-mt-4" id="saved">保存されるもの3種と、その居場所</h2>
           <p>
             右側のパネル（スマホでは <strong>Ask AI</strong> のシート）は
             <strong>AI</strong> と <strong>Saved</strong> の2つに分かれている。
@@ -137,14 +154,14 @@ export default function HelpPage() {
             </li>
           </ul>
 
-          <h2>キーボード</h2>
+          <h2 className="scroll-mt-4" id="keyboard">キーボード</h2>
           <ul>
             <li><strong>←</strong> / <strong>→</strong> — PDFはページ、EPUBは章を移動。最初と最後では何も起きない</li>
             <li><strong>↑</strong> <strong>↓</strong> <strong>Space</strong> <strong>PageUp</strong> <strong>PageDown</strong> — ふつうにスクロールする</li>
           </ul>
           <p>入力欄に文字を打っている間は、矢印キーはページを動かさない。</p>
 
-          <h2>表示の設定</h2>
+          <h2 className="scroll-mt-4" id="display">表示の設定</h2>
           <ul>
             <li><strong>Dark</strong> / <strong>Light</strong> — 画面の明暗</li>
             <li>
@@ -155,7 +172,7 @@ export default function HelpPage() {
           </ul>
           <p>設定はブラウザに保存されるので、端末ごとに別々になる。</p>
 
-          <h2>EPUBとは何か</h2>
+          <h2 className="scroll-mt-4" id="epub">EPUBとは何か</h2>
           <p>
             電子書籍のファイル形式のひとつ。中身はWebページ（XHTMLとCSS）をZIPで
             固めたもので、拡張子は <code>.epub</code>。
@@ -179,7 +196,7 @@ export default function HelpPage() {
             Kindleなどで買った本がこれにあたる。
           </p>
 
-          <h2>うまくいかないとき</h2>
+          <h2 className="scroll-mt-4" id="trouble">うまくいかないとき</h2>
           <ul>
             <li>
               ページに <strong>could not be drawn</strong> と出る — <strong>Try again</strong> を押す。
@@ -199,6 +216,14 @@ export default function HelpPage() {
               一覧には残っているので、保存そのものは効いている
             </li>
           </ul>
+          {/* Plain anchors, so the manual works with scripting off — which is
+              the state a page explaining how to use something should survive. */}
+          <a
+            className="border-edge bg-paper text-ink-quiet hover:text-ink right-(--gutter) bottom-(--gutter) fixed rounded-lg border px-3 py-2 text-xs tracking-wide uppercase no-underline shadow-sm transition-colors duration-(--fast)"
+            href="#top"
+          >
+            ↑ Top
+          </a>
         </article>
       }
     />

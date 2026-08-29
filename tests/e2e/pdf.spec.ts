@@ -2,6 +2,17 @@ import { expect, test } from "@playwright/test";
 
 import { buildPdf, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
 
+/**
+ * The reader's controls, which sit above the pane rather than inside it.
+ *
+ * A toolbar inside the scrolling pane is pinned vertically and nothing else, so
+ * zooming a page past the width of the screen slid the page number off to the
+ * left along with the book.
+ */
+function controls(page: import("@playwright/test").Page) {
+  return page.getByRole("group", { name: "PDF controls" });
+}
+
 test("PDF renders with navigation and selectable text", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
@@ -10,7 +21,7 @@ test("PDF renders with navigation and selectable text", async ({ page }) => {
 
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(reader).toBeVisible({ timeout: 10_000 });
-  await expect(reader.getByText("of 2")).toBeVisible({ timeout: 10_000 });
+  await expect(controls(page).getByText("of 2")).toBeVisible({ timeout: 10_000 });
   await expect(reader.getByText("Structure of Scientific Revolutions")).toBeVisible({ timeout: 10_000 });
 
   // Every page is in the column; there is no page to swap to.
@@ -90,7 +101,7 @@ test("arrow keys turn pages and the zoom control resizes the page", async ({ pag
   await page.goto(`/documents/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
-  await expect(reader.getByText("of 2")).toBeVisible({ timeout: 10_000 });
+  await expect(controls(page).getByText("of 2")).toBeVisible({ timeout: 10_000 });
 
   const pageNumber = page.getByRole("spinbutton", { name: "Page number" });
   await page.keyboard.press("ArrowRight");
@@ -102,7 +113,7 @@ test("arrow keys turn pages and the zoom control resizes the page", async ({ pag
     (await reader.locator('[data-page-number="1"] canvas').boundingBox())!.width;
   const fitWidth = await widthAt();
 
-  const zoom = reader.getByRole("group", { name: "Page zoom" });
+  const zoom = controls(page).getByRole("group", { name: "Page zoom" });
   await zoom.getByRole("button", { name: "Zoom in" }).click();
   await expect(zoom.getByText("125%")).toBeVisible();
   await expect.poll(widthAt).toBeGreaterThan(fitWidth * 1.2);
@@ -128,7 +139,7 @@ test("typing a follow-up question never turns the page", async ({ page }) => {
   await page.goto(`/documents/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
-  await expect(reader.getByText("of 2")).toBeVisible({ timeout: 10_000 });
+  await expect(controls(page).getByText("of 2")).toBeVisible({ timeout: 10_000 });
 
   const question = page.getByLabel("Ask about this passage");
   await question.fill("Why does this matter");

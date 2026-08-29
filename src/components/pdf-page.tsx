@@ -36,6 +36,13 @@ type PdfPageProps = {
   pageNumber: number;
   /** Multiplier on top of fit-to-width. */
   zoom: number;
+  /**
+   * The width a page occupies at 100%, measured once from the column.
+   *
+   * Passed in rather than read from this page's own box. The box is now sized
+   * from the zoom, so measuring it here would feed the zoom back into itself.
+   */
+  containerWidth: number;
   /** Page size at scale 1, used to hold space before the page is drawn. */
   aspectRatio: number;
   /** Every saved highlight; this page draws the ones that name its number. */
@@ -55,6 +62,7 @@ export function PdfPage({
   document: pdfDocument,
   pageNumber,
   zoom,
+  containerWidth,
   aspectRatio,
   highlights = [],
   onTextExtracted,
@@ -141,7 +149,7 @@ export function PdfPage({
         // The canvas and the text layer must share one display scale, or the
         // selectable text drifts away from the glyphs on the canvas.
         const unscaled = page.getViewport({ scale: 1 });
-        const available = container!.clientWidth || unscaled.width;
+        const available = containerWidth || unscaled.width;
         const cssScale = (available / unscaled.width) * zoom;
         const viewport = page.getViewport({ scale: cssScale });
         const devicePixelRatio = window.devicePixelRatio || 1;
@@ -204,7 +212,7 @@ export function PdfPage({
       cancelled = true;
       task?.cancel();
     };
-  }, [visible, pdfDocument, pageNumber, zoom, attempt, onTextExtracted]);
+  }, [visible, pdfDocument, pageNumber, zoom, containerWidth, attempt, onTextExtracted]);
 
   // Never before the text layer exists: the spans a highlight points at are
   // created by that render, and pdf.js replaces them wholesale every time the
@@ -219,33 +227,23 @@ export function PdfPage({
   // that are still in the document, so only unmounting has to clean up.
   useEffect(() => () => clearHighlights({ format: "pdf", page: pageNumber }), [pageNumber]);
 
-  // Re-draw when the column changes width: a rotated phone, a resized window,
-  // or the pane beside it appearing.
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    let lastWidth = container.clientWidth;
-    const observer = new ResizeObserver(() => {
-      const width = container.clientWidth;
-      if (width && width !== lastWidth) {
-        lastWidth = width;
-        setAttempt((current) => current + 1);
-      }
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <div
+      // Auto margins rather than a centring alignment: a flex item centred by
+      // align-items cannot be scrolled back to on the overflowing side, and a
+      // page zoomed past the width of the screen overflows on both.
+      //
       className="relative mx-auto"
       data-page-number={pageNumber}
       ref={containerRef}
-      style={{ aspectRatio: drawn ? undefined : `1 / ${aspectRatio}` }}
+      style={{
+        aspectRatio: `1 / ${aspectRatio}`,
+        width: containerWidth ? `${Math.floor(containerWidth * zoom)}px` : undefined,
+      }}
     >
       {/* Hidden until drawn: an untouched canvas is 300x150 by default, which
           would sit in the middle of the reserved space as a small white box. */}
-      <canvas className={drawn ? "block" : "hidden"} ref={canvasRef} />
+      <canvas className={drawn ? "block h-full w-full" : "hidden"} ref={canvasRef} />
       <div className="textLayer absolute inset-0" ref={textLayerRef} />
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-paper/90 text-sm" role="alert">

@@ -1453,6 +1453,53 @@ Chrome と Firefox は何年も前に実装しているが、WebKit は未実装
 
 ---
 
+## PDFZOOM-001 — 拡大時の挙動
+**Status:** DONE
+**Priority:** P0
+**Depends on:** PDFWORKER-001
+
+### 報告
+
+- ツールバーがヘッダから離れている
+- **拡大時の横スクロールが致命的**
+- 左上を起点に拡大するのが不自然。内容は中央列にある
+- 拡大するとページ番号の挙動が怪しくなる
+
+### 原因
+
+すべて「拡大するとペインが横にもスクロールする」ことに起因していた。
+
+- `sticky top-0` は縦にしか効かないので、ツールバーが本と一緒に左へ流れた
+- 起点が左上だったので、本文のある中央から離れた
+- ページ判定が「少しでも見えている一番上」だったので、3倍のページが自分のごく一部しか見せないことで壊れた
+
+### Verify
+
+- `tests/e2e/mobile.spec.ts` — 中央から拡大すること、左右どちらの端にも到達できること、拡大しても中央のページを数えること
+- `tests/e2e/pdf.spec.ts` — ツールバーがペインの外にあること（`PDF controls`）
+- mutation: 中央寄せを外す／`align-items` で中央揃えにする、でそれぞれ赤
+
+判断理由は `docs/DECISIONS.md` D-38〜D-40。
+
+---
+
+## HELP-002 — マニュアルの目次
+**Status:** DONE
+**Priority:** P2
+**Depends on:** HELP-001
+
+### Goal
+
+引いて使えるようにする。見出しへのアンカー一覧と、上へ戻るリンク。
+
+### Verify
+
+- `tests/e2e/help.spec.ts` — 目次の各項目に行き先が実在すること、移動できること
+
+判断理由は `docs/DECISIONS.md` D-41。
+
+---
+
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
 **Priority:** P0 before final v0.1 sign-off  
