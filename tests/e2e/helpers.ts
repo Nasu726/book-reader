@@ -187,3 +187,69 @@ export async function swipeSheetDown(page: Page): Promise<void> {
   for (const step of [40, 90, 150, 220]) await page.mouse.move(x, y + step);
   await page.mouse.up();
 }
+
+/**
+ * A tagged PDF: one that carries its own structure tree.
+ *
+ * Each entry is a paragraph, given as the visual lines it was set as. The point
+ * of the fixture is that those line breaks are the typesetter's and the
+ * structure says so, which is the difference between reading a PDF's text and
+ * guessing at it.
+ */
+export function buildTaggedPdf(paragraphs: readonly (readonly string[])[]): Buffer {
+  const objects: string[] = [];
+  const structRoot = 6;
+  const firstStructElem = 7;
+  const parentTree = firstStructElem + paragraphs.length;
+
+  // Set as one continuous block of evenly spaced lines, so the geometry offers
+  // no clue where one paragraph ends: no gap, no indent, no line stopping short
+  // of the margin. Only the structure knows, which is the point of the fixture.
+  let baseline = 720;
+  const content = paragraphs.map((lines, index) => {
+    const block = [
+      `/P <</MCID ${index}>> BDC`,
+      "BT",
+      "/F1 14 Tf",
+      `1 0 0 1 60 ${baseline} Tm`,
+      "20 TL",
+      ...lines.map((line) => `(${line.replace(/[()\\]/g, "\\$&")}) Tj T*`),
+      "ET",
+      "EMC",
+    ].join("\n");
+    baseline -= lines.length * 20;
+    return block;
+  }).join("\n");
+
+  objects[1] = "<< /Type /Catalog /Pages 2 0 R /MarkInfo << /Marked true >> "
+    + `/StructTreeRoot ${structRoot} 0 R >>`;
+  objects[2] = "<< /Type /Pages /Kids [3 0 R] /Count 1 >>";
+  objects[3] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /StructParents 0 "
+    + "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>";
+  objects[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+  objects[5] = `<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
+  objects[structRoot] = "<< /Type /StructTreeRoot /K ["
+    + paragraphs.map((_, index) => `${firstStructElem + index} 0 R`).join(" ")
+    + `] /ParentTree ${parentTree} 0 R >>`;
+  paragraphs.forEach((_, index) => {
+    objects[firstStructElem + index] = `<< /Type /StructElem /S /P /P ${structRoot} 0 R `
+      + `/Pg 3 0 R /K ${index} >>`;
+  });
+  objects[parentTree] = "<< /Nums [0 ["
+    + paragraphs.map((_, index) => `${firstStructElem + index} 0 R`).join(" ")
+    + "]] >>";
+
+  let pdf = "%PDF-1.7\n";
+  const offsets: number[] = [];
+  for (let id = 1; id < objects.length; id += 1) {
+    offsets[id] = pdf.length;
+    pdf += `${id} 0 obj\n${objects[id]}\nendobj\n`;
+  }
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let id = 1; id < objects.length; id += 1) {
+    pdf += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(pdf, "latin1");
+}

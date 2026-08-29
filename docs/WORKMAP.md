@@ -1499,6 +1499,49 @@ Chrome と Firefox は何年も前に実装しているが、WebKit は未実装
 
 ---
 
+## PDFTEXT-001 — 段落をPDFの論理構造から読む
+**Status:** DONE
+**Priority:** P1
+**Depends on:** PDFSEL-001
+
+### 問題
+
+テキスト表示の段落分けが不正確。PDFの改行は組版上のもので文の切れ目ではないため、レイアウトからの推測には限界がある。
+
+### 解決
+
+タグ付きPDFの構造ツリー（`getStructTree()` ＋ marked content）を優先し、無い場合のみレイアウト推測へ落ちる。
+
+### Verify
+
+- `tests/unit/pdf-structure.test.mts` — 構造から段落を組む、行末ハイフンの結合、入れ子コンテナ、タグ無しはnull
+- `tests/e2e/pdf.spec.ts` — **行幅も行間も字下げも一様**なタグ付きPDF（レイアウトからは段落が分からない）で2段落に分かれること
+- mutation: 構造を無視させると1段落になって赤
+
+判断理由は `docs/DECISIONS.md` D-45。
+
+---
+
+## PDFZOOM-002 — 拡大時に読んでいる場所を保つ / ツールバーが動かない
+**Status:** DONE
+**Priority:** P0
+**Depends on:** PDFZOOM-001
+
+### 報告
+
+- 6ページ目で拡大すると5、4ページ目へずれる
+- 表示切り替えでズームUIが消えると、切り替えボタン自体が動く
+
+### Verify
+
+- `tests/e2e/pdf.spec.ts` — 切り替え前後でボタンの座標が変わらないこと
+- 目視: 8ページのPDFで6ページ目へ移動し100%→200%、カウンタと内容が6のままであること、切り替えボタンが両表示で x=971.89 であること
+- mutation: 右端グループの順序を反転させると赤
+
+判断理由は `docs/DECISIONS.md` D-46、D-47。
+
+---
+
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
 **Priority:** P0 before final v0.1 sign-off  

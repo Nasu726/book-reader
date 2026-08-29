@@ -103,6 +103,8 @@ export function PdfRenderer({
 
   const columnRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  /** The page at the top of the pane, and how far into it the pane starts. */
+  const anchorRef = useRef({ fraction: 0, page: 1 });
 
   /**
    * The strip above the reading pane, which this reader fills.
@@ -215,9 +217,23 @@ export function PdfRenderer({
    * same frame and the column can be re-centred before anything is drawn.
    */
   useLayoutEffect(() => {
-    const scroller = columnRef.current?.closest("[data-reader-scroll]");
-    if (!scroller) return;
+    const column = columnRef.current;
+    const scroller = column?.closest("[data-reader-scroll]");
+    if (!column || !scroller) return;
+
     scroller.scrollLeft = (scroller.scrollWidth - scroller.clientWidth) / 2;
+
+    // And stay on the same page. Every page above this one has just changed
+    // height, so the same scrollTop now shows something else entirely: zooming
+    // in on page six walked backwards to five, then four. Page boxes are sized
+    // from the zoom rather than from what has been drawn, so the new heights
+    // are known here, before anything is painted.
+    const { fraction, page } = anchorRef.current;
+    const anchor = column.querySelector(`[data-page-number="${page}"]`);
+    if (!anchor) return;
+    const box = anchor.getBoundingClientRect();
+    const paneTop = scroller.getBoundingClientRect().top;
+    scroller.scrollTop += box.top + fraction * box.height - paneTop;
   }, [zoom, containerWidth]);
 
   const scrollToPage = useCallback((target: number) => {
@@ -267,7 +283,7 @@ export function PdfRenderer({
     function pickCurrentPage() {
       frame = 0;
       const paneTop = scroller!.getBoundingClientRect().top;
-      let best: { page: number; top: number } | null = null;
+      let best: { element: Element; page: number; top: number } | null = null;
       for (const element of onScreen) {
         const page = Number(element.getAttribute("data-page-number"));
         if (!Number.isInteger(page)) continue;
@@ -277,9 +293,17 @@ export function PdfRenderer({
         // instead reads the next one down whenever a page is shorter than the
         // screen, which in the text view is most of them.
         if (box.bottom <= paneTop + 1) continue;
-        if (!best || box.top < best.top) best = { page, top: box.top };
+        if (!best || box.top < best.top) best = { element, page, top: box.top };
       }
-      if (best) setCurrentPage(best.page);
+      if (!best) return;
+      setCurrentPage(best.page);
+      // Where the top of the pane falls inside that page, as a fraction of its
+      // height. Pixels do not survive a zoom; this does.
+      const box = best.element.getBoundingClientRect();
+      anchorRef.current = {
+        fraction: box.height > 0 ? (paneTop - box.top) / box.height : 0,
+        page: best.page,
+      };
     }
 
     function schedule() {
@@ -423,51 +447,61 @@ export function PdfRenderer({
               of {pageCount || "…"}
             </span>
           </label>
-          <div aria-label="Reading view" className="ml-auto flex items-center gap-1" role="group">
-            {([["pages", "Pages"], ["text", "Text"]] as const).map(([candidate, label]) => (
-              <button
-                aria-pressed={view === candidate}
-                className={`border-edge min-h-11 rounded-lg border px-3 text-xs tracking-wide uppercase transition-colors duration-(--fast) ${
-                  view === candidate ? "bg-marker border-marker text-ink-on-marker" : "text-ink-quiet hover:text-ink"
-                }`}
-                key={candidate}
-                onClick={() => setStoredPdfView(candidate)}
-                type="button"
-              >
-                {label}
-              </button>
-            ))}
+
+          {/*
+            One group at the right edge, in a fixed order, with the switch last.
+            Zoom belongs to the printed page and leaves with it; when the two
+            were laid out as equals, changing the view moved the control you
+            change the view with out from under the pointer.
+          */}
+          <div className="ml-auto flex items-center gap-2">
+            {view === "pages" && (
+              <div aria-label="Page zoom" className="flex items-center gap-1" role="group">
+                <button
+                  aria-label="Zoom out"
+                  className="border-edge min-h-11 rounded-lg border px-3 text-sm"
+                  disabled={zoom <= MIN_ZOOM}
+                  onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Math.round((current - 0.25) * 100) / 100))}
+                  type="button"
+                >
+                  −
+                </button>
+                <button
+                  aria-label={`Zoom, currently ${Math.round(zoom * 100)} percent. Reset to fit width`}
+                  className="border-edge min-h-11 rounded-lg border px-2 text-sm tabular-nums"
+                  onClick={() => setZoom(1)}
+                  type="button"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  aria-label="Zoom in"
+                  className="border-edge min-h-11 rounded-lg border px-3 text-sm"
+                  disabled={zoom >= MAX_ZOOM}
+                  onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Math.round((current + 0.25) * 100) / 100))}
+                  type="button"
+                >
+                  +
+                </button>
+              </div>
+            )}
+
+            <div aria-label="Reading view" className="flex items-center gap-1" role="group">
+              {([["pages", "Pages"], ["text", "Text"]] as const).map(([candidate, label]) => (
+                <button
+                  aria-pressed={view === candidate}
+                  className={`border-edge min-h-11 rounded-lg border px-3 text-xs tracking-wide uppercase transition-colors duration-(--fast) ${
+                    view === candidate ? "bg-marker border-marker text-ink-on-marker" : "text-ink-quiet hover:text-ink"
+                  }`}
+                  key={candidate}
+                  onClick={() => setStoredPdfView(candidate)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          {view === "pages" && (
-          <div aria-label="Page zoom" className="flex items-center gap-1" role="group">
-            <button
-              aria-label="Zoom out"
-              className="border-edge min-h-11 rounded-lg border px-3 text-sm"
-              disabled={zoom <= MIN_ZOOM}
-              onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Math.round((current - 0.25) * 100) / 100))}
-              type="button"
-            >
-              −
-            </button>
-            <button
-              aria-label={`Zoom, currently ${Math.round(zoom * 100)} percent. Reset to fit width`}
-              className="border-edge min-h-11 rounded-lg border px-2 text-sm tabular-nums"
-              onClick={() => setZoom(1)}
-              type="button"
-            >
-              {Math.round(zoom * 100)}%
-            </button>
-            <button
-              aria-label="Zoom in"
-              className="border-edge min-h-11 rounded-lg border px-3 text-sm"
-              disabled={zoom >= MAX_ZOOM}
-              onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Math.round((current + 0.25) * 100) / 100))}
-              type="button"
-            >
-              +
-            </button>
-          </div>
-          )}
         </div>,
         toolbarHost,
       )}

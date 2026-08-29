@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildPdf, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
+import { buildPdf, buildTaggedPdf, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
 
 /**
  * The reader's controls, which sit above the pane rather than inside it.
@@ -338,4 +338,61 @@ test("the page number keeps up in the text view", async ({ page }) => {
     async () => page.getByRole("spinbutton", { name: "Page number" }).inputValue(),
     { timeout: 15_000 },
   ).toBe("5");
+});
+
+test("the view switch does not move when the zoom control leaves with it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  const documentId = await importDocument(page, "switch.pdf", MULTIPAGE_PDF, "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
+
+  const toggle = controls(page).getByRole("button", { name: "Text" });
+  const before = await toggle.boundingBox();
+
+  await toggle.click();
+  await expect(page.getByRole("group", { name: "Page zoom" })).toBeHidden();
+
+  // Zoom belongs to the printed page and leaves with it. A control that moves
+  // out from under the pointer when its neighbour goes is a control you have to
+  // find again to undo what you just did.
+  const after = await controls(page).getByRole("button", { name: "Text" }).boundingBox();
+  expect(Math.abs(after!.x - before!.x)).toBeLessThan(1);
+  expect(Math.abs(after!.y - before!.y)).toBeLessThan(1);
+});
+
+test("a tagged PDF is read as the paragraphs it says it has", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page);
+  const documentId = await importDocument(
+    page,
+    "tagged.pdf",
+    // Every line the same width, evenly spaced, no indents: the layout says
+    // nothing about where the paragraph ends and the structure says everything.
+    buildTaggedPdf([
+      [
+        "History, if viewed as a repository for more than a",
+        "anecdote or chronology, could produce a decisive b",
+        "transformation in the image of science by which cc",
+      ],
+      ["Normal science means research firmly based upon one"],
+    ]),
+    "application/pdf",
+  );
+  await page.goto(`/documents/${documentId}`);
+  await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
+  await controls(page).getByRole("button", { name: "Text" }).click();
+
+  // Three lines on the page, one paragraph in the document. Where a PDF is
+  // tagged it already knows this; reading it off the geometry is guesswork.
+  const paragraphs = page.locator('[data-page-number="1"] p');
+  await expect(paragraphs).toHaveCount(2, { timeout: 15_000 });
+  await expect(paragraphs.first()).toHaveText(
+    "History, if viewed as a repository for more than a anecdote or chronology,"
+    + " could produce a decisive b transformation in the image of science by which cc",
+  );
+  await expect(paragraphs.nth(1)).toHaveText(
+    "Normal science means research firmly based upon one",
+  );
 });

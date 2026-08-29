@@ -3,6 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { extractPdfParagraphs, extractPdfText } from "@/core/documents/pdf-extraction";
+import {
+  paragraphsFromStructure,
+  type MarkedTextItem,
+  type StructTreeNode,
+} from "@/core/documents/pdf-structure";
 import { clearHighlights, paintHighlights, type PaintableHighlight } from "./highlight-paint";
 import type { PdfDocumentProxy } from "./pdf-page";
 
@@ -58,11 +63,20 @@ export function PdfTextPage({
     async function read() {
       try {
         const page = await pdfDocument.getPage(pageNumber);
-        const content = await page.getTextContent();
+        // Marked content, so the structure tree has something to point at.
+        // Where a PDF is tagged it already knows where its paragraphs are, and
+        // reading them off the page's geometry is guesswork by comparison.
+        const [content, structure] = await Promise.all([
+          page.getTextContent({ includeMarkedContent: true }),
+          page.getStructTree().catch(() => null),
+        ]);
         if (cancelled) return;
-        const items = content.items as unknown as Parameters<typeof extractPdfParagraphs>[0];
-        setParagraphs(extractPdfParagraphs(items));
-        onTextExtracted?.(pageNumber, extractPdfText(items));
+
+        const items = content.items as unknown as MarkedTextItem[];
+        const tagged = paragraphsFromStructure(structure as StructTreeNode | null, items);
+        const geometric = items as unknown as Parameters<typeof extractPdfParagraphs>[0];
+        setParagraphs(tagged ?? extractPdfParagraphs(geometric));
+        onTextExtracted?.(pageNumber, extractPdfText(geometric));
         page.cleanup();
       } catch (cause) {
         if (!cancelled) {
