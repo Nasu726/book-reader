@@ -1332,6 +1332,82 @@ iPhone で大きなPDFが開けず「無限リトライ」になる。PCでは�
 
 ---
 
+## CTX-002 — 質問を「開いているページ」で接地する
+**Status:** DONE
+**Priority:** P0
+**Depends on:** CTX-001, CONV-003
+
+### 問題
+
+選択なしで質問すると、モデルへ届くのはタイトルだけだった。実際に「ドキュメントが提示されていないので貼ってください」と返ってきた。
+
+### 解決
+
+選択が無いときだけ、現在のページ（EPUBは章）の本文を最大4,000文字だけ context に載せる。選択があるときは `surroundingText` が既にあるので載せない。
+
+### Verify
+
+- `tests/unit/ai-action-service.test.mts` — 接地されること、選択時は二重に載らないこと、上限で切られること
+
+判断理由は `docs/DECISIONS.md` D-31。
+
+---
+
+## DESK-003 — 右パネルを3タブにする
+**Status:** DONE
+**Priority:** P1
+**Depends on:** DESK-002
+
+### Goal
+
+`AI` / `Notes` / `Marks`。ハイライトが増えるとノートと単語帳が画面外へ押し出される問題を解く。
+
+### Verify
+
+- `tests/e2e/secondary-tabs.spec.ts` — 3つが互いに独立して表示・非表示になること、矢印キーで巡回すること
+
+判断理由は `docs/DECISIONS.md` D-32。
+
+---
+
+## MOBILE-002 — 入力時のページ拡大を止める
+**Status:** DONE
+**Priority:** P0
+**Depends on:** DESIGN-001
+
+### 問題
+
+iOS Safari は16px未満のフィールドにフォーカスするとページを拡大し、戻さない。
+
+### Verify
+
+- `tests/e2e/mobile.spec.ts` — 表示中のフィールドすべての計算後 font-size が16px以上
+
+判断理由は `docs/DECISIONS.md` D-33。
+
+---
+
+## PDFRANGE-002 — 範囲取得の退路と、失敗の可視化
+**Status:** DONE
+**Priority:** P0
+**Depends on:** PDFRANGE-001
+
+### 問題
+
+1ページのPDFでもiPhoneで描画に失敗し、Try againも効かないとの報告。メモリでも取得量でも説明がつかない。
+
+### 解決
+
+範囲取得に失敗したら全体取得で開き直す。ページ描画の例外は握り潰さず、**メッセージを画面に出す**。実機からしか得られない情報を持ち帰れるようにするため。
+
+### 残っていること
+
+原因は未特定。実機のエラーメッセージ待ち。`docs/HUMAN-TASKS.md` H-10（WebKit の E2E）が入れば、この種の不具合を手元で再現できる。
+
+判断理由は `docs/DECISIONS.md` D-34。
+
+---
+
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
 **Priority:** P0 before final v0.1 sign-off  
