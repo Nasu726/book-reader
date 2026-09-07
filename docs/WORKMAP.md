@@ -1814,3 +1814,39 @@ YYYY-MM-DD — TASK-ID
 - Verification: lint, typecheck, 119 unit tests, 39 Chromium E2E tests, production build。Worker preview で実バインディング動作を確認。デプロイ後の実URLに対し、未認証で `/` と `/api/documents` が Access のログインへ302されアプリに到達しないことを確認。
 - Important decision: 無料枠の CPU 10ms は I/O 待ちを含まないため AI 応答の遅さは問題にならないが、scrypt検証は実測51〜79msで収まらない。認証を Access へ委譲し、JWT検証の実測は中央値1.25ms。Workerバンドルは gzip 1360 KiB で上限3 MiBに収まった。判断理由は `docs/DECISIONS.md` D-1〜D-15。
 - Follow-up: `OPENROUTER_API_KEY` の secret 登録（H-5）と本人による本番動作確認（H-6b）。SSRのCPU実測は本番アクセス後に取る。
+
+---
+
+## SHAREDLIB-001 — Reader documents と shared canonical Paper Library の統合
+**Status:** DONE  
+**Priority:** P1  
+**Issue / PR:** #7 / #8
+
+### Result
+
+- Reader `documents.paper_id` でcanonical Paperを任意リンクできる。
+- canonical PDF bytesはReader storageへ複製せず、認証済み `/api/documents/:id/source` 経由で読む。
+- linked Reader documentは `paper_retention_refs` の `owner = 'book-reader'` でPaper Collector GCから保護する。
+- Reader title / progress / highlights / notes / conversationsはReader-ownedのままcanonical scholarly metadataへwrite backしない。
+- 通常のPDF/EPUB uploadとDocumentStorage/R2経路は維持する。
+- Reader migrationはCollector-ownedの `papers` / `paper_retention_refs` を作成・変更しない。
+
+### Verify
+
+- GitHub Actions Verify #29 (`34148581981`)
+- lint / typecheck / unit tests / full Chromium E2E / production build が全通過。
+- canonical linkage、retention lifecycle、remote PDF source、通常upload/deleteの回帰testを含む。
+
+判断理由は `docs/DECISIONS.md` D-48。
+
+### Follow-up
+
+- production activationはHUMAN: Book Reader #10 / `docs/HUMAN-TASKS.md` H-11。
+- shared D1のCollector migration/deploy prerequisiteはPaper Collector #86。
+
+### Execution Log — 2026-09-08
+
+- Result: optional canonical Paper linkage、PDF byte非複製のauthenticated remote-source reading、Collector retention guardを追加し、通常import経路を維持した。
+- Verification: GitHub Actions Verify #29 (`34148581981`) — lint、typecheck、unit tests、full Chromium E2E、production build。
+- Important decision: canonical Paper/retention schemaはPaper Collectorが所有し、Readerは参照とReader固有状態のみを所有する。
+- Follow-up: 本番有効化はBook Reader #10でHUMAN。Paper Collector #86の完了が先行条件。

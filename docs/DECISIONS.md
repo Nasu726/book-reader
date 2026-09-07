@@ -847,3 +847,31 @@ PDFの改行は組版上の改行であって、文の切れ目ではない。�
 ズームは紙の表示にしか無いので、Text にすると消える。両者を対等に並べていたため、**表示を切り替えた瞬間に、表示を切り替えるボタン自体がポインタの下から動いた**。押し間違いを誘うし、戻すのに探し直させる。
 
 `tests/e2e/pdf.spec.ts` が切り替え前後のボタンの座標を比べる。目視でも確認した（両表示とも x=971.89）。
+
+---
+
+## D-48 — Readerはcanonical Paperを参照し、PDF bytesを複製せず、retention refでGCを防ぐ
+
+### Context
+
+Paper Collectorの `papers` をcanonical scholarly identityとしてReaderから再利用したい。一方、Readerは単体local SQLiteでも動く必要があり、Reader固有のtitle customization・読書状態・annotationをcanonical scholarly metadataへ書き戻してはならない。またCollector GCがReaderから参照中のPaperを削除してはならない。
+
+### Decision
+
+- `documents.paper_id` はnullableなcross-app identityとする。
+- Reader側から `papers` へのFKは張らない。local Reader DBはCollector schemaなしで起動可能なままにする。
+- `papers` と `paper_retention_refs` のschema/migration ownershipはPaper Collectorに置く。Readerはquery descriptorとしてのみ参照する。
+- canonical PaperのPDFはReader storageへ複製せず、`pdf_url ?? source_url` をauthenticated Reader `/api/documents/:id/source` からproxyし、Rangeをforwardする。
+- Reader title / progress / highlights / notes / conversationsはReader-ownedとし、canonical Paper metadataへwrite backしない。
+- explicit uploadは従来どおりDocumentStorage/R2を使う。
+- attach時はReader rowを作成後にretention ref (`owner = 'book-reader'`) を確立し、retention作成失敗時はReader rowをrollbackする。
+- delete時はReader rowを削除後にretention refをreleaseする。cleanup失敗でstale refが残る方が、live referenceを早期releaseしてCollector GCへ露出するより安全。
+- production activationはCollector側migration（少なくとも `papers` / `paper_retention_refs`）を先に完了し、その後Reader migration/deployを行う。
+
+### Why
+
+canonical identity・sourceを重複させず、Reader固有状態のownershipを維持し、Collector GCとのlifecycle raceをretention contractで明示的に防げる。Reader単体local modeも犠牲にしない。
+
+### Revisit when
+
+shared D1による直接cross-app schema accessを廃止し、Paper lifecycleを専用API/serviceへ移す場合。
