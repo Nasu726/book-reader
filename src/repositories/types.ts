@@ -7,6 +7,8 @@ export type DocumentRecord = {
   format: "epub" | "pdf";
   author?: string;
   sourceFilename?: string;
+  /** Canonical Paper Collector identity when this Reader document is linked. */
+  paperId?: string;
 };
 
 export type LibraryItem = DocumentRecord & {
@@ -146,6 +148,20 @@ export interface ConversationRepository {
   }): Promise<void>;
 }
 
+export type DocumentSourceRecord =
+  | {
+      kind: "stored";
+      filename: string | null;
+      format: "epub" | "pdf";
+      data: string;
+    }
+  | {
+      kind: "canonical-paper";
+      filename: null;
+      format: "pdf";
+      paperId: string;
+    };
+
 export interface LibraryRepository {
   list(userId: string): Promise<readonly LibraryItem[]>;
   create(document: DocumentRecord): Promise<void>;
@@ -161,9 +177,5 @@ export interface LibraryRepository {
   getSource(
     id: string,
     userId: string,
-  ): Promise<{
-    filename: string | null;
-    format: "epub" | "pdf";
-    data: string;
-  } | null>;
+  ): Promise<DocumentSourceRecord | null>;
 }
