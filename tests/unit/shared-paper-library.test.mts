@@ -128,10 +128,10 @@ test("attaching a canonical Paper creates only Reader state plus a retention gua
       "reader-user",
       "My reading title",
     );
-    assert.equal(
-      fixture.raw.prepare("SELECT title FROM papers WHERE id = 'paper-1'").get()?.title,
-      "Canonical title",
-    );
+    const canonicalTitle = fixture.raw.prepare(
+      "SELECT title FROM papers WHERE id = 'paper-1'",
+    ).get() as { title: string };
+    assert.equal(canonicalTitle.title, "Canonical title");
   } finally {
     fixture.cleanup();
   }
@@ -157,15 +157,15 @@ test("retention blocks canonical deletion until Reader releases its link", async
       "reader-user",
     );
     await releaseCanonicalPaper(fixture.db, "reader-document-2");
-    assert.equal(
-      fixture.raw.prepare("SELECT COUNT(*) AS count FROM paper_retention_refs").get()?.count,
-      0,
-    );
+    const retentionCount = fixture.raw.prepare(
+      "SELECT COUNT(*) AS count FROM paper_retention_refs",
+    ).get() as { count: number };
+    assert.equal(retentionCount.count, 0);
     fixture.raw.prepare("DELETE FROM papers WHERE id = 'paper-1'").run();
-    assert.equal(
-      fixture.raw.prepare("SELECT COUNT(*) AS count FROM papers").get()?.count,
-      0,
-    );
+    const paperCount = fixture.raw.prepare(
+      "SELECT COUNT(*) AS count FROM papers",
+    ).get() as { count: number };
+    assert.equal(paperCount.count, 0);
   } finally {
     fixture.cleanup();
   }
@@ -181,14 +181,14 @@ test("missing canonical Papers do not leave orphan Reader documents", async () =
       () => "must-not-exist",
     );
     assert.deepEqual(result, { status: "not_found" });
-    assert.equal(
-      fixture.raw.prepare("SELECT COUNT(*) AS count FROM documents").get()?.count,
-      0,
-    );
-    assert.equal(
-      fixture.raw.prepare("SELECT COUNT(*) AS count FROM paper_retention_refs").get()?.count,
-      0,
-    );
+    const documentCount = fixture.raw.prepare(
+      "SELECT COUNT(*) AS count FROM documents",
+    ).get() as { count: number };
+    assert.equal(documentCount.count, 0);
+    const retentionCount = fixture.raw.prepare(
+      "SELECT COUNT(*) AS count FROM paper_retention_refs",
+    ).get() as { count: number };
+    assert.equal(retentionCount.count, 0);
   } finally {
     fixture.cleanup();
   }
