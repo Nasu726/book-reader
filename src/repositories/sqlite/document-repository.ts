@@ -20,6 +20,7 @@ function toDocumentRecord(row: typeof documents.$inferSelect): DocumentRecord {
     format: row.format,
     author: row.author ?? undefined,
     sourceFilename: row.sourceFilename ?? undefined,
+    paperId: row.paperId ?? undefined,
   };
 }
 
@@ -65,6 +66,7 @@ export function createSqliteDocumentRepository(
         format: input.format,
         author: input.author ?? null,
         sourceFilename: input.sourceFilename ?? null,
+        paperId: input.paperId ?? null,
       });
   };
 
