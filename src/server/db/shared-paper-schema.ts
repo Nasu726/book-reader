@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
@@ -27,7 +28,7 @@ export const paperRetentionRefs = sqliteTable(
     paperId: text("paper_id").notNull(),
     owner: text("owner").notNull(),
     referenceId: text("reference_id").notNull(),
-    createdAt: text("created_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [primaryKey({ columns: [table.owner, table.referenceId] })],
 );
