@@ -34,7 +34,27 @@ test("source updates are scoped to the owning user and report ownership", async 
   assert.equal(await repository.updateSourceIfOwned(documentId, "attacker", "bad"), false);
   assert.equal(await repository.getSource(documentId, "attacker"), null);
   assert.equal(await repository.updateSourceIfOwned(documentId, "owner", "good"), true);
-  assert.equal((await repository.getSource(documentId, "owner"))?.data, "good");
+  const stored = await repository.getSource(documentId, "owner");
+  assert.equal(stored?.kind, "stored");
+  if (stored?.kind === "stored") assert.equal(stored.data, "good");
   assert.equal(await repository.delete(documentId, "attacker"), false);
   assert.equal(await repository.delete(documentId, "owner"), true);
+});
+
+test("a canonical Paper is a source descriptor without stored bytes", async () => {
+  await repository.create({
+    id: "canonical-document",
+    userId: "owner",
+    title: "Canonical paper",
+    format: "pdf",
+    paperId: "paper-canonical",
+  });
+
+  assert.deepEqual(await repository.getSource("canonical-document", "owner"), {
+    kind: "canonical-paper",
+    filename: null,
+    format: "pdf",
+    paperId: "paper-canonical",
+  });
+  assert.equal(await repository.getSource("canonical-document", "attacker"), null);
 });

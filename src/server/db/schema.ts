@@ -14,6 +14,7 @@ export const documents = sqliteTable("documents", {
   author: text("author"),
   sourceFilename: text("source_filename"),
   fileData: text("file_data"),
+  paperId: text("paper_id"),
   lastOpenedAt: integer("last_opened_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()

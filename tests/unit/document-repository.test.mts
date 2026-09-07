@@ -15,6 +15,7 @@ const document = {
   format: "pdf" as const,
   author: "Author",
   sourceFilename: "test.pdf",
+  paperId: "paper-1",
 };
 
 let repository: ReturnType<typeof createSqliteDocumentRepository>;

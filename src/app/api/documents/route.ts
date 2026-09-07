@@ -5,9 +5,11 @@ import { chargeWrite } from "@/server/usage/write-budget";
 import { getDatabase } from "@/server/db/database";
 import { detectFormatFromBytes } from "@/core/documents/file-signature";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
+import { attachCanonicalPaper } from "@/server/documents/shared-paper";
 import { getDocumentStorage } from "@/server/storage";
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_PAPER_ID_LENGTH = 300;
 const ALLOWED_TYPES: Record<string, "epub" | "pdf"> = {
   "application/epub+zip": "epub",
   "application/pdf": "pdf",
@@ -33,6 +35,36 @@ export async function POST(request: Request) {
 
   const overBudget = await chargeWrite(database, session.userId);
   if (overBudget) return overBudget;
+
+  if ((request.headers.get("content-type") ?? "").toLowerCase().includes("application/json")) {
+    let input: { paperId?: unknown };
+    try {
+      input = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid canonical Paper request." }, { status: 400 });
+    }
+    const paperId = typeof input.paperId === "string" ? input.paperId.trim() : "";
+    if (!paperId || paperId.length > MAX_PAPER_ID_LENGTH) {
+      return Response.json({ error: "A valid canonical Paper id is required." }, { status: 400 });
+    }
+
+    try {
+      const attached = await attachCanonicalPaper(database, session.userId, paperId);
+      if (attached.status === "not_found") {
+        return Response.json({ error: "Canonical Paper not found." }, { status: 404 });
+      }
+      return Response.json(
+        { document: attached.document },
+        {
+          status: 201,
+          headers: { location: `/documents/${attached.document.id}` },
+        },
+      );
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+      return Response.json({ error: "Failed to link the canonical Paper." }, { status: 500 });
+    }
+  }
 
   let file: File;
   let storageError: unknown;

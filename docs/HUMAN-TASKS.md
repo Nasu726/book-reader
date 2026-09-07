@@ -370,3 +370,31 @@ sudo apt-get install libgtk-4-1 libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 
 ### 完了の確認
 
 `playwright.config.ts` の `mobile-layout` プロジェクトから `browserName: "chromium"` の2行を消して、`npx playwright test --project=mobile-layout` が通ること。現状は iPhone 17 の画面サイズと dpr3 のまま Chromium で走っている。
+
+---
+
+## H-11. Shared Paper Library の本番有効化
+
+**Status:** HUMAN  
+**GitHub Issue:** #10  
+**Depends on:** Paper Collector #86、Reader #7 / PR #8
+
+**なぜ人間またはローカルエージェントが必要か**
+本番の共有D1 migration、Cloudflare deploy、Accessで保護された本番環境へのサインインと実データsmoke testが必要になる。Chat上のエージェントは本番credentialと保護されたブラウザセッションを持たない。
+
+**必須順序**
+
+1. Paper Collector #86 を先に進め、共有本番D1にCollector-ownedの `papers` と `paper_retention_refs` が存在することを確認する。
+2. 無ければReader側で作らず、Paper Collectorのmigrationを適用する。
+3. Readerの `migrations/0004_shared_paper_link.sql` を適用する。
+4. Readerをdeployする。
+5. Book Reader #10 に記載したproduction smoke testを実行する。
+
+**安全規約**
+
+- productionへdevelopment seedを流さない。
+- migration historyを偽装しない。
+- `papers` / `paper_retention_refs` はPaper Collector所有。Reader migrationから作成・変更しない。
+- 本番だけで起きる差異は、その場で推測修正せず先にIssue化する。
+
+**伝えること**: Book Reader #10 のchecklist結果。失敗があれば該当項目・レスポンス/ログ・可能ならスクリーンショット。

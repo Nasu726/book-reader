@@ -1,9 +1,9 @@
-
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { getCurrentUser } from "@/server/auth/current-session";
 import { chargeWrite } from "@/server/usage/write-budget";
 import { getDatabase } from "@/server/db/database";
 import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
+import { releaseCanonicalPaper } from "@/server/documents/shared-paper";
 import { getDocumentStorage } from "@/server/storage";
 
 const MAX_TITLE_LENGTH = 300;
@@ -63,14 +63,24 @@ export async function DELETE(
   }
 
   const repository = createSqliteLibraryRepository(database);
-  // Read the storage reference before the row goes away, or the bytes are
-  // orphaned on disk with nothing left pointing at them.
+  // Read the source before the row goes away, or uploaded bytes are orphaned on
+  // disk/R2 with nothing left pointing at them. The discriminated source also
+  // tells us whether this Reader row actually owns a canonical Paper retention
+  // ref; ordinary uploads must never touch Collector-owned tables.
   const source = await repository.getSource(id, session.userId);
   if (!await repository.delete(id, session.userId)) {
     return documentNotFound();
   }
-  if (source) {
+  if (source?.kind === "stored") {
     await (await getDocumentStorage()).delete(source.data).catch(() => undefined);
+  }
+  if (source?.kind === "canonical-paper") {
+    // A stale retention ref is safe (it only delays Collector GC), while
+    // releasing before the Reader row is gone could expose a still-live link
+    // to GC. Cleanup therefore happens after the successful document delete.
+    await releaseCanonicalPaper(database, document.id).catch((error) => {
+      console.error(error instanceof Error ? error.message : error);
+    });
   }
 
   return new Response(null, { status: 204 });

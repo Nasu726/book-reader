@@ -26,6 +26,7 @@ export function migrate(database: SqliteMigratable) {
       author TEXT,
       source_filename TEXT,
       file_data TEXT,
+      paper_id TEXT,
       last_opened_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -35,9 +36,13 @@ export function migrate(database: SqliteMigratable) {
   if (!columns.some((column) => column.name === "file_data")) {
     db.exec("ALTER TABLE documents ADD COLUMN file_data TEXT");
   }
+  if (!columns.some((column) => column.name === "paper_id")) {
+    db.exec("ALTER TABLE documents ADD COLUMN paper_id TEXT");
+  }
   if (!columns.some((column) => column.name === "last_opened_at")) {
     db.exec("ALTER TABLE documents ADD COLUMN last_opened_at INTEGER");
   }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_documents_paper_id ON documents(paper_id)");
   db.exec(`
     CREATE TABLE IF NOT EXISTS document_sections (
       document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,

@@ -7,6 +7,7 @@ import {
 } from "@/server/db/schema";
 import type {
   DocumentRecord,
+  DocumentSourceRecord,
   LibraryItem,
   LibraryRepository,
 } from "../types";
@@ -22,6 +23,7 @@ export function createSqliteLibraryRepository(db: Db): LibraryRepository {
       format: row.format,
       author: row.author ?? undefined,
       sourceFilename: row.sourceFilename ?? undefined,
+      paperId: row.paperId ?? undefined,
       lastOpenedAt: row.lastOpenedAt ?? undefined,
       progress: progressRows.find((p) => p.documentId === row.id)?.location ? 1 : 0,
     }));
@@ -36,6 +38,7 @@ export function createSqliteLibraryRepository(db: Db): LibraryRepository {
       author: document.author ?? null,
       sourceFilename: document.sourceFilename ?? null,
       fileData: null,
+      paperId: document.paperId ?? null,
     });
   }
 
@@ -78,15 +81,32 @@ export function createSqliteLibraryRepository(db: Db): LibraryRepository {
     return result.length > 0;
   }
 
-  async function getSource(id: string, userId: string) {
+  async function getSource(id: string, userId: string): Promise<DocumentSourceRecord | null> {
     const row = await db.select({
       data: documents.fileData,
+      paperId: documents.paperId,
       format: documents.format,
       sourceFilename: documents.sourceFilename,
     }).from(documents).where(and(eq(documents.id, id), eq(documents.userId, userId))).limit(1);
     const document = row[0];
-    if (!document?.data) return null;
-    return { filename: document.sourceFilename ?? null, format: document.format, data: document.data };
+    if (!document) return null;
+    if (document.data) {
+      return {
+        kind: "stored",
+        filename: document.sourceFilename ?? null,
+        format: document.format,
+        data: document.data,
+      };
+    }
+    if (document.paperId) {
+      return {
+        kind: "canonical-paper",
+        filename: null,
+        format: "pdf",
+        paperId: document.paperId,
+      };
+    }
+    return null;
   }
 
   return { list, create, delete: remove, rename, updateSource, updateSourceIfOwned, markOpened, getSource };
