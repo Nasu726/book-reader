@@ -1,7 +1,8 @@
-
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
+import { createSharedPaperRepository } from "@/repositories/sqlite/shared-paper-repository";
 import { getCurrentUser } from "@/server/auth/current-session";
 import { getDatabase } from "@/server/db/database";
+import { proxyRemotePaperPdf } from "@/server/documents/remote-paper-source";
 import { getDocumentStorage } from "@/server/storage";
 import { parseRangeHeader } from "@/core/documents/storage";
 
@@ -26,6 +27,14 @@ export async function GET(
   ).getSource(id, session.userId);
   if (!source) {
     return Response.json({ error: "Document not found." }, { status: 404 });
+  }
+
+  if (source.kind === "canonical-paper") {
+    const paper = await createSharedPaperRepository(database).getById(source.paperId);
+    if (!paper) {
+      return Response.json({ error: "Canonical Paper not found." }, { status: 404 });
+    }
+    return proxyRemotePaperPdf(request, paper.pdfUrl ?? paper.sourceUrl);
   }
 
   const storage = await getDocumentStorage();
