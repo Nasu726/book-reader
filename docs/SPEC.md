@@ -76,6 +76,18 @@ Metadata抽出に失敗しても手動またはfilename fallbackにより文書�
 
 文書を削除できる。関連データの扱いを明示し、孤児データを残さない。
 
+### DOC-005 — Shared canonical Paper link
+**SHOULD**
+
+Paper Collectorと同じproduction D1を利用する場合、Reader文書はCollector所有のcanonical `papers` レコードへnullable `paper_id`で紐づけられる。
+
+- EPUB・一般文書・手動uploadは`paper_id`無しで従来どおり成立する
+- canonical Paper由来のPDFは、通常`papers.pdf_url`（無ければ`source_url`）をReaderの認証済みsource経路から読み、PDF bytesをD1/R2へ重複保存しない
+- Reader固有のtitle変更、progress、highlight、note、conversation等はcanonical scholarly metadataを書き換えない
+- linked documentが生存する間は`paper_retention_refs`にReader所有参照を登録し、Paper Collectorの物理GCからcanonical Paperを保護する
+- linked document削除後にretention参照を解除する。解除失敗時はcanonical Paperを誤削除するよりstale guardを残す方を優先する
+- Reader migrationはReader所有schemaのみを変更し、Collector所有`papers`/`paper_retention_refs`を作成・変更しない
+
 ---
 
 ## 3. Reader
@@ -217,7 +229,6 @@ target_language = configurable
 **MUST**
 
 選択箇所に対して自由質問を送信できる。
-
 ### AI-005 — Streaming
 **SHOULD**
 
@@ -448,6 +459,7 @@ title
 type
 author
 source_filename
+paper_id (nullable; shared canonical papers.id when linked)
 created_at
 updated_at
 ```
@@ -698,8 +710,3 @@ Chrome latest stableで主要フローを検証する。
 - [x] PDFのtext layerがcanvasと一致し、選択位置がずれない
 - [x] EPUB本文が見出し・段落構造を保って表示される
 - [x] 複数端末で同時にログインを維持できる
-- [x] AI providerのrate limitがReaderの失敗として露出しない
-- [x] uploadした文書のbyte列がSQLiteの外に置かれる
-- [x] PWAとして必要な構成が存在する
-
-`SEL-005 PDF selection normalization`、高度な論文構造抽出、Vocabulary等は未完でもMVPを成立させられる。
