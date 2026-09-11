@@ -99,7 +99,6 @@ export function PdfRenderer({
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [currentPage, setCurrentPage] = useState(() => parsePage(initialLocation));
-  const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
 
   const columnRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -384,11 +383,11 @@ export function PdfRenderer({
       } catch {
         paperStructure = undefined;
       }
-      const captured = selection
-        ? capturePdfSelection(selection, page, { documentTitle, pageText, paperStructure })
-        : null;
-      setCapturedSelection(captured);
-      onSelectionChange?.(captured);
+      onSelectionChange?.(
+        selection
+          ? capturePdfSelection(selection, page, { documentTitle, pageText, paperStructure })
+          : null,
+      );
     };
 
     column.addEventListener("mouseup", updateSelection);
@@ -532,10 +531,6 @@ export function PdfRenderer({
           ))
           : <p aria-live="polite" className="text-sm">Opening…</p>}
       </div>
-
-      <section aria-label="PDF selection preview" className="mx-3 mt-4 rounded-xl border border-rule p-3 text-sm sm:mx-0">
-        {capturedSelection?.text ||"Select PDF text to prepare it for AI actions."}
-      </section>
     </section>
   );
 }

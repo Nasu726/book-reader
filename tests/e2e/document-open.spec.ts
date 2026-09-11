@@ -75,7 +75,6 @@ test("PDF selection exposes selectable text and captures normalized intent", asy
   await expect(secondary).toContainText("No passage selected");
   await expect(secondary.getByLabel("Ask about this passage"))
     .toHaveAttribute("placeholder", "Select a passage to use this command");
-  await expect(reader.getByText("Select PDF text to prepare it for AI actions.")).toBeVisible();
 });
 
 test("PDF selection highlights persist and can be deleted", async ({ page }) => {

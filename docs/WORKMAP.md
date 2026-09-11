@@ -934,7 +934,7 @@ Evidence: The vocabulary schema stores arbitrary terms and phrases with meaning,
 ---
 
 ## PROD-CF-001 — Cloudflare deployment target
-**Status:** IN_PROGRESS
+**Status:** DONE
 **Priority:** P0 before production
 **Depends on:** PROD-001
 
@@ -989,7 +989,9 @@ SSRのCPU実測はデプロイ後に取る。
 
 ### デプロイ状況
 
-最終デプロイ: 2026-08-29、main の `021c9ff` から（Version `00c9fee9`）。
+デプロイは main への push ごとにローカルの wrangler から行っている（最新は `docs/WORKMAP.md` 末尾の Execution Log と git log を見る）。
+
+本人は 2026-08-29 以降、実際の iPhone と PC から本番を使い、そこから不具合を報告している（PDFWORKER-001、PDFZOOM-001/002 など）。「本人による本番動作確認」はその形で済んでいる。H-7 のチェックリスト項目の個別確認は未了のまま HUMAN-001 に残る。
 
 - URL: https://book-reader.nasu.uk（`https://book-reader.e9gp1ant-1729.workers.dev` も同じWorker）
 - Cloudflare Access で Worker 単位に保護済み。未認証は Access のログインへ302され、アプリまで到達しない。`/help` も同様にAccessの内側にある（アプリ自身は認証を要求しないが、エッジで保護される）
@@ -1581,6 +1583,36 @@ Chrome と Firefox は何年も前に実装しているが、WebKit は未実装
 - unit 4（`document-repository.test.mts`、他人の userId で null / false。mutation: WHERE から userId を外すと赤）
 - E2E `mobile.spec.ts`「the selection menu stays on the screen and every colour is a thumb wide」。mutation: `w-max` を外すと幅差 31px で赤、`h-11 w-11` を `h-7 w-7` にすると赤
 - 目視（iPhone 17 幅、Chromium）: メニューが x=8〜394 に収まり 2 段、色は 44px。EPUB ヘッダのタイトル幅 84→156px
+
+---
+
+## PAPER-002 — 文書全体の目次と、section 単位の AI context
+**Status:** TODO
+**Priority:** P2
+**Depends on:** PAPER-001, PDFTEXT-001
+
+### Goal
+
+- PDF 自身の outline（しおり）を目次として使い、ツールバーからジャンプできる。EPUB はナビゲーションの節一覧で同じ操作にする
+- 選択無しの質問に、現在のページではなく現在の section を渡す（PAPER-001 はページ単位の推定しか持たない）
+
+推定ではなく文書の自己申告を使う点は D-45 と同じ。outline が無い PDF は今のまま（ページ単位）。
+
+---
+
+## EXPORT-001 — Highlights / Note / Vocabulary の Markdown 出力
+**Status:** TODO
+**Priority:** P2
+
+GET 1 本と純関数 1 つ。ページ・引用・メモを保つ。要望が出てから。
+
+---
+
+## UPLOAD-001 — アップロードの実上限
+**Status:** TODO
+**Priority:** P3
+
+Workers は `request.formData()` で本文を全量バッファし、`file.arrayBuffer()` でもう 1 部持つ。メモリ上限 128MB のため、アプリの 100MB 上限は**未検証**。論文は数 MB なので実害は無い。必要になったら raw body の PUT と `storage.put(stream)` に変える。準備工事はしない。
 
 ---
 

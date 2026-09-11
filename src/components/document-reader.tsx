@@ -108,7 +108,6 @@ export function DocumentReader({
   const readerRef = useRef<HTMLElement>(null);
   const [epub, setEpub] = useState<ParsedEpub | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [capturedSelection, setCapturedSelection] = useState<DocumentSelection | null>(null);
   const progress = useDocumentProgress(documentId);
   const initialLocation = progress.initialLocation;
   const initialSectionId = (() => {
@@ -204,9 +203,7 @@ export function DocumentReader({
     function capture() {
       const selection = window.getSelection();
       if (!selection) return;
-      const captured = captureEpubSelection(selection, document, documentTitle || document.title);
-      setCapturedSelection(captured);
-      onSelectionChange?.(captured);
+      onSelectionChange?.(captureEpubSelection(selection, document, documentTitle || document.title));
     }
     reader.addEventListener("mouseup", capture);
     reader.addEventListener("touchend", capture);
@@ -272,9 +269,6 @@ export function DocumentReader({
             <button className="min-h-10 rounded bg-ink px-3 text-white" onClick={() => void progress.save(JSON.stringify({ version: 1, sectionId: section.id }))} type="button">Retry</button>
           </div>
         )}
-        <div aria-label="EPUB selection preview" className="rounded-xl border border-rule p-3 text-sm">
-          {capturedSelection?.text ||"Select EPUB text to prepare it for AI actions."}
-        </div>
       </section>
     );
   }
@@ -289,10 +283,7 @@ export function DocumentReader({
         highlights={highlights}
         onVisibleTextChange={onVisibleTextChange}
         initialLocation={initialLocation}
-        onSelectionChange={(selection) => {
-          setCapturedSelection(selection);
-          onSelectionChange?.(selection);
-        }}
+        onSelectionChange={onSelectionChange}
         onLocationChange={(location) => void progress.save(location)}
         source={source}
       />
