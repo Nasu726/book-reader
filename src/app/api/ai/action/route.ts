@@ -1,12 +1,12 @@
 
 import { AI_ACTIONS, describeUserTurn, type AiAction } from "@/core/ai/action-service";
 import { createSqliteConversationRepository } from "@/repositories/sqlite/conversation-repository";
-import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { AiProviderError, generateWithRetry } from "@/core/ai/provider";
 import { createAiProvider } from "@/server/ai/provider-factory";
 import { getCurrentUser } from "@/server/auth/current-session";
 import { chargeWrite } from "@/server/usage/write-budget";
 import { getDatabase } from "@/server/db/database";
+import { documentNotFound, requireOwnedDocument } from "@/server/documents/ownership";
 
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_CHARACTERS = 8_000;
@@ -56,10 +56,9 @@ export async function POST(request: Request) {
     database,
   );
   const documentId = typeof input.documentId === "string" ? input.documentId : null;
-  const document = documentId
-    ? await createSqliteDocumentRepository(database).getById(documentId)
+  const ownedDocument = documentId
+    ? await requireOwnedDocument(database, documentId, session.userId)
     : null;
-  const ownedDocument = document?.userId === session.userId ? document : null;
 
   async function resolveConversation(): Promise<string | null> {
     if (!ownedDocument || !documentId) return null;
@@ -154,11 +153,8 @@ export async function GET(request: Request) {
     return Response.json({ error: "Document ID is required." }, { status: 400 });
   }
 
-  const document = await createSqliteDocumentRepository(
-    database,
-  ).getById(documentId);
-  if (document?.userId !== session.userId) {
-    return Response.json({ error: "Document not found." }, { status: 404 });
+  if (!await requireOwnedDocument(database, documentId, session.userId)) {
+    return documentNotFound();
   }
 
   const conversationRepository = createSqliteConversationRepository(
@@ -200,9 +196,8 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "Document ID is required." }, { status: 400 });
   }
 
-  const document = await createSqliteDocumentRepository(database).getById(documentId);
-  if (document?.userId !== session.userId) {
-    return Response.json({ error: "Document not found." }, { status: 404 });
+  if (!await requireOwnedDocument(database, documentId, session.userId)) {
+    return documentNotFound();
   }
 
   await createSqliteConversationRepository(database).deleteByDocument(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { AiAnswerPanel } from "./ai-answer-panel";
 import { useAiActions } from "./use-ai-actions";
@@ -20,8 +20,6 @@ type SelectionAiConnectorProps = {
   documentFormat: "epub" |"pdf";
   documentTitle: string;
   documentSourceFilename?: string;
-  /** Sign-out control, built on the server because only it knows how. */
-  account?: ReactNode;
   initialHighlights: readonly {
     id: string;
     note?: string;
@@ -51,7 +49,6 @@ export function SelectionAiConnector({
   documentFormat,
   documentTitle,
   documentSourceFilename,
-  account,
   initialHighlights,
   initialVocabulary,
 }: SelectionAiConnectorProps) {
@@ -157,7 +154,6 @@ export function SelectionAiConnector({
 
   return (
     <AppShell
-      account={account}
       openSecondarySignal={sheetSignal}
       showTextSize={documentFormat === "epub" || pdfView === "text"}
       title={

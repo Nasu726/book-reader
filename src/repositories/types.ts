@@ -22,11 +22,11 @@ export type DocumentSectionRecord = {
   sortOrder: number;
 };
 
+/** Every lookup names the owner; a document is never reachable by id alone. */
 export interface DocumentRepository {
-  list(): Promise<readonly DocumentRecord[]>;
-  getById(id: string): Promise<DocumentRecord | null>;
+  getById(id: string, userId: string): Promise<DocumentRecord | null>;
   create(document: DocumentRecord): Promise<void>;
-  delete(id: string): Promise<boolean>;
+  delete(id: string, userId: string): Promise<boolean>;
 }
 
 export interface DocumentSectionRepository {

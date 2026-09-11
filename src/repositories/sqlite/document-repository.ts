@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import type { Db } from "../../server/db/client";
 import {
@@ -38,19 +38,22 @@ function toSectionRecord(
 export function createSqliteDocumentRepository(
   db: Db,
 ): DocumentRepository & { sections: DocumentSectionRepository } {
-  const list = async (): Promise<readonly DocumentRecord[]> => {
-    const rows = await db.select().from(documents);
-
-    return rows.map(toDocumentRecord);
-  };
-
+  /**
+   * Scoped to the owner in the query itself, not checked afterwards.
+   *
+   * A lookup by id alone left the check to every caller, and callers forget:
+   * the highlight route once accepted writes against anyone's document, and
+   * three more had grown their own copy of the comparison. With the owner in
+   * the WHERE clause there is no way to fetch a document without saying whose.
+   */
   const getById = async (
     id: string,
+    userId: string,
   ): Promise<DocumentRecord | null> => {
     const rows = await db
       .select()
       .from(documents)
-      .where(eq(documents.id, id))
+      .where(and(eq(documents.id, id), eq(documents.userId, userId)))
       .limit(1);
 
     return rows[0] ? toDocumentRecord(rows[0]) : null;
@@ -68,12 +71,12 @@ export function createSqliteDocumentRepository(
       });
   };
 
-  const deleteById = async (id: string): Promise<boolean> => {
+  const deleteById = async (id: string, userId: string): Promise<boolean> => {
     // `.returning()` rather than a driver-specific row count: better-sqlite3
     // reports `changes`, D1 reports `meta.changes`, and this works on both.
     const deleted = await db
       .delete(documents)
-      .where(eq(documents.id, id))
+      .where(and(eq(documents.id, id), eq(documents.userId, userId)))
       .returning({ id: documents.id });
 
     return deleted.length > 0;
@@ -125,7 +128,6 @@ export function createSqliteDocumentRepository(
   };
 
   return {
-    list,
     getById,
     create,
     delete: deleteById,

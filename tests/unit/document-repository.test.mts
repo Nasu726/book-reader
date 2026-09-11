@@ -38,8 +38,13 @@ after(() => {
 test("document CRUD round trip", async () => {
   await repository.create(document);
 
-  assert.deepEqual(await repository.getById(document.id), document);
-  assert.equal((await repository.list()).length, 1);
+  assert.deepEqual(await repository.getById(document.id, document.userId), document);
+});
+
+test("a document cannot be read or deleted by anyone but its owner", async () => {
+  assert.equal(await repository.getById(document.id, "someone-else"), null);
+  assert.equal(await repository.delete(document.id, "someone-else"), false);
+  assert.deepEqual(await repository.getById(document.id, document.userId), document);
 });
 
 test("document sections are ordered and upserted", async () => {
@@ -81,7 +86,7 @@ test("document sections are ordered and upserted", async () => {
 });
 
 test("deleting a document removes its sections", async () => {
-  assert.equal(await repository.delete(document.id), true);
-  assert.equal(await repository.delete(document.id), false);
+  assert.equal(await repository.delete(document.id, document.userId), true);
+  assert.equal(await repository.delete(document.id, document.userId), false);
   assert.deepEqual(await repository.sections.listByDocument(document.id), []);
 });

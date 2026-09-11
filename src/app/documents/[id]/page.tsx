@@ -1,13 +1,12 @@
 import { SelectionAiConnector } from "@/components/selection-ai-connector";
 import { notFound, redirect } from "next/navigation";
 
-import { createSqliteDocumentRepository } from "@/repositories/sqlite/document-repository";
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
 import { createSqliteLibraryRepository } from "@/repositories/sqlite/library-repository";
 import { createSqliteVocabularyRepository } from "@/repositories/sqlite/vocabulary-repository";
-import { getCurrentUser, usesExternalAuth } from "@/server/auth/current-session";
-import { SignOut } from "@/components/sign-out";
+import { getCurrentUser } from "@/server/auth/current-session";
 import { getDatabase } from "@/server/db/database";
+import { requireOwnedDocument } from "@/server/documents/ownership";
 
 type DocumentPageProps = {
   params: Promise<{ id: string }>;
@@ -21,9 +20,8 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   }
 
   const { id } = await params;
-  const repository = createSqliteDocumentRepository(database);
-  const document = await repository.getById(id);
-  if (!document || document.userId !== session.userId) {
+  const document = await requireOwnedDocument(database, id, session.userId);
+  if (!document) {
     notFound();
   }
 
@@ -34,7 +32,6 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
 
   return (
     <SelectionAiConnector
-      account={<SignOut usesAccess={usesExternalAuth()} />}
       documentFormat={document.format}
       documentId={id}
       documentTitle={document.title}

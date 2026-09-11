@@ -106,7 +106,13 @@ export function SelectionActions({
   return (
     <div
       aria-label="Actions for the selected text"
-      className="border-edge bg-paper-raised fixed z-40 flex max-w-[calc(100vw-16px)] flex-wrap items-center justify-center gap-1 rounded-xl border p-1 shadow-lg"
+      // `w-max`, because the width must not depend on where the menu is. A
+      // fixed element with only `left` set is shrink-to-fit against the right
+      // edge of the screen, so moving it changed its width, which re-wrapped
+      // its rows, which moved its centre: on a phone the menu measured itself
+      // at one width and was then drawn at another, hanging off the left edge
+      // with Simplify cut in half.
+      className="border-edge bg-paper-raised fixed z-40 flex w-max max-w-[calc(100vw-16px)] flex-wrap items-center justify-center gap-1 rounded-xl border p-1 shadow-lg"
       ref={keepOnScreen}
       role="group"
       style={{
@@ -131,18 +137,25 @@ export function SelectionActions({
       ))}
       {/* Four colours instead of one Highlight button: choosing the colour is
           the same single tap as highlighting, so nothing is asked of a reader
-          who does not care which one it is. */}
-      <span aria-hidden className="mx-1 w-px self-stretch bg-rule" />
-      <span aria-label="Highlight" className="flex items-center gap-1 pr-1" role="group">
+          who does not care which one it is.
+
+          The rule between the words and the colours goes when the menu wraps
+          onto two rows on a phone, where it would open the second row. */}
+      <span aria-hidden className="mx-1 w-px self-stretch bg-rule max-sm:hidden" />
+      <span aria-label="Highlight" className="flex items-center" role="group">
         {HIGHLIGHT_COLORS.map((color) => (
+          // The dot is the size of a dot; the button around it is the size of
+          // a thumb. A 28-pixel target on a phone was mostly missed.
           <button
             aria-label={`Highlight in ${color}`}
-            className={`h-7 w-7 rounded-full border border-black/15 dark:border-white/25 ${SWATCHES[color]}`}
+            className="flex h-11 w-11 items-center justify-center"
             key={color}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onHighlight(color)}
             type="button"
-          />
+          >
+            <span className={`block h-7 w-7 rounded-full border border-black/15 dark:border-white/25 ${SWATCHES[color]}`} />
+          </button>
         ))}
       </span>
     </div>

@@ -100,6 +100,59 @@ test("every control is large enough to tap", async ({ page }) => {
   }), { timeout: 15_000 }).toEqual([]);
 });
 
+test("the selection menu stays on the screen and every colour is a thumb wide", async ({ page }) => {
+  await login(page);
+  const documentId = await importDocument(page, "menu.pdf", MULTIPAGE_PDF, "application/pdf");
+  await page.goto(`/documents/${documentId}`);
+  await page.waitForFunction(
+    () => document.querySelectorAll(".textLayer span").length > 0,
+    undefined,
+    { timeout: 15_000 },
+  );
+
+  const menu = page.getByRole("group", { name: "Actions for the selected text" });
+  const selectLine = async (text: string) => {
+    await page.evaluate((wanted) => {
+      const target = Array.from(document.querySelectorAll(".textLayer span"))
+        .find((node) => node.textContent?.includes(wanted));
+      if (!target) throw new Error(`PDF text "${wanted}" not found.`);
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      const selected = window.getSelection();
+      selected?.removeAllRanges();
+      selected?.addRange(range);
+      target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    }, text);
+    await expect(menu).toBeVisible();
+    return (await menu.boundingBox())!;
+  };
+
+  // Both lines start at the left margin, so a menu centred on either has to
+  // give up centring to stay on the screen.
+  const viewportWidth = await page.evaluate(() => window.innerWidth);
+  const wide = await selectLine("Structure of Scientific");
+  expect(wide.x).toBeGreaterThanOrEqual(0);
+  expect(wide.x + wide.width).toBeLessThanOrEqual(viewportWidth);
+
+  // The menu must be the same size wherever it is put. A fixed element with
+  // only `left` set is as wide as the room to its right, so it measured
+  // itself at one width, moved, re-wrapped at another, and hung off the edge.
+  const short = await selectLine("A Role for History");
+  expect(short.x).toBeGreaterThanOrEqual(0);
+  expect(short.x + short.width).toBeLessThanOrEqual(viewportWidth);
+  expect(Math.abs(short.width - wide.width)).toBeLessThanOrEqual(1);
+
+  // Not just the words: the colour dots are the smallest thing here, and a
+  // 28-pixel dot is a target most thumbs miss.
+  const small = await menu.locator("button").evaluateAll((buttons) => buttons.flatMap((button) => {
+    const rect = button.getBoundingClientRect();
+    return rect.width < 44 || rect.height < 44
+      ? [`${button.getAttribute("aria-label") ?? button.textContent}: ${rect.width}x${rect.height}`]
+      : [];
+  }));
+  expect(small).toEqual([]);
+});
+
 test("a long PDF gives back the pages it has scrolled past", async ({ page }) => {
   test.setTimeout(90_000);
   await login(page);

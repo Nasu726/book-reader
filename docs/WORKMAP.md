@@ -1542,6 +1542,48 @@ Chrome と Firefox は何年も前に実装しているが、WebKit は未実装
 
 ---
 
+## REVIEW-001 — 外部レビュー（2026-09-11）の採否
+**Status:** DONE
+**Priority:** P1
+
+ユーザーが ChatGPT に現状をレビューさせた結果の採否。判断はコードと計測で裏を取ってから行った（判断理由は `docs/DECISIONS.md` D-48〜D-50）。
+
+### 採用して実装したもの
+
+| 指摘 | 確認した事実 | 対応 |
+|---|---|---|
+| ハイライトの色ボタンが 28px | 実測 28×28 | 44×44 のボタンの中に 28px の丸。`tests/e2e/mobile.spec.ts` |
+| （指摘外・計測で発見）選択メニューが左端からはみ出す | iPhone 17 幅で box.x = **-16.5** | 幅を `max-content` にして位置に依存させない。D-48 |
+| 上部ヘッダが詰まりすぎ | EPUB でタイトル幅 **84px**（"Notes on…"） | 読書画面から Sign out を外す（Library に残る）。156px に。D-49 |
+| `getById(id)` を認可込みに | 5 箇所すべてにチェックはあったが 4 箇所が自前コピー | 所有者を SQL の WHERE に入れ `getById(id, userId)`。未指定の読み出しは型で不可能。未使用の `list()` を削除 |
+
+### 指摘どおりではないと確認したもの
+
+- **AI 入力欄が下端に残らない**: composer は既にシート最下端に固定、transcript だけがスクロールする（実測: input bottom 660 / sheet bottom 665）。残る不確実性は iOS キーボード時の挙動のみ → H-7 の確認項目に具体化
+- **FAB に safe-area-inset-bottom**: `viewport-fit=cover` を指定していないので、iOS は自動で safe area の内側にレイアウトする。指摘は前提が違う
+- **論文の section 認識**: PAPER-001 で実装済み（ページ単位のヒューリスティック）。未実装なのは「文書全体での構造」と「ナビゲーション」→ PAPER-002
+- **retry / timeout / cancellation**: 実装済み（`src/core/ai/provider.ts`）
+
+### 採用しなかったもの
+
+- **DeepL / 翻訳キャッシュ**: D-50。品質の苦情が無い、API キーと（多くの地域で）カード登録が要る、選択文だけを送ると論文の文脈を失う。キャッシュは DeepL 前提で、D1 の書き込み予算（1 日 2,000）を食う側
+- **OpenRouter の primary/fallback**: 必要になったら `openrouter-provider.ts` の `model` を `models: [...]` にする 3 行。今は必要が無い
+- **AI ドロワーのコマンド簡略化、選択メニューの Highlight 1 ボタン化、Library 行の … メニュー化、テーマをメニューへ**: いずれもユーザーが明示的に決めた現行の形と逆。使い心地の報告があってから
+
+### 後回し（Task 化）
+
+- **EXPORT-001**（TODO, P2）: Highlights + Note + Vocabulary の Markdown 出力。GET 1 本と純関数 1 つで済むが、要望が出ていない
+- **PAPER-002**（TODO, P2）: 文書全体の section 構造（タグ付き PDF は D-45 の H1〜H6 から正確に取れる）とナビゲーション。質問時の context を「現在の section」にする用途
+- **UPLOAD-001**（TODO, P3）: Workers は `request.formData()` で本文を全量バッファする。メモリ上限 128MB のため、**100MB 上限は未検証**（論文は数 MB なので実害なし）。必要になったら raw body PUT + `storage.put(stream)` に変える。今は準備工事をしない
+
+### Verify
+
+- unit 4（`document-repository.test.mts`、他人の userId で null / false。mutation: WHERE から userId を外すと赤）
+- E2E `mobile.spec.ts`「the selection menu stays on the screen and every colour is a thumb wide」。mutation: `w-max` を外すと幅差 31px で赤、`h-11 w-11` を `h-7 w-7` にすると赤
+- 目視（iPhone 17 幅、Chromium）: メニューが x=8〜394 に収まり 2 段、色は 44px。EPUB ヘッダのタイトル幅 84→156px
+
+---
+
 ## HUMAN-001 — Real iPhone dogfooding
 **Status:** HUMAN  
 **Priority:** P0 before final v0.1 sign-off  
