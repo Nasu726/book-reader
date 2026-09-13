@@ -37,6 +37,6 @@ test("every write route charges the daily budget", () => {
     }
   }
 
-  assert.ok(checked >= 10, `only ${checked} write handlers were scanned; the scan is not finding them`);
+  assert.ok(checked >= 9, `only ${checked} write handlers were scanned; the scan is not finding them`);
   assert.deepEqual(missing, []);
 });

@@ -1,16 +1,16 @@
 export const DOCUMENT_SELECTION_VERSION = 1;
 
-import type { PaperStructure } from "@/core/documents/paper-structure";
-
+/**
+ * What the reader picked: the text, and where in the document it is.
+ *
+ * The title rides along so a copy can name its source. Nothing here is
+ * about the model that used to read it — the surrounding text and the
+ * inferred paper structure went with the AI (D-52).
+ */
 export type DocumentSelection = {
   version: typeof DOCUMENT_SELECTION_VERSION;
   documentTitle?: string;
   format: "epub" | "pdf";
-  paperStructure?: PaperStructure;
-  surroundingText?: {
-    after?: string;
-    before?: string;
-  };
   text: string;
   location: string;
 };
@@ -114,30 +114,9 @@ export function normalizeSelectionText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function extractSurroundingText(
-  container: HTMLElement,
-  startOffset: number,
-  endOffset: number,
-): { after?: string; before?: string } | undefined {
-  const sectionText = container.textContent ?? "";
-  if (startOffset < 0 || endOffset > sectionText.length) return undefined;
-
-  const before = normalizeSelectionText(sectionText.slice(Math.max(0, startOffset - 240), startOffset));
-  const after = normalizeSelectionText(sectionText.slice(endOffset, Math.min(sectionText.length, endOffset + 240)));
-  return !before && !after ? undefined : { after: after || undefined, before: before || undefined };
-}
-
-function withContext(
-  captured: DocumentSelection,
-  documentTitle: string,
-  surroundingText?: DocumentSelection["surroundingText"],
-): DocumentSelection {
+function withContext(captured: DocumentSelection, documentTitle: string): DocumentSelection {
   const title = documentTitle.trim();
-  return {
-    ...captured,
-    ...(title && { documentTitle: title }),
-    ...(surroundingText && { surroundingText }),
-  };
+  return { ...captured, ...(title && { documentTitle: title }) };
 }
 
 export function parseSelectionLocation(value: string): DocumentSelection | null {
@@ -200,19 +179,15 @@ export function captureEpubSelection(
     } satisfies EpubRangeSource & { version: number }),
     text,
     version: DOCUMENT_SELECTION_VERSION,
-  } satisfies Omit<DocumentSelection, "documentTitle" | "surroundingText">;
+  } satisfies Omit<DocumentSelection, "documentTitle">;
 
-  return withContext(captured, documentTitle, extractSurroundingText(container, startOffset, endOffset));
+  return withContext(captured, documentTitle);
 }
 
 export function capturePdfSelection(
   selection: Selection,
   pageNumber: number,
-  context?: {
-    documentTitle: string;
-    pageText?: string;
-    paperStructure?: PaperStructure;
-  },
+  context?: { documentTitle: string },
 ): DocumentSelection | null {
   const text = normalizePdfSelectionText(selection.toString());
   if (!text || !Number.isInteger(pageNumber) || pageNumber < 1) return null;
@@ -226,36 +201,9 @@ export function capturePdfSelection(
     }),
     text,
     version: DOCUMENT_SELECTION_VERSION,
-  } satisfies Omit<DocumentSelection, "documentTitle" | "surroundingText" | "paperStructure">;
+  } satisfies Omit<DocumentSelection, "documentTitle">;
 
-  if (!context?.pageText?.trim()) {
-    return {
-      ...withContext(captured, context?.documentTitle ?? ""),
-      ...(context?.paperStructure && { paperStructure: context.paperStructure }),
-    };
-  }
-
-  const normalizedPageText = normalizeSelectionText(context.pageText);
-  const normalizedSelectedText = normalizeSelectionText(text).toLowerCase();
-  const selectedIndex = normalizedPageText.toLowerCase().indexOf(normalizedSelectedText);
-  if (selectedIndex < 0) {
-    return {
-      ...withContext(captured, context.documentTitle),
-      ...(context.paperStructure && { paperStructure: context.paperStructure }),
-    };
-  }
-
-  const startOffset = selectedIndex;
-  const endOffset = startOffset + normalizedSelectedText.length;
-  const before = normalizeSelectionText(normalizedPageText.slice(Math.max(0, startOffset - 240), startOffset));
-  const after = normalizeSelectionText(normalizedPageText.slice(endOffset, Math.min(normalizedPageText.length, endOffset + 240)));
-  return {
-    ...withContext(captured, context.documentTitle, {
-      after: after || undefined,
-      before: before || undefined,
-    }),
-    ...(context.paperStructure && { paperStructure: context.paperStructure }),
-  };
+  return withContext(captured, context?.documentTitle ?? "");
 }
 
 export function normalizePdfSelectionText(value: string): string {

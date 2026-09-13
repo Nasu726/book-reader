@@ -5,15 +5,6 @@ import { useCallback } from "react";
 import { HIGHLIGHT_COLORS, type HighlightColor } from "@/core/highlights/colors";
 import type { DocumentSelection } from "@/core/selection/capture";
 
-/** Highlighting is handled separately: it needs a colour, not just a verb. */
-export type SelectionAction ="explain" |"translate" |"simplify";
-
-const LABELS: Record<SelectionAction, string> = {
-  explain: "Explain",
-  translate: "Translate",
-  simplify: "Simplify",
-};
-
 /** The swatch itself, so a colour is picked by looking rather than by reading. */
 const SWATCHES: Record<HighlightColor, string> = {
   yellow: "bg-yellow-300",
@@ -73,10 +64,10 @@ function useEdgeAwarePlacement(left: number) {
 }
 
 /**
- * The actions, offered where the reader is already looking.
+ * The colours, offered where the reader is already looking.
  *
- * They existed only in the pane beside the text, which is why "how do I add a
- * highlight" was a fair question: nothing near the passage said it was
+ * Highlighting existed only in the pane beside the text, which is why "how do
+ * I add a highlight" was a fair question: nothing near the passage said it was
  * possible. A control that appears against the selection answers that without a
  * manual.
  *
@@ -87,11 +78,9 @@ function useEdgeAwarePlacement(left: number) {
  */
 export function SelectionActions({
   selection,
-  onAction,
   onHighlight,
 }: {
   selection: DocumentSelection | null;
-  onAction: (action: SelectionAction) => void;
   onHighlight: (color: HighlightColor) => void;
 }) {
   // Measured during render rather than in an effect. The position comes from
@@ -123,25 +112,9 @@ export function SelectionActions({
           : "translate(-50%, -100%)",
       }}
     >
-      {(Object.keys(LABELS) as SelectionAction[]).map((action) => (
-        <button
-          className="min-h-11 rounded-lg px-3 text-sm hover:bg-rule/40"
-          key={action}
-          // The menu must not steal the selection it is acting on.
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => onAction(action)}
-          type="button"
-        >
-          {LABELS[action]}
-        </button>
-      ))}
       {/* Four colours instead of one Highlight button: choosing the colour is
           the same single tap as highlighting, so nothing is asked of a reader
-          who does not care which one it is.
-
-          The rule between the words and the colours goes when the menu wraps
-          onto two rows on a phone, where it would open the second row. */}
-      <span aria-hidden className="mx-1 w-px self-stretch bg-rule max-sm:hidden" />
+          who does not care which one it is. */}
       <span aria-label="Highlight" className="flex items-center" role="group">
         {HIGHLIGHT_COLORS.map((color) => (
           // The dot is the size of a dot; the button around it is the size of

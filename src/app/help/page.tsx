@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata = {
-  title: "使い方 — AI Reader",
+  title: "使い方 — book-reader",
 };
 
 /**
@@ -32,7 +32,8 @@ export default function HelpPage() {
       reader={
         <article className="reader-prose mx-auto max-w-prose px-4 pb-24 sm:px-0" id="top">
           <p>
-            PDFとEPUBを読み、気になった文章をその場でAIに聞くための個人用リーダー。
+            PDFとEPUBを読み、印とメモを残すための個人用リーダー。
+            質問や翻訳は Claude / ChatGPT / DeepL に文章を貼って行う。
             保存したものはすべて本ごとに紐づき、開き直せば元の場所に残っている。
           </p>
 
@@ -44,7 +45,7 @@ export default function HelpPage() {
             <ol className="space-y-1">
               <li><a className="hover:text-ink underline underline-offset-4" href="#add">本を追加する・消す</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#read">読む</a></li>
-              <li><a className="hover:text-ink underline underline-offset-4" href="#ask">文章を選んでAIに聞く</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#mark">文章を選んで印を付ける</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#saved">保存されるもの3種と、その居場所</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#keyboard">キーボード</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#display">表示の設定</a></li>
@@ -64,7 +65,7 @@ export default function HelpPage() {
             <li><strong>Rename</strong> — 表示名を変える。EPUBは本の中のタイトルを自動で採用するが、自分で変えたあとは上書きされない</li>
             <li>
               <strong>Remove</strong> — ライブラリから消す。
-              <strong>取り込んだファイルごと消える</strong>し、その本のハイライト・ノート・単語帳・AIの会話も一緒に消える。確認ダイアログが出る
+              <strong>取り込んだファイルごと消える</strong>し、その本のハイライト・ノート・単語帳も一緒に消える。確認ダイアログが出る
             </li>
           </ul>
 
@@ -98,63 +99,23 @@ export default function HelpPage() {
             <strong>読書位置は自動で保存される</strong>ので、閉じて開き直すと続きから始まる。
           </p>
 
-          <h2 className="scroll-mt-4" id="ask">文章を選んでAIに聞く</h2>
+          <h2 className="scroll-mt-4" id="mark">文章を選んで印を付ける</h2>
           <p>
             本文をなぞって選択すると、<strong>選択したところのすぐそばに小さなメニューが出る</strong>。
-            Explain / Translate / Simplify と、ハイライト用の丸い色。
+            丸い色を押すと、その色の印が本文に付く。
           </p>
           <p>
-            右のパネル（スマホでは右下の <strong>Ask AI</strong> で下から出てくる。
-            上端の横棒を下へスワイプすると戻る）は <strong>AI</strong> /
-            <strong>Notes</strong> / <strong>Marks</strong> の3つに分かれている。
-            会話・自分で書いたもの・本文に付けた印は別のものなので、混ざらない。
-            <strong>AI</strong> タブは
-            <strong>1本の会話</strong>になっている。Explain も Translate も質問も、
-            同じ流れに上から順に積まれる。前の回答が消えることはない。
+            質問したい・訳したいときは、文章をコピーして Claude / ChatGPT / DeepL に貼る。
+            論文全体について聞くなら、最初に PDF そのものを渡しておくとよい。
+            アプリの中に AI は無い — 外のものの方がよく出来ているので。
           </p>
-          <p>
-            <strong>送るのは一番下の入力欄だけ</strong>。上のボタンは、その入力欄に
-            <code>/explain</code> のようなコマンドを書き込むだけで、送信はしない。
-            おかげで「選んだ文章について聞く」と「ただ質問する」が同じ操作になる。
-          </p>
-          <ul>
-            <li>
-              <code>/explain</code> — 選んだ文章を説明させる。
-              <code>/explain もっと短く</code> のように、続けて注文を書いてもよい
-            </li>
-            <li><code>/translate</code> — 訳させる。訳す先の言語はその下で選ぶ（既定は日本語）</li>
-            <li><code>/simplify</code> — やさしく言い直させる</li>
-            <li>コマンドを付けなければ、そのまま質問になる</li>
-          </ul>
-          <p>
-            入力欄のすぐ上に、<strong>いまどの文章が対象か</strong>が出ている。
-            本文の選択を解除すると <strong>No passage selected</strong> に変わる。
-            この状態でも<strong>質問はできる</strong> — そのときは
-            <strong>いま読んでいる節の本文</strong>（PDFはしおりで区切った節、EPUBは章）が
-            節の名前と一緒に送られる。しおりの無いPDFは開いているページだけ。
-            本を丸ごと送ると会話の余地が無くなるので、節が長すぎる場合も目の前のページに絞る。
-            コマンド（<code>/explain</code> など）は対象が要るので、選択するまで送れない。
-            パネル側のボタンを押しても選択は外れない。
-          </p>
-          <ul>
-            <li>
-              回答の下の <strong>Save to notes</strong> で、その回答を
-              <strong>Document note</strong> に書き足せる。会話は流れていくものなので、
-              残したいものだけこうして拾う
-            </li>
-            <li>
-              <strong>Clear conversation</strong> で会話をまるごと消す。会話は文書ごとに保存され、
-              次に開くと続きから見える
-            </li>
-          </ul>
-          <p>訳元の言語は指定しない（英語とは限らないため）。答えは日本語で返る。</p>
 
           <h2 className="scroll-mt-4" id="saved">保存されるもの3種と、その居場所</h2>
           <p>
-            右側のパネル（スマホでは <strong>Ask AI</strong> のシート）は
-            <strong>AI</strong> と <strong>Saved</strong> の2つに分かれている。
-            AIとのやりとりと、自分で残したものは別のものなので、混ざらないようにしてある。
-            保存したものは <strong>Saved</strong> 側、本ごとに分かれている。
+            右側のパネル（スマホでは右下の <strong>Notes</strong> で下から出てくるシート。
+            上端の横棒を下へスワイプすると戻る）は <strong>Marks</strong> と
+            <strong>Notes</strong> の2つに分かれている。本文に付けた印と、自分で書いたものは
+            別のものなので、混ざらない。どちらも本ごとに分かれている。
           </p>
           <ul>
             <li>
@@ -164,8 +125,7 @@ export default function HelpPage() {
             </li>
             <li>
               <strong>Notes</strong> タブの <strong>Document note</strong> — その本に1つだけの自由なメモ。書いて
-              <strong>Save note</strong>。空にして保存すると消える。
-              AIの回答の <strong>Save to notes</strong> もここに書き足される
+              <strong>Save note</strong>。空にして保存すると消える
             </li>
             <li>
               <strong>Save vocabulary</strong> — 単語帳。文章を選んでから意味を書いて保存すると、
@@ -223,9 +183,8 @@ export default function HelpPage() {
             </li>
             <li>
               文字が選べない・選択位置がずれる — 紙をスキャンしただけのPDFの可能性がある。
-              その場合、文字の情報を持っていないので選択もAIも使えない
+              その場合、文字の情報を持っていないので選択も印も付けられない
             </li>
-            <li>AIが答えない — APIキーとモデルの設定を確認する</li>
             <li>
               <strong>Daily save limit reached</strong> と出る — 無料枠を使い切らないための
               1日あたりの保存回数の上限に達している。翌日には戻る

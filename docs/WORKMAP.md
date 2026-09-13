@@ -24,7 +24,7 @@ PIVOT-000（記録）
 `docs/SPEC.md` と `docs/PLAN.md` を v2.0 に書き直し、`docs/DECISIONS.md` に D-52、`docs/HUMAN-TASKS.md` に H-11〜H-13 を追加。
 
 ## PIVOT-001 — AI を消す（現行スタック上）
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Depends on:** PIVOT-000
 

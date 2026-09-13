@@ -53,30 +53,6 @@ test("the source route streams document bytes rather than a base64 payload", asy
   expect(body.subarray(0, 5).toString("latin1")).toBe("%PDF-");
 });
 
-test("PDF selection exposes selectable text and captures normalized intent", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
-  const documentId = await importDocument(page, "selection.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
-
-  const reader = page.getByRole("region", { name: "PDF reader" });
-  await expect(reader).toBeVisible({ timeout: 10_000 });
-  const secondary = page.getByRole("complementary", { name: "AI and notes" });
-  const actions = secondary.getByRole("group", { name: "AI actions" });
-  await expect(actions).toBeVisible();
-  // The actions stay pressable with nothing selected: they write a command into
-  // the composer, and a control that cannot be pressed cannot say why. What is
-  // held back is sending, and the composer says what is missing.
-  for (const action of ["explain", "translate", "simplify"]) {
-    await expect(actions.getByRole("button", { name: `Insert /${action}` })).toBeEnabled();
-  }
-  await actions.getByRole("button", { name: "Insert /explain" }).click();
-  await expect(secondary.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
-  await expect(secondary).toContainText("No passage selected");
-  await expect(secondary.getByLabel("Ask about this passage"))
-    .toHaveAttribute("placeholder", "Select a passage to use this command");
-});
-
 test("PDF selection highlights persist and can be deleted", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);

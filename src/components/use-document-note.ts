@@ -4,13 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type DocumentNote = ReturnType<typeof useDocumentNote>;
 
-/**
- * The one free-text note kept with a document.
- *
- * Lifted out of the panel that shows it so that an answer can be kept from the
- * conversation without the two copies of the note disagreeing about what it
- * says.
- */
+/** The one free-text note kept with a document. */
 export function useDocumentNote(documentId: string) {
   const [content, setContent] = useState("");
   // What the server is holding, so the button can say which of the two things
@@ -41,8 +35,6 @@ export function useDocumentNote(documentId: string) {
     };
   }, [documentId]);
 
-  // The value to save is passed in rather than read from state: appending sets
-  // the text and saves it in the same breath, and state has not settled yet.
   const save = useCallback(async (next: string) => {
     try {
       const response = await fetch(`/api/documents/${documentId}/note`, {
@@ -59,21 +51,11 @@ export function useDocumentNote(documentId: string) {
     }
   }, [documentId]);
 
-  /** Keeps an answer, under whatever is already written. */
-  const append = useCallback(async (text: string) => {
-    const addition = text.trim();
-    if (!addition) return;
-    edited.current = true;
-    const next = content.trim() ? `${content.trim()}\n\n---\n\n${addition}` : addition;
-    setContent(next);
-    await save(next);
-  }, [content, save]);
-
   const edit = useCallback((next: string) => {
     edited.current = true;
     setContent(next);
     setStatus("idle");
   }, []);
 
-  return { append, content, edit, save, status, stored };
+  return { content, edit, save, status, stored };
 }

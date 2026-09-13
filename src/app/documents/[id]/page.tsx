@@ -1,4 +1,4 @@
-import { SelectionAiConnector } from "@/components/selection-ai-connector";
+import { ReaderWorkbench } from "@/components/reader-workbench";
 import { notFound, redirect } from "next/navigation";
 
 import { createSqliteHighlightRepository } from "@/repositories/sqlite/highlight-repository";
@@ -31,7 +31,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   );
 
   return (
-    <SelectionAiConnector
+    <ReaderWorkbench
       documentFormat={document.format}
       documentId={id}
       documentTitle={document.title}

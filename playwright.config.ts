@@ -53,10 +53,6 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
     env: {
-      AI_MODEL: "mock-model",
-      // The suite must exercise the real server AI route, not a browser stub,
-      // so the provider is swapped instead of the transport.
-      AI_PROVIDER: "mock",
       AUTH_PASSWORD_HASH: E2E_PASSWORD_HASH,
       AUTH_USERNAME: E2E_USERNAME,
       DATABASE_PATH: E2E_DATABASE_PATH,

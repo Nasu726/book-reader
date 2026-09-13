@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
-import { AiAnswerPanel } from "./ai-answer-panel";
-import { useAiActions } from "./use-ai-actions";
 import { AppShell } from "./app-shell";
 import { SecondaryTabs, type SecondaryTab } from "./secondary-tabs";
 import { SelectionActions } from "./selection-actions";
@@ -15,7 +13,7 @@ import Link from "next/link";
 import { DEFAULT_HIGHLIGHT_COLOR, type HighlightColor } from "@/core/highlights/colors";
 import type { DocumentSelection } from "@/core/selection/capture";
 
-type SelectionAiConnectorProps = {
+type ReaderWorkbenchProps = {
   documentId: string;
   documentFormat: "epub" |"pdf";
   documentTitle: string;
@@ -44,41 +42,30 @@ const SWATCH_CLASS: Record<HighlightColor, string> = {
   pink: "bg-pink-300",
 };
 
-export function SelectionAiConnector({
+/**
+ * The reading screen: the book, the menu against a selection, and the pane
+ * of what the reader marked and wrote.
+ *
+ * It was the place where a selection met the AI. The AI went (D-52); what is
+ * left is the book and the reader's own marks, which is what the pane beside
+ * the text was always for.
+ */
+export function ReaderWorkbench({
   documentId,
   documentFormat,
   documentTitle,
   documentSourceFilename,
   initialHighlights,
   initialVocabulary,
-}: SelectionAiConnectorProps) {
+}: ReaderWorkbenchProps) {
   const [selection, setSelection] = useState<DocumentSelection | null>(null);
-  const [sheetSignal, setSheetSignal] = useState(0);
-  const [tab, setTab] = useState<SecondaryTab>("ai");
+  const [tab, setTab] = useState<SecondaryTab>("highlights");
   const [highlightState, setHighlightState] = useState<"idle" |"saved" |"error">("idle");
   const [highlights, setHighlights] = useState(() => [...initialHighlights]);
   const [vocabulary, setVocabulary] = useState(() => [...initialVocabulary]);
   const [meaning, setMeaning] = useState("");
   // What the reader is looking at, so a question with nothing selected still
   // has the page to stand on.
-  const [visible, setVisible] = useState<{ text: string; sectionTitle?: string }>({ text: "" });
-  // Stable, and a no-op when nothing changed. The readers report from an
-  // effect that depends on this callback, so a fresh function or a fresh
-  // object on every call would have the report re-render the connector, which
-  // would re-run the effect, which would report again, without end.
-  const rememberVisible = useCallback((text: string, sectionTitle?: string) => {
-    setVisible((current) => (
-      current.text === text && current.sectionTitle === sectionTitle
-        ? current
-        : { sectionTitle, text }
-    ));
-  }, []);
-  const conversation = useAiActions({
-    documentExcerpt: visible.text,
-    documentId,
-    sectionTitle: visible.sectionTitle,
-    selection,
-  });
   const note = useDocumentNote(documentId);
   // Reflowed text can be resized; a drawn page has zoom instead.
   const pdfView = useSyncExternalStore(subscribe, getStoredPdfView, serverPdfView);
@@ -170,7 +157,6 @@ export function SelectionAiConnector({
 
   return (
     <AppShell
-      openSecondarySignal={sheetSignal}
       showTextSize={documentFormat === "epub" || pdfView === "text"}
       title={
         <div className="min-w-0">
@@ -182,18 +168,8 @@ export function SelectionAiConnector({
       }
       reader={
         <>
-          {/* The actions, offered against the passage itself. */}
+          {/* The colours, offered against the passage itself. */}
           <SelectionActions
-            onAction={(action) => {
-              // Started straight from the click. Routing it through a prop and
-              // an effect turned a user event into a state change, and made the
-              // same action twice in a row look like no change at all.
-              void conversation.send(action);
-              // The answer has somewhere to arrive: the AI tab, and on a phone
-              // the sheet that holds it.
-              setTab("ai");
-              setSheetSignal((current) => current + 1);
-            }}
             onHighlight={(color) => {
               if (selection) void handleHighlightCreated(selection, color);
             }}
@@ -206,7 +182,6 @@ export function SelectionAiConnector({
             format={documentFormat}
             highlights={highlights}
             onSelectionChange={(captured) => setSelection(captured)}
-            onVisibleTextChange={rememberVisible}
           />
           {highlightState !== "idle" && (
             <p
@@ -224,7 +199,6 @@ export function SelectionAiConnector({
           active={tab}
           onChange={setTab}
           panels={{
-            ai: <AiAnswerPanel conversation={conversation} onSaveToNotes={note.append} />,
             highlights: <>
           {/* No box and no heading: the tab is already what reveals this, and
               a panel that repeats its own tab's name says nothing. */}

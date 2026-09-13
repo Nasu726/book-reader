@@ -132,7 +132,7 @@ test("arrow keys turn pages and the zoom control resizes the page", async ({ pag
   expect(aligned).toBe(true);
 });
 
-test("typing a follow-up question never turns the page", async ({ page }) => {
+test("typing a note never turns the page", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
   const documentId = await importDocument(page, "typing.pdf", MULTIPAGE_PDF, "application/pdf");
@@ -140,13 +140,14 @@ test("typing a follow-up question never turns the page", async ({ page }) => {
 
   await expect(controls(page).getByText("of 2")).toBeVisible({ timeout: 10_000 });
 
-  const question = page.getByLabel("Ask about this passage");
-  await question.fill("Why does this matter");
-  await question.press("ArrowLeft");
-  await question.press("ArrowRight");
+  await page.getByRole("tab", { name: "Notes" }).click();
+  const note = page.getByRole("textbox", { name: "Document note" });
+  await note.fill("Why does this matter");
+  await note.press("ArrowLeft");
+  await note.press("ArrowRight");
 
   await expect(page.getByRole("spinbutton", { name: "Page number" })).toHaveValue("1");
-  await expect(question).toHaveValue("Why does this matter");
+  await expect(note).toHaveValue("Why does this matter");
 });
 
 test("arrow keys do nothing at the first and last page", async ({ page }) => {

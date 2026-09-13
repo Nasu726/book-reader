@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getDocument, TextLayer } from "pdfjs-dist/legacy/build/pdf.mjs";
 
-import { extractPdfText } from "@/core/documents/pdf-extraction";
 import { installStreamAsyncIterator } from "./stream-async-iterator";
 import { clearHighlights, paintHighlights, type PaintableHighlight } from "./highlight-paint";
 
@@ -47,7 +46,6 @@ type PdfPageProps = {
   aspectRatio: number;
   /** Every saved highlight; this page draws the ones that name its number. */
   highlights?: readonly PaintableHighlight[];
-  onTextExtracted?: (pageNumber: number, text: string) => void;
 };
 
 /**
@@ -65,7 +63,6 @@ export function PdfPage({
   containerWidth,
   aspectRatio,
   highlights = [],
-  onTextExtracted,
 }: PdfPageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -171,16 +168,6 @@ export function PdfPage({
         const textContent = await page.getTextContent();
         if (cancelled) return;
 
-        try {
-          onTextExtracted?.(
-            pageNumber,
-            extractPdfText(textContent.items as unknown as Parameters<typeof extractPdfText>[0]),
-          );
-        } catch {
-          // Extraction feeds AI context only; a failure here must not stop the
-          // page from being readable.
-        }
-
         stage = "placing the selectable text";
         layer!.replaceChildren();
         layer!.style.setProperty("--scale-factor", String(cssScale));
@@ -212,7 +199,7 @@ export function PdfPage({
       cancelled = true;
       task?.cancel();
     };
-  }, [visible, pdfDocument, pageNumber, zoom, containerWidth, attempt, onTextExtracted]);
+  }, [visible, pdfDocument, pageNumber, zoom, containerWidth, attempt]);
 
   // Never before the text layer exists: the spans a highlight points at are
   // created by that render, and pdf.js replaces them wholesale every time the

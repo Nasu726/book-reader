@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { extractPdfParagraphs, extractPdfText } from "@/core/documents/pdf-extraction";
+import { extractPdfParagraphs } from "@/core/documents/pdf-extraction";
 import {
   paragraphsFromStructure,
   type MarkedTextItem,
@@ -15,7 +15,6 @@ type PdfTextPageProps = {
   document: PdfDocumentProxy;
   pageNumber: number;
   highlights?: readonly PaintableHighlight[];
-  onTextExtracted?: (pageNumber: number, text: string) => void;
 };
 
 /**
@@ -36,7 +35,6 @@ export function PdfTextPage({
   document: pdfDocument,
   pageNumber,
   highlights = [],
-  onTextExtracted,
 }: PdfTextPageProps) {
   const containerRef = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
@@ -76,7 +74,6 @@ export function PdfTextPage({
         const tagged = paragraphsFromStructure(structure as StructTreeNode | null, items);
         const geometric = items as unknown as Parameters<typeof extractPdfParagraphs>[0];
         setParagraphs(tagged ?? extractPdfParagraphs(geometric));
-        onTextExtracted?.(pageNumber, extractPdfText(geometric));
         page.cleanup();
       } catch (cause) {
         if (!cancelled) {
@@ -87,7 +84,7 @@ export function PdfTextPage({
 
     void read();
     return () => { cancelled = true; };
-  }, [visible, paragraphs, pdfDocument, pageNumber, onTextExtracted]);
+  }, [visible, paragraphs, pdfDocument, pageNumber]);
 
   useEffect(() => {
     const container = containerRef.current;

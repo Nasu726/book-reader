@@ -15,17 +15,12 @@ type AppShellProps = {
   account?: ReactNode;
   /** Text size only appears where reflowing the text does something. */
   showTextSize?: boolean;
-  /**
-   * Increment to open the sheet from outside — used when an action chosen at
-   * the selection will put its answer in there.
-   */
-  openSecondarySignal?: number;
 };
 
 /**
  * The frame every screen sits in: a fixed top bar, then the reading surface,
- * with the AI and notes pane beside it on a wide screen and behind a button on
- * a narrow one.
+ * with the marks and notes pane beside it on a wide screen and behind a button
+ * on a narrow one.
  *
  * Two rules hold this together, and both were learned the hard way.
  *
@@ -45,17 +40,10 @@ export function AppShell({
   secondary,
   account,
   showTextSize,
-  openSecondarySignal = 0,
 }: AppShellProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [lastSignal, setLastSignal] = useState(0);
   const sheetRef = useRef<HTMLElement>(null);
   const dragRef = useRef<{ from: number; at: number; time: number } | null>(null);
-
-  if (openSecondarySignal !== lastSignal) {
-    setLastSignal(openSecondarySignal);
-    if (openSecondarySignal > 0) setSheetOpen(true);
-  }
 
   // Escape closes it, because a swipe is not something every reader can make
   // and the grip is not something every reader can see.
@@ -155,14 +143,14 @@ export function AppShell({
             onClick={() => setSheetOpen(true)}
             type="button"
           >
-            Ask AI
+            Notes
           </button>
         )}
 
         {/* Dims the page behind the sheet and closes it when tapped. */}
         {secondary && sheetOpen && (
           <button
-            aria-label="Close the AI panel"
+            aria-label="Close the notes panel"
             className="fixed inset-0 z-30 bg-black/25 backdrop-blur-[1px] transition-opacity duration-(--slow) lg:hidden"
             onClick={() => setSheetOpen(false)}
             type="button"
@@ -182,7 +170,7 @@ export function AppShell({
         */}
         {secondary && (
         <aside
-          aria-label={sheetOpen ? "AI drawer" : "AI and notes"}
+          aria-label={sheetOpen ? "Notes drawer" : "Marks and notes"}
           aria-modal={sheetOpen || undefined}
           ref={sheetRef}
           className={[

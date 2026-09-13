@@ -17,10 +17,7 @@ import {
 import { installStreamAsyncIterator } from "./stream-async-iterator";
 
 import { capturePdfSelection, type DocumentSelection } from "@/core/selection/capture";
-import { extractPdfText } from "@/core/documents/pdf-extraction";
-import { inferPaperStructure } from "@/core/documents/paper-structure";
-import { readPdfOutline, sectionAt, sectionPages, type OutlineEntry } from "@/core/documents/pdf-outline";
-import { MAX_EXCERPT_CHARACTERS } from "@/core/ai/action-service";
+import { readPdfOutline, sectionAt, type OutlineEntry } from "@/core/documents/pdf-outline";
 import { ContentsSelect } from "./contents-select";
 import type { PaintableHighlight } from "./highlight-paint";
 import { PdfPage, type PdfDocumentProxy } from "./pdf-page";
@@ -62,8 +59,6 @@ type PdfRendererProps = {
   onLocationChange?: (location: string) => void;
   onSelectionChange?: (selection: DocumentSelection | null) => void;
   /** The text of the page in view, for questions that have nothing selected. */
-  /** The text in front of the reader, and the heading it is under. */
-  onVisibleTextChange?: (text: string, sectionTitle?: string) => void;
 };
 
 function parsePage(location: string | null | undefined): number {
@@ -93,7 +88,6 @@ export function PdfRenderer({
   initialLocation,
   onLocationChange,
   onSelectionChange,
-  onVisibleTextChange,
   source,
 }: PdfRendererProps) {
   type PdfLoadingTask = ReturnType<typeof getDocument>;
@@ -129,7 +123,6 @@ export function PdfRenderer({
     () => document.querySelector("[data-reader-toolbar]"),
     () => null,
   );
-  const pageTextRef = useRef(new Map<number, string>());
   const restoredRef = useRef(false);
 
   useEffect(() => {
@@ -387,17 +380,8 @@ export function PdfRenderer({
       // screen — and in the text view, where a short page leaves the middle of
       // the pane showing the next one, they part company immediately.
       const page = pageOfSelection(selection) ?? currentPage;
-      const pageText = pageTextRef.current.get(page) ?? "";
-      let paperStructure: ReturnType<typeof inferPaperStructure> | undefined;
-      try {
-        paperStructure = pageText.trim() ? inferPaperStructure(pageText) : undefined;
-      } catch {
-        paperStructure = undefined;
-      }
       onSelectionChange?.(
-        selection
-          ? capturePdfSelection(selection, page, { documentTitle, pageText, paperStructure })
-          : null,
+        selection ? capturePdfSelection(selection, page, { documentTitle }) : null,
       );
     };
 
@@ -409,63 +393,7 @@ export function PdfRenderer({
     };
   }, [currentPage, documentTitle, onSelectionChange]);
 
-  // Counted so the effect below has something to react to: the text of a page
-  // arrives after the page is already on screen, and a ref changing is not a
-  // reason for anything to run again.
-  const [extracted, setExtracted] = useState(0);
-
-  const rememberPageText = useCallback((page: number, text: string) => {
-    pageTextRef.current.set(page, text);
-    setExtracted((current) => current + 1);
-  }, []);
-
   const section = sectionAt(outline, currentPage);
-  const [sectionStart, sectionEnd] = section
-    ? sectionPages(outline, section, pageCount)
-    : [currentPage, currentPage];
-
-  // The section's text is wanted before its pages have been drawn: pages are
-  // only drawn near the viewport, and a question about "this section" should
-  // not depend on how far the reader has scrolled through it. Reading the text
-  // alone is cheap; drawing is what is deferred.
-  useEffect(() => {
-    if (!document_) return;
-    let cancelled = false;
-    for (let page = sectionStart; page <= sectionEnd; page += 1) {
-      if (pageTextRef.current.has(page)) continue;
-      void document_.getPage(page)
-        .then((loaded) => loaded.getTextContent())
-        .then((content) => {
-          if (cancelled || pageTextRef.current.has(page)) return;
-          rememberPageText(
-            page,
-            extractPdfText(content.items as unknown as Parameters<typeof extractPdfText>[0]),
-          );
-        })
-        .catch(() => undefined);
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [document_, rememberPageText, sectionStart, sectionEnd]);
-
-  // What the reader is looking at: the section they are in, by the document's
-  // own contents, or the page in hand when there are no contents. Reported when
-  // the page changes and again as the text of those pages becomes known.
-  useEffect(() => {
-    const pages = [];
-    for (let page = sectionStart; page <= sectionEnd; page += 1) {
-      pages.push(pageTextRef.current.get(page) ?? "");
-    }
-    const inHand = pageTextRef.current.get(currentPage) ?? "";
-    const beforeInHand = pages.slice(0, currentPage - sectionStart).join("\n\n").length;
-    // The page in hand has to be inside the budget, or the model would see the
-    // start of a long chapter and nothing of what the question is about.
-    const text = beforeInHand + inHand.length > MAX_EXCERPT_CHARACTERS
-      ? inHand
-      : pages.join("\n\n").trim();
-    onVisibleTextChange?.(text, section?.title);
-  }, [currentPage, extracted, onVisibleTextChange, section, sectionStart, sectionEnd]);
 
   if (error) {
     return (
@@ -571,7 +499,6 @@ export function PdfRenderer({
                 document={document_}
                 highlights={highlights}
                 key={index + 1}
-                onTextExtracted={rememberPageText}
                 pageNumber={index + 1}
               />
             ) : (
@@ -581,7 +508,6 @@ export function PdfRenderer({
                 document={document_}
                 highlights={highlights}
                 key={index + 1}
-                onTextExtracted={rememberPageText}
                 pageNumber={index + 1}
                 zoom={zoom}
               />

@@ -189,27 +189,12 @@ export function buildPdf(
 }
 
 /**
- * Names an action in the composer and sends it.
- *
- * The buttons write `/explain` into the input rather than sending, because the
- * composer is the only thing that sends: asking about a passage and asking a
- * question of your own are then the same gesture.
- */
-export async function runAction(
-  page: Page,
-  action: "explain" | "translate" | "simplify",
-): Promise<void> {
-  await page.getByRole("button", { name: `Insert /${action}` }).click();
-  await page.getByRole("button", { name: "Send", exact: true }).click();
-}
-
-/**
  * Pushes the sheet back down with a swipe, the way the grip at its top says it
  * can be. There is no Close button: a grip that cannot be dragged is a promise
  * the interface does not keep.
  */
 export async function swipeSheetDown(page: Page): Promise<void> {
-  const grip = page.getByRole("dialog", { name: "AI drawer" }).locator("div").first();
+  const grip = page.getByRole("dialog", { name: "Notes drawer" }).locator("div").first();
   const box = await grip.boundingBox();
   if (!box) throw new Error("The sheet has no grip to drag.");
   const x = box.x + box.width / 2;

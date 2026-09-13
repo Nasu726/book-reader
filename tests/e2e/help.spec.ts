@@ -16,7 +16,7 @@ test("the header offers the manual from every screen", async ({ page }) => {
 
   await page.getByRole("link", { name: "Help" }).click();
   await expect(page).toHaveURL(/\/help$/);
-  await expect(page.getByRole("heading", { name: "文章を選んでAIに聞く" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "文章を選んで印を付ける" })).toBeVisible();
 
   await page.getByRole("link", { name: "← Library" }).click();
   await expect(page.getByRole("region", { name: "Library" })).toBeVisible();

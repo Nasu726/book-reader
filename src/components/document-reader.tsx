@@ -18,8 +18,6 @@ type DocumentReaderProps = {
   highlights?: readonly PaintableHighlight[];
   onSelectionChange?: (selection: DocumentSelection | null) => void;
   /** What is in view, for questions that have nothing selected. */
-  /** The text in front of the reader, and the heading it is under. */
-  onVisibleTextChange?: (text: string, sectionTitle?: string) => void;
 };
 
 type ParsedEpub = {
@@ -104,7 +102,6 @@ export function DocumentReader({
   format,
   highlights = [],
   onSelectionChange,
-  onVisibleTextChange,
 }: DocumentReaderProps) {
   const chapterRef = useRef<HTMLElement>(null);
   const readerRef = useRef<HTMLElement>(null);
@@ -228,11 +225,6 @@ export function DocumentReader({
   useEffect(() => clearAllHighlights, []);
 
   useEffect(() => {
-    if (format !== "epub") return;
-    onVisibleTextChange?.(section?.content ?? "", section?.title);
-  }, [format, onVisibleTextChange, section]);
-
-  useEffect(() => {
     if (format === "pdf" || !hasUserNavigated || !epub) return;
     const section = epub.sections[sectionIndex];
     if (!section) return;
@@ -291,7 +283,6 @@ export function DocumentReader({
       <PdfRenderer
         documentTitle={documentTitle}
         highlights={highlights}
-        onVisibleTextChange={onVisibleTextChange}
         initialLocation={initialLocation}
         onSelectionChange={onSelectionChange}
         onLocationChange={(location) => void progress.save(location)}

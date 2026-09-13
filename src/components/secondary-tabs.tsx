@@ -2,22 +2,17 @@
 
 import { useRef, type ReactNode } from "react";
 
-export type SecondaryTab = "ai" | "notes" | "highlights";
+export type SecondaryTab = "highlights" | "notes";
 
 const TABS: { id: SecondaryTab; label: string }[] = [
-  { id: "ai", label: "AI" },
-  { id: "notes", label: "Notes" },
   { id: "highlights", label: "Marks" },
+  { id: "notes", label: "Notes" },
 ];
 
 /**
- * Splits the pane beside the text into three things that are not each other.
- *
- * The conversation, what the reader wrote, and what the reader marked. They
- * were stacked in one column at first, so the note and the vocabulary sat below
- * an answer of unpredictable length; putting the marks in with them only moved
- * the problem, because a book with thirty highlights pushed the note off the
- * bottom instead.
+ * Splits the pane beside the text into two things that are not each other:
+ * what the reader marked, and what the reader wrote. Stacked in one column, a
+ * book with thirty highlights pushed the note off the bottom.
  *
  * Every panel stays mounted and the others are hidden, so switching tabs does
  * not throw away a half-typed meaning or scroll an answer back to the top.
@@ -78,8 +73,7 @@ export function SecondaryTabs({
       {TABS.map((tab) => (
         <div
           aria-labelledby={`tab-${tab.id}`}
-          // Scrolls inside itself when it has more than fits. The AI panel
-          // manages its own height and so never uses this; the saved things
+          // Scrolls inside itself when it has more than fits: the saved things
           // grow without limit and always will.
           className="min-h-0 flex-1 space-y-4 overflow-y-auto"
           hidden={active !== tab.id}

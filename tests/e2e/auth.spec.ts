@@ -39,7 +39,7 @@ test("the reader fills a narrow viewport and the AI pane stays out of the way", 
   expect(box).not.toBeNull();
   expect(box!.width).toBeGreaterThan(300);
 
-  await expect(page.getByRole("complementary", { name: "AI and notes" })).toBeHidden();
+  await expect(page.getByRole("complementary", { name: "Marks and notes" })).toBeHidden();
 });
 
 test("a wide viewport hosts the secondary pane beside the reader", async ({ page }) => {
@@ -50,7 +50,7 @@ test("a wide viewport hosts the secondary pane beside the reader", async ({ page
   await page.goto(`/documents/${documentId}`);
 
   const reader = page.getByRole("main", { name: "Reader" });
-  const secondary = page.getByRole("complementary", { name: "AI and notes" });
+  const secondary = page.getByRole("complementary", { name: "Marks and notes" });
   await expect(secondary).toBeVisible();
 
   const boxes = await Promise.all([reader.boundingBox(), secondary.boundingBox()]);

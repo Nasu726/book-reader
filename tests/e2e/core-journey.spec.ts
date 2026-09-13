@@ -1,11 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, importDocument, login, MULTIPAGE_PDF, runAction, scrollReaderToEnd } from "./helpers";
-
-// The server runs with AI_PROVIDER=mock, so these journeys exercise the real
-// /api/ai/action route — authentication, conversation persistence and all —
-// instead of a browser-level stub that would skip the server entirely.
-const MOCK_AI_RESPONSE = "Mock AI response.";
+import { buildEpub, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
 
 /** Selects the title line on page 1, the way a reader drags across it. */
 async function selectPassage(page: import("@playwright/test").Page) {
@@ -23,7 +18,7 @@ async function selectPassage(page: import("@playwright/test").Page) {
   });
 }
 
-test("PDF journey imports, reads, selects, acts, highlights, and restores", async ({ page }) => {
+test("PDF journey imports, reads, selects, highlights, and restores", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page);
 
@@ -44,33 +39,14 @@ test("PDF journey imports, reads, selects, acts, highlights, and restores", asyn
   const selectedText = await selectPassage(page);
   expect(selectedText).toContain("Structure of Scientific Revolutions");
 
-  const secondary = page.getByRole("complementary", { name: "AI and notes" });
-  // One conversation, so each action adds to it rather than replacing what the
-  // last one said.
-  for (const [index, action] of (["explain", "translate", "simplify"] as const).entries()) {
-    await runAction(page, action);
-    await expect(secondary.getByRole("region", { name: "AI response" }))
-      .toHaveCount(index + 1, { timeout: 15_000 });
-  }
-  await secondary.getByLabel("Ask about this passage").fill("Why does this matter?");
-  await secondary.getByRole("button", { name: "Send", exact: true }).click();
-  await expect(secondary.getByRole("region", { name: "AI response" }))
-    .toHaveCount(4, { timeout: 15_000 });
-  await expect(secondary.getByRole("region", { name: "AI response" }).last())
-    .toContainText(MOCK_AI_RESPONSE);
-
-  // Highlighting lives against the passage now, so the selection the AI actions
-  // consumed has to be made again — clicking in the pane clears it, exactly as
-  // it would for a reader.
-  await selectPassage(page);
   await page.getByRole("group", { name: "Actions for the selected text" })
     .getByRole("button", { name: "Highlight in yellow" }).click();
-  // The same allowance the AI assertions above use. These confirmations wait on
-  // a round trip to the development server, which two Playwright workers
-  // rendering PDF pages can hold up well past the default five seconds.
+  // These confirmations wait on a round trip to the development server, which
+  // two Playwright workers rendering PDF pages can hold up well past the
+  // default five seconds.
   await expect(page.getByText("Highlight saved.")).toBeVisible({ timeout: 15_000 });
 
-  // What the reader keeps lives in its own tab, away from the AI's answers.
+  // What the reader wrote lives in its own tab, away from what they marked.
   await page.getByRole("tab", { name: "Notes" }).click();
   const note = page.getByRole("textbox", { name: "Document note" });
   await note.fill("Persisted document note.");
