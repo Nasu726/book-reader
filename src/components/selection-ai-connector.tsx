@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 
 import { AiAnswerPanel } from "./ai-answer-panel";
 import { useAiActions } from "./use-ai-actions";
@@ -61,8 +61,24 @@ export function SelectionAiConnector({
   const [meaning, setMeaning] = useState("");
   // What the reader is looking at, so a question with nothing selected still
   // has the page to stand on.
-  const [visibleText, setVisibleText] = useState("");
-  const conversation = useAiActions({ documentExcerpt: visibleText, documentId, selection });
+  const [visible, setVisible] = useState<{ text: string; sectionTitle?: string }>({ text: "" });
+  // Stable, and a no-op when nothing changed. The readers report from an
+  // effect that depends on this callback, so a fresh function or a fresh
+  // object on every call would have the report re-render the connector, which
+  // would re-run the effect, which would report again, without end.
+  const rememberVisible = useCallback((text: string, sectionTitle?: string) => {
+    setVisible((current) => (
+      current.text === text && current.sectionTitle === sectionTitle
+        ? current
+        : { sectionTitle, text }
+    ));
+  }, []);
+  const conversation = useAiActions({
+    documentExcerpt: visible.text,
+    documentId,
+    sectionTitle: visible.sectionTitle,
+    selection,
+  });
   const note = useDocumentNote(documentId);
   // Reflowed text can be resized; a drawn page has zoom instead.
   const pdfView = useSyncExternalStore(subscribe, getStoredPdfView, serverPdfView);
@@ -190,7 +206,7 @@ export function SelectionAiConnector({
             format={documentFormat}
             highlights={highlights}
             onSelectionChange={(captured) => setSelection(captured)}
-            onVisibleTextChange={setVisibleText}
+            onVisibleTextChange={rememberVisible}
           />
           {highlightState !== "idle" && (
             <p

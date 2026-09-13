@@ -5,8 +5,15 @@ import {
   generateWithTimeout,
 } from "./provider.ts";
 
-/** The most of the open page that is worth spending on one question. */
-const MAX_EXCERPT_CHARACTERS = 4_000;
+/**
+ * The most of the open section that is worth spending on one question.
+ *
+ * About three pages of dense prose. A section of a paper usually fits; a
+ * chapter of a book does not, and the reader that supplies the excerpt falls
+ * back to the page in hand rather than send the start of a chapter the reader
+ * is at the end of.
+ */
+export const MAX_EXCERPT_CHARACTERS = 12_000;
 
 export const AI_ACTIONS = [
   "explain",
@@ -94,6 +101,12 @@ export type AiActionInput = {
    * context window on itself and leave nothing for the conversation.
    */
   documentExcerpt?: string;
+  /**
+   * Where the reader is, by the document's own contents: a PDF outline entry
+   * or an EPUB chapter. Outranks the section guessed from the page's headings,
+   * which only ever found one when the heading was on the same page.
+   */
+  sectionTitle?: string;
   paperStructure?: PaperStructure;
   surroundingText?: { before?: string; after?: string };
   sourceLanguage?: string;
@@ -178,7 +191,7 @@ export function buildPrompt(input: AiActionInput): {
     promptParts.push(`Question: ${asked}`);
   }
   if (selected) promptParts.push("Selected text:", selected);
-  const sectionTitle = findPaperSectionTitle(input.paperStructure, selected);
+  const sectionTitle = input.sectionTitle?.trim() || findPaperSectionTitle(input.paperStructure, selected);
 
   // Enough to answer from, far short of what a chapter would cost.
   const excerpt = !selected && input.documentExcerpt?.trim()

@@ -86,6 +86,13 @@ export default function HelpPage() {
           </p>
           <p>
             EPUBは <strong>Previous</strong> / <strong>Next</strong> で章を移動する。
+            そのあいだの一覧から章を選んでも飛べる。
+          </p>
+          <p>
+            PDFにしおり（作者が付けた目次。LaTeXや出版社のPDFにはたいてい入っている）が
+            あれば、<strong>Page</strong> 欄の隣に同じ一覧が出る。閉じた状態では
+            <strong>いまどの節にいるか</strong>を示す。しおりの無いPDFには出ない —
+            見出しを推測して目次をでっち上げることはしない。
           </p>
           <p>
             <strong>読書位置は自動で保存される</strong>ので、閉じて開き直すと続きから始まる。
@@ -123,8 +130,9 @@ export default function HelpPage() {
             入力欄のすぐ上に、<strong>いまどの文章が対象か</strong>が出ている。
             本文の選択を解除すると <strong>No passage selected</strong> に変わる。
             この状態でも<strong>質問はできる</strong> — そのときは
-            <strong>いま開いているページ（EPUBなら章）の本文</strong>が一緒に送られる。
-            本を丸ごと送ると会話の余地が無くなるので、送るのは目の前の1ページ分だけ。
+            <strong>いま読んでいる節の本文</strong>（PDFはしおりで区切った節、EPUBは章）が
+            節の名前と一緒に送られる。しおりの無いPDFは開いているページだけ。
+            本を丸ごと送ると会話の余地が無くなるので、節が長すぎる場合も目の前のページに絞る。
             コマンド（<code>/explain</code> など）は対象が要るので、選択するまで送れない。
             パネル側のボタンを押しても選択は外れない。
           </p>

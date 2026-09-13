@@ -91,9 +91,12 @@ test("the conversation can be thrown away", async ({ page }) => {
     return ((await response.json()) as { messages: unknown[] }).messages.length;
   }, { timeout: 10_000 }).toBe(0);
 
-  await page.reload();
-  await page.waitForResponse((response) =>
+  // Listened for before the reload, or the history can have been fetched
+  // before the listener exists and the wait runs out the whole timeout.
+  const history = page.waitForResponse((response) =>
     response.url().includes("/api/ai/action?documentId=") && response.request().method() === "GET");
+  await page.reload();
+  await history;
   await expect(page.getByRole("region", { name: "AI response" })).toHaveCount(0);
 });
 

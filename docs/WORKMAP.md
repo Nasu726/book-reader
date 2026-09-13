@@ -1587,7 +1587,7 @@ Chrome と Firefox は何年も前に実装しているが、WebKit は未実装
 ---
 
 ## PAPER-002 — 文書全体の目次と、section 単位の AI context
-**Status:** TODO
+**Status:** DONE
 **Priority:** P2
 **Depends on:** PAPER-001, PDFTEXT-001
 
@@ -1597,6 +1597,23 @@ Chrome と Firefox は何年も前に実装しているが、WebKit は未実装
 - 選択無しの質問に、現在のページではなく現在の section を渡す（PAPER-001 はページ単位の推定しか持たない）
 
 推定ではなく文書の自己申告を使う点は D-45 と同じ。outline が無い PDF は今のまま（ページ単位）。
+
+### 実装
+
+- `src/core/documents/pdf-outline.ts` — `readPdfOutline()`（`getOutline()` を平坦化、深さ 2 まで、行き先の無い項目は捨てる）、`sectionAt()`、`sectionPages()`
+- `src/components/contents-select.tsx` — ネイティブ `<select aria-label="Contents">` 1 つ。両形式共通。閉じた状態が「いまどこにいるか」
+- `pdf-renderer.tsx` — 開いた後に outline を読む。現在の section のページの本文は**描画前に読む**（描画は viewport 付近だけなので、質問が「どこまでスクロールしたか」に依存しないため）。context は section 全体、ただし手元のページが予算（`MAX_EXCERPT_CHARACTERS` = 12,000 字）に入らない長い章は手元のページだけ
+- `action-service.ts` — `sectionTitle`（文書の自己申告）が PAPER-001 の推定より優先。選択ありでも付く
+- EPUB は章題を `sectionTitle` として渡す
+
+### Verify
+
+- unit 4（`pdf-outline.test.mts`）、`ai-action-service.test.mts` に 1 件追加
+- E2E `contents.spec.ts` 3 件: 一覧と移動と「現在地」、選択無し質問の context に section の 3 ページ（未描画の 6 ページ目を含む）が入り隣の節は入らないこと、EPUB の章一覧と章題
+- mutation: section を 1 ページにすると赤、先読みを止めると赤（6 ページ目が欠ける）、`sectionTitle` を渡さないと 2 件赤
+- 目視（iPhone 17 幅・デスクトップ、PDF・EPUB）: ツールバーは横にはみ出さず、EPUB のカウンタが 3 行に折れる問題を直した
+
+判断理由は `docs/DECISIONS.md` D-51。
 
 ---
 

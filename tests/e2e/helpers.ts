@@ -110,13 +110,46 @@ export async function scrollReaderToEnd(page: Page): Promise<void> {
  * Memory behaviour only shows up over a document long enough to scroll through:
  * two pages fit in a phone's canvas budget however carelessly they are handled.
  */
-export function buildPdf(pageCount: number, paddingPerPage = 0, linesPerPage = 1): Buffer {
+/** One bookmark of a PDF outline; `items` are its subsections. */
+export type OutlineSpec = { title: string; page: number; items?: readonly OutlineSpec[] };
+
+export function buildPdf(
+  pageCount: number,
+  paddingPerPage = 0,
+  linesPerPage = 1,
+  outline: readonly OutlineSpec[] = [],
+): Buffer {
   const objects: string[] = [];
   const pageIds = Array.from({ length: pageCount }, (_, index) => 3 + index);
   const fontId = 3 + pageCount;
   const contentIds = pageIds.map((_, index) => fontId + 1 + index);
 
-  objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  // The outline, when asked for: the bookmarks a viewer lists in its sidebar,
+  // each pointing at the top of a page. Written after the content objects.
+  const outlinesId = outline.length > 0 ? fontId + 1 + pageCount : 0;
+  if (outlinesId) {
+    let nextId = outlinesId + 1;
+    const write = (items: readonly OutlineSpec[], parentId: number): [number, number] => {
+      const ids = items.map(() => nextId++);
+      items.forEach((item, index) => {
+        const children = item.items?.length ? write(item.items, ids[index]!) : null;
+        objects[ids[index]!] = [
+          `<< /Title (${item.title}) /Parent ${parentId} 0 R`,
+          index > 0 ? `/Prev ${ids[index - 1]} 0 R` : "",
+          index < ids.length - 1 ? `/Next ${ids[index + 1]} 0 R` : "",
+          children ? `/First ${children[0]} 0 R /Last ${children[1]} 0 R /Count ${item.items!.length}` : "",
+          `/Dest [${pageIds[item.page - 1]} 0 R /XYZ 0 792 null] >>`,
+        ].filter(Boolean).join(" ");
+      });
+      return [ids[0]!, ids[ids.length - 1]!];
+    };
+    const [first, last] = write(outline, outlinesId);
+    objects[outlinesId] = `<< /Type /Outlines /First ${first} 0 R /Last ${last} 0 R /Count ${outline.length} >>`;
+  }
+
+  objects[1] = outlinesId
+    ? `<< /Type /Catalog /Pages 2 0 R /Outlines ${outlinesId} 0 R /PageMode /UseOutlines >>`
+    : "<< /Type /Catalog /Pages 2 0 R >>";
   objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageCount} >>`;
   pageIds.forEach((id, index) => {
     objects[id] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] `

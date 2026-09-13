@@ -221,12 +221,34 @@ test("a selected passage carries itself, so the page is not sent as well", () =>
   assert.doesNotMatch(context, /What the reader is looking at:/);
 });
 
-test("the open page is truncated rather than sent whole", () => {
+test("the open section is truncated rather than sent whole", () => {
   const { context } = buildPrompt({
     action: "ask",
     documentExcerpt: "x".repeat(20_000),
     selectedText: "",
     userQuestion: "What is this about?",
   });
-  assert.ok(context.length < 5_000, `context was ${context.length} characters`);
+  assert.ok(context.length < 13_000, `context was ${context.length} characters`);
+});
+
+test("the section the reader is in is named, from the document's own contents", () => {
+  const { context } = buildPrompt({
+    action: "ask",
+    documentExcerpt: "Some text.",
+    sectionTitle: "2.2 Data",
+    selectedText: "",
+    userQuestion: "What is this about?",
+  });
+  assert.match(context, /Section: 2\.2 Data/);
+
+  // The declared section outranks the one guessed from the page's headings,
+  // and is still there with a passage selected, which the guess mostly is not.
+  const selected = buildPrompt({
+    ...baseInput,
+    action: "explain",
+    paperStructure,
+    sectionTitle: "2.2 Data",
+  }).context;
+  assert.match(selected, /Section: 2\.2 Data/);
+  assert.doesNotMatch(selected, /Section: Results/);
 });

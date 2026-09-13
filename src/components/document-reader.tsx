@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ContentsSelect } from "./contents-select";
 import { PdfRenderer } from "./pdf-renderer";
 import { captureEpubSelection, type DocumentSelection } from "@/core/selection/capture";
 import { clearAllHighlights, paintHighlights, type PaintableHighlight } from "./highlight-paint";
@@ -17,7 +18,8 @@ type DocumentReaderProps = {
   highlights?: readonly PaintableHighlight[];
   onSelectionChange?: (selection: DocumentSelection | null) => void;
   /** What is in view, for questions that have nothing selected. */
-  onVisibleTextChange?: (text: string) => void;
+  /** The text in front of the reader, and the heading it is under. */
+  onVisibleTextChange?: (text: string, sectionTitle?: string) => void;
 };
 
 type ParsedEpub = {
@@ -227,7 +229,7 @@ export function DocumentReader({
 
   useEffect(() => {
     if (format !== "epub") return;
-    onVisibleTextChange?.(section?.content ?? "");
+    onVisibleTextChange?.(section?.content ?? "", section?.title);
   }, [format, onVisibleTextChange, section]);
 
   useEffect(() => {
@@ -250,9 +252,17 @@ export function DocumentReader({
     return (
       <section aria-label="EPUB reader" className="space-y-4" ref={readerRef}>
         <div className="flex items-center justify-between gap-2">
-          <button className="border-edge min-h-11 rounded-lg border px-3 text-sm" disabled={sectionIndex === 0} onClick={() => goToSection(sectionIndex - 1)} type="button">Previous</button>
-          <span className="text-sm">{sectionIndex + 1} / {epub.sections.length}</span>
-          <button className="border-edge min-h-11 rounded-lg border px-3 text-sm" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => goToSection(sectionIndex + 1)} type="button">Next</button>
+          <button className="border-edge min-h-11 shrink-0 rounded-lg border px-3 text-sm" disabled={sectionIndex === 0} onClick={() => goToSection(sectionIndex - 1)} type="button">Previous</button>
+          {/* Takes what the buttons and the count leave, so a phone gets a
+              narrower list rather than a count folded onto three lines. */}
+          <ContentsSelect
+            className="min-w-0 flex-1 sm:max-w-72"
+            current={sectionIndex}
+            entries={epub.sections.map((candidate, index) => ({ label: candidate.title || `Section ${index + 1}` }))}
+            onPick={goToSection}
+          />
+          <span className="shrink-0 text-sm tabular-nums whitespace-nowrap">{sectionIndex + 1} / {epub.sections.length}</span>
+          <button className="border-edge min-h-11 shrink-0 rounded-lg border px-3 text-sm" disabled={sectionIndex >= epub.sections.length - 1} onClick={() => goToSection(sectionIndex + 1)} type="button">Next</button>
         </div>
         <article className="reader-prose max-w-prose rounded-xl border border-rule p-4" data-reader-section={section.id} ref={chapterRef}>
           {/* The nav label is only shown when the chapter body carries no heading of its own. */}

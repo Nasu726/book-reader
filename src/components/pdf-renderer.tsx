@@ -17,7 +17,11 @@ import {
 import { installStreamAsyncIterator } from "./stream-async-iterator";
 
 import { capturePdfSelection, type DocumentSelection } from "@/core/selection/capture";
+import { extractPdfText } from "@/core/documents/pdf-extraction";
 import { inferPaperStructure } from "@/core/documents/paper-structure";
+import { readPdfOutline, sectionAt, sectionPages, type OutlineEntry } from "@/core/documents/pdf-outline";
+import { MAX_EXCERPT_CHARACTERS } from "@/core/ai/action-service";
+import { ContentsSelect } from "./contents-select";
 import type { PaintableHighlight } from "./highlight-paint";
 import { PdfPage, type PdfDocumentProxy } from "./pdf-page";
 import { PdfTextPage } from "./pdf-text-page";
@@ -58,7 +62,8 @@ type PdfRendererProps = {
   onLocationChange?: (location: string) => void;
   onSelectionChange?: (selection: DocumentSelection | null) => void;
   /** The text of the page in view, for questions that have nothing selected. */
-  onVisibleTextChange?: (text: string) => void;
+  /** The text in front of the reader, and the heading it is under. */
+  onVisibleTextChange?: (text: string, sectionTitle?: string) => void;
 };
 
 function parsePage(location: string | null | undefined): number {
@@ -99,6 +104,8 @@ export function PdfRenderer({
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [currentPage, setCurrentPage] = useState(() => parsePage(initialLocation));
+  /** The document's own contents, when it has any (D-51). */
+  const [outline, setOutline] = useState<readonly OutlineEntry[]>([]);
 
   const columnRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -186,6 +193,10 @@ export function PdfRenderer({
       setAspectRatio(size.height / size.width);
       setPageCount(opened.numPages);
       setDocument(opened);
+      // After the pages, not before them: a contents list is worth nothing
+      // while the book is still opening, and reading it can take a moment.
+      const entries = await readPdfOutline(opened);
+      if (!cancelled) setOutline(entries);
     }
 
     void open();
@@ -408,11 +419,53 @@ export function PdfRenderer({
     setExtracted((current) => current + 1);
   }, []);
 
-  // What the reader is looking at, reported when the page changes and again
-  // when that page's text is finally known.
+  const section = sectionAt(outline, currentPage);
+  const [sectionStart, sectionEnd] = section
+    ? sectionPages(outline, section, pageCount)
+    : [currentPage, currentPage];
+
+  // The section's text is wanted before its pages have been drawn: pages are
+  // only drawn near the viewport, and a question about "this section" should
+  // not depend on how far the reader has scrolled through it. Reading the text
+  // alone is cheap; drawing is what is deferred.
   useEffect(() => {
-    onVisibleTextChange?.(pageTextRef.current.get(currentPage) ?? "");
-  }, [currentPage, extracted, onVisibleTextChange]);
+    if (!document_) return;
+    let cancelled = false;
+    for (let page = sectionStart; page <= sectionEnd; page += 1) {
+      if (pageTextRef.current.has(page)) continue;
+      void document_.getPage(page)
+        .then((loaded) => loaded.getTextContent())
+        .then((content) => {
+          if (cancelled || pageTextRef.current.has(page)) return;
+          rememberPageText(
+            page,
+            extractPdfText(content.items as unknown as Parameters<typeof extractPdfText>[0]),
+          );
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [document_, rememberPageText, sectionStart, sectionEnd]);
+
+  // What the reader is looking at: the section they are in, by the document's
+  // own contents, or the page in hand when there are no contents. Reported when
+  // the page changes and again as the text of those pages becomes known.
+  useEffect(() => {
+    const pages = [];
+    for (let page = sectionStart; page <= sectionEnd; page += 1) {
+      pages.push(pageTextRef.current.get(page) ?? "");
+    }
+    const inHand = pageTextRef.current.get(currentPage) ?? "";
+    const beforeInHand = pages.slice(0, currentPage - sectionStart).join("\n\n").length;
+    // The page in hand has to be inside the budget, or the model would see the
+    // start of a long chapter and nothing of what the question is about.
+    const text = beforeInHand + inHand.length > MAX_EXCERPT_CHARACTERS
+      ? inHand
+      : pages.join("\n\n").trim();
+    onVisibleTextChange?.(text, section?.title);
+  }, [currentPage, extracted, onVisibleTextChange, section, sectionStart, sectionEnd]);
 
   if (error) {
     return (
@@ -446,6 +499,11 @@ export function PdfRenderer({
               of {pageCount || "…"}
             </span>
           </label>
+          <ContentsSelect
+            current={section ? outline.indexOf(section) : -1}
+            entries={outline.map((entry) => ({ depth: entry.depth, label: entry.title }))}
+            onPick={(index) => scrollToPage(outline[index]!.page)}
+          />
 
           {/*
             One group at the right edge, in a fixed order, with the switch last.

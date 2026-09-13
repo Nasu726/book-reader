@@ -154,11 +154,16 @@ test("EPUB journey renders authored structure and restores the stored position",
   await expect(reader.locator("p")).toHaveCount(2);
   await expect(reader.locator("article")).not.toContainText("ch1");
 
+  // Listened for before the click: the save is debounced a quarter of a
+  // second behind the navigation, and under a loaded suite the two visibility
+  // checks could take longer than that — then the response had already come
+  // and gone, and the wait ran out the test's whole timeout.
+  const saved = page.waitForResponse((response) =>
+    response.url().includes("/progress") && response.request().method() === "POST");
   await reader.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("2 / 2")).toBeVisible();
   await expect(reader.getByText("Beta restoration text.")).toBeVisible();
-  await page.waitForResponse((response) =>
-    response.url().includes("/progress") && response.request().method() === "POST");
+  await saved;
 
   await page.reload();
   await expect(reader.getByText("Beta restoration text.")).toBeVisible({ timeout: 10_000 });
