@@ -1,705 +1,267 @@
-# AI Reader 仕様書
+# book-reader 仕様書
 
-**Version:** 1.1  
+**Version:** 2.0（2026-09-13 の転回後）  
 **文書種別:** Product / Technical Specification  
-**優先度表記:** `MUST` = MVP必須 / `SHOULD` = 強く推奨 / `MAY` = 後回し可
+**優先度表記:** `MUST` = 必須 / `SHOULD` = 強く推奨 / `MAY` = 後回し可
+
+v1.x（AI Reader）の仕様は git 履歴にある。転回の理由は `docs/DECISIONS.md` D-52。
+
+---
+
+## 0. 一文で
+
+> **PDF / EPUB を快適に読み、印とメモを Obsidian の vault に残す個人用 Reader。** 質問・説明・翻訳は外部の AI に任せ、アプリはそこへ渡すコピーを快適にする。
 
 ---
 
 ## 1. 対象プラットフォーム
 
 ### ENV-001 — iPhone Safari
-**MUST（受け入れは延期）**
+**MUST**
 
-最新の一般提供iOS上のSafariで主要ユーザーフローが動作すること。
-
-2026-08-27: 要件としては維持するが、MVP完成判定のブロッカーから外す。実機検証はHUMAN-001でしか行えず、待機が開発全体を止めるため。モバイルレイアウトの退行防止は自動検証を継続する。
+最新の一般提供 iOS 上の Safari で主要フローが動作すること。実機検証は HUMAN タスクでしか行えないため、自動検証は iPhone 17 の寸法・dpr の Chromium で行い、実機固有項目は `docs/HUMAN-TASKS.md` に残す。
 
 ### ENV-002 — Google Chrome
 **MUST**
 
-最新安定版Google Chromeで主要ユーザーフローが動作すること。デスクトップChromeを正式な対応対象とする。
+最新安定版 Google Chrome（デスクトップ）で主要フローが動作すること。
 
 ### ENV-003 — Responsive
 **MUST**
 
-狭い画面では1ペイン、十分に広い画面ではReaderと操作領域を併置できるレスポンシブ設計とする。
+狭い画面では本文 1 ペイン＋下から出るシート、十分な幅では本文＋右ペイン。
 
 ### ENV-004 — PWA
 **MUST**
 
-PWAとして必要なmanifest、icon、standalone起動に必要な設定等を備える。PWAインストールをサポートするプラットフォームではホーム画面 / アプリ一覧から起動可能にする。
-
-通常ブラウザとしてのアクセスも常に可能とする。
+manifest、icon、standalone 起動、app shell のオフラインキャッシュを備える。ホーム画面から起動でき、通常ブラウザでも使える。`navigator.storage.persist()` を要求する。
 
 ---
 
-## 2. 文書管理
+## 2. 文書
 
-### DOC-001 — Import
+### DOC-001 — Open a file
 **MUST**
 
-ユーザーはPDFまたはEPUBファイルをアプリへ取り込める。
+`<input type="file">` で PDF / EPUB を開ける。**文書の id はファイル内容の SHA-256**。同じファイルはどの端末で開いても同じ id になり、同じノートに結び付く。
 
-### DOC-002 — Library
+### DOC-002 — Keep on this device
 **MUST**
 
-取り込んだ文書を一覧表示できる。
+開いたファイルの byte 列を IndexedDB に保持し、次回はファイル選択なしで開ける。端末間で byte 列は共有しない（論文は端末ごと）。
 
-最低表示項目:
-
-- title
-- type
-- author（取得できる場合）
-- last opened
-- reading progress
-
-### DOC-003 — Metadata
+### DOC-003 — Library
 **MUST**
 
-可能な範囲で以下を保存する。
+vault にあるノート（`Reading/*.md`）の一覧と、この端末にあるファイルの一覧を 1 つの Library として表示する。最低表示項目: 題名、追加日、status、この端末に本体があるか。本体が無いノートは「ファイルを開く」を求め、frontmatter の `source` があればそのリンクを示す。
 
-```text
-id
-title
-type
-author
-source_filename
-created_at
-updated_at
-```
-
-Metadata抽出に失敗しても手動またはfilename fallbackにより文書を開けること。
-
-### DOC-004 — Delete
+### DOC-004 — Metadata
 **SHOULD**
 
-文書を削除できる。関連データの扱いを明示し、孤児データを残さない。
+題名は PDF メタデータ → EPUB メタデータ → ファイル名の順で決め、手で直せる。`authors` / `source` は取れれば入れ、無ければ frontmatter から省く。
+
+### DOC-005 — Remove from this device
+**SHOULD**
+
+この端末の byte 列を消せる。**ノートは消さない**（vault のノートを消すのは Obsidian か git で行う）。
 
 ---
 
 ## 3. Reader
 
-### READ-001 — Open
+### READ-001 — Navigate
 **MUST**
 
-LibraryからPDF / EPUBを開ける。
+PDF: ページ移動、ズーム（50〜300%、画面中央に向かって拡大）、Pages / Text の表示切り替え。EPUB: 章移動。
 
-### READ-002 — Navigate
+### READ-002 — Contents
 **MUST**
 
-- PDF: ページ移動
-- EPUB: 章 / 内部位置移動
-
-ができる。
+PDF の outline（しおり）と EPUB のナビゲーションを目次として表示し、そこへ移動できる。見出しを推測して目次を作らない。
 
 ### READ-003 — Progress
 **MUST**
 
-読書位置を自動保存し、再度開いた際に復元する。
+読書位置を自動保存し、再度開いた際に復元する。**保存先はこの端末**（IndexedDB）。端末間で同期しない。
 
-### READ-004 — Theme
+### READ-004 — Theme / Text size
 **MUST**
 
-ライト / ダーク表示を切り替えられる。
+ライト / ダークを切り替えられる。文字サイズは reflow する本文（EPUB、PDF の Text 表示）で変えられる。
 
-### READ-005 — Font size
-**MUST for EPUB / SHOULD for reflowable content**
-
-本文の文字サイズを変更できる。固定レイアウトPDFでは無理に再組版せず、zoom等の形式に適した操作を提供する。
-
-### READ-006 — Scroll stability
+### READ-005 — Scroll stability
 **MUST**
 
-AI操作、Drawer / Sheet開閉、画面回転、ブラウザ戻る操作等で、不必要に読書位置が先頭へ戻らない。
+シートの開閉、画面回転、ズーム、表示切り替えで読書位置を失わない。
 
-### READ-007 — Desktop layout
+### READ-006 — Two-column PDF
 **SHOULD**
 
-十分な画面幅では、
-
-- 左: Reader
-- 右: AI conversation / actions / notes
-
-を基本候補とする2ペインUIを提供する。
-
-### READ-008 — Two-column PDF
-**SHOULD**
-
-2段組論文PDFを少なくとも正しく表示できること。
-
-抽出テキストの読み順については別要件 `PDF-002` とする。
+2 段組の論文 PDF を正しく表示できる。Text 表示はタグ付き PDF の構造ツリーを優先し、無ければレイアウトから段落を推定する。
 
 ---
 
-## 4. Text Selection / Highlight
+## 4. 選択・印・コピー
 
 ### SEL-001 — Select text
 **MUST**
 
-Reader内のテキストをユーザーが選択できる。
+本文のテキストを選択できる。iOS のネイティブ選択ハンドルを独自 UI で塞がない。
 
-### SEL-002 — Selection action menu
+### SEL-002 — Selection menu
 **MUST**
 
-選択後に以下へ到達できる。
+選択すると、選択のそばにメニューが出る。項目は **Copy / Copy with source / 色 4 つ**。メニューは画面からはみ出さず、タップ領域は 44px 以上。
 
-- Explain
-- Translate
-- Simplify
-- Ask
-- Highlight
-
-### SEL-003 — Preserve selection intent
+### SEL-003 — Highlight
 **MUST**
 
-AI操作ボタンを押すためにフォーカスが移動しても、対象テキストを失わない。
+選択範囲を色付きの印として保存し、本文に色が付き、文書を開き直しても復元される。印は Pages 表示と Text 表示の両方に出る。
 
-Selection Rangeまたは内部表現を操作開始時に確保する。
-
-### SEL-004 — Mobile usability
+### SEL-004 — Highlight note
 **MUST**
 
-iOSのネイティブselection UIを過度に妨害しない。独自UIがネイティブハンドルの操作を妨げない。
+印ごとにメモを付けられる。単語と意味の記録はこれで行う（独立した Vocabulary 機能は持たない）。
 
-### SEL-005 — PDF selection normalization
+### COPY-001 — Clean copy
+**MUST**
+
+PDF からのコピーは行末の改行を繋ぎ、ハイフン分割を戻した段落テキストにする。
+
+### COPY-002 — Copy with source
+**MUST**
+
+`"…" — 題名, §節, p.N` の形。`source` があれば続けて付ける。
+
+### COPY-003 — Paragraph copy
+**MUST**
+
+Text 表示では段落ごとに 1 タップでコピーできる（選択ハンドル不要、44px）。
+
+---
+
+## 5. ノートと vault
+
+### NOTE-001 — One note per document
+**MUST**
+
+文書 1 つに Markdown ノート 1 つ。パスは `<VAULT_DIR>/<題名> (<id 先頭 8 桁>).md`。frontmatter に `title / added / status / tags`、あれば `authors / source`。
+
+### NOTE-002 — Managed block
+**MUST**
+
+ノート内の `<!-- book-reader:start -->` 〜 `<!-- book-reader:end -->` だけをアプリが書く。**ブロック外はアプリが読むだけで書き換えない。** ブロックには印（引用、ページ、色、メモ、位置コメント）と Memo（文書メモ）が入る。
+
+### NOTE-003 — Note is the store
+**MUST**
+
+印・メモの正本はノート本文。隠しファイルや別 JSON を置かない。`renderNote` と `parseNote` は純関数で、render → parse → render が同一になる。パーサは壊れた行を無視し、ブロックが無ければ全文を利用者の領域として扱う。
+
+### NOTE-004 — Memo
+**MUST**
+
+文書ごとの自由記述メモをアプリで書け、ブロック内の `## Memo` に入る。空にすれば消える。
+
+### VAULT-001 — Local-first
+**MUST**
+
+印・メモは IndexedDB に即保存され、オフラインでも読み書きできる。vault への書き込みは debounce（30 秒）した outbox が行い、繋がったときに流れる。保存失敗を無言で成功扱いしない。
+
+### VAULT-002 — Merge
+**MUST**
+
+書く前に vault の現在版を読み、利用者の領域はそのまま、管理ブロックは印を id で union する（別端末で増えたものを落とさない）。ローカルで消した印は tombstone で除く。sha 衝突は読み直して 1 回だけ再試行する。
+
+### VAULT-003 — One write, one commit
 **SHOULD**
 
-PDF内で視覚上連続する文章が改行・text item境界をまたぐ場合、AIへ渡す選択テキストを可能な範囲で自然な文章へ正規化する。
-
-例:
-
-```text
-inter-
-national
-```
-
-や不自然な行末改行等の扱いを改善する。
-
-完全対応はMVPのブロッカーにしない。
-
-### SEL-006 — Highlight
-**MUST**
-
-選択範囲をハイライトとして保存し、文書を再度開いても復元できる。
+1 回の書き込み = 1 commit。メッセージは何をしたか分かる短文（`reader: <題名> (+2 highlights)`）。
 
 ---
 
-## 5. AI機能
+## 6. サーバとセキュリティ
 
-### AI-001 — Explain
+### SRV-001 — No database
 **MUST**
 
-選択箇所を現在の文書コンテキストを踏まえて説明する。
+サーバは静的資産の配信と vault 代理だけ。利用者のデータを持たない。
 
-### AI-002 — Translate
+### SRV-002 — Vault proxy
 **MUST**
 
-選択箇所をユーザーが理解できる言語へ翻訳できる。
+`/api/vault/*` が GitHub contents API を代理する。`GET` / `PUT` のみ、パスは `VAULT_DIR` 配下の `.md` のみ（`..` 拒否）、本文サイズ上限、GitHub のエラーはステータスのみ返す。
 
-初期利用では英語→日本語が中心でもよいが、実装を英語 / 日本語の固定pairにしない。
-
-少なくとも以下が将来可能な内部設計にする。
-
-```text
-source_language = auto
-target_language = configurable
-```
-
-### AI-003 — Simplify
+### SEC-001 — Access
 **MUST**
 
-選択文章の意味を可能な限り保持しながら平易な表現へ変換する。
+アプリ全体を Cloudflare Access の内側に置く。URL を知っているだけでは到達できない。
 
-対象言語を英語に固定する必要はない。初期UIが英語学習を優先することは許容する。
-
-### AI-004 — Ask
+### SEC-002 — No secret in the browser
 **MUST**
 
-選択箇所に対して自由質問を送信できる。
+GitHub のトークンは Worker の secret（`VAULT_TOKEN`）にだけ存在し、レスポンス・ログ・bundle に出ない。ブラウザ側に設定画面は無い。
 
-### AI-005 — Streaming
-**SHOULD**
-
-対応Providerでは回答を段階表示できる設計が望ましい。ただしProviderの `generate()` のみでもMVP完成を妨げない。
-
-### AI-006 — Cancel
-**SHOULD**
-
-長いAIリクエストをキャンセルできる。
-
-### AI-007 — Retry
+### SEC-003 — CSP
 **MUST**
 
-一時的なAPI失敗後にユーザーが再試行できる。
+`default-src 'self'; connect-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'`。`unsafe-eval` を使わない。
 
-### AI-008 — Error presentation
+### SEC-004 — Untrusted documents
 **MUST**
 
-rate limit、timeout、network error、provider errorを「Reader自体の失敗」と混同せず表示する。
+EPUB の HTML はサニタイズし、script を実行しない。ノートの Markdown は HTML として描画しない。
+
+### SEC-005 — Secrets in git
+**MUST**
+
+`.env*`、`.dev.vars` を commit しない。
 
 ---
 
-## 6. AI Provider
-
-### PROV-001 — Provider abstraction
-**MUST**
-
-アプリケーションコードは特定Provider SDK / endpointへ直接依存しない。
-
-最低インターフェース:
-
-```ts
-interface AIProvider {
-  generate(request: GenerateRequest): Promise<GenerateResponse>;
-}
-```
-
-型名や詳細はコードベースに合わせて変更可能。
-
-### PROV-002 — OpenRouter
-**MUST**
-
-最初のProviderとしてOpenRouterを利用できる。
-
-### PROV-003 — Model configuration
-**MUST**
-
-ProviderとModelを設定で切り替えられる。
-
-例:
-
-```env
-AI_PROVIDER=openrouter
-AI_MODEL=<model-id>
-```
-
-### PROV-004 — Future provider
-**MUST**
-
-OpenAI等の別Provider追加時にReader / UIの主要コードを書き換える必要がない。
-
-### PROV-005 — Server only secret
-**MUST**
-
-AI Provider API keyはサーバー側でのみ参照する。
-
----
-
-## 7. Context Builder
-
-### CTX-001 — Inputs
-**MUST**
-
-Context Builderは必要に応じて以下を入力とする。
-
-```text
-document metadata
-current chapter / section
-previous surrounding text
-selected text
-following surrounding text
-conversation history
-user request
-```
-
-### CTX-002 — Selection priority
-**MUST**
-
-選択テキストとユーザー質問を最優先情報として保持する。
-
-### CTX-003 — Budget
-**MUST**
-
-全文書を無条件に送らず、context budgetを設ける。
-
-### CTX-004 — Deterministic tests
-**MUST**
-
-Context Builderは外部AIを呼び出さずにunit test可能な構造にする。
-
-### CTX-005 — Prompt separation
-**MUST**
-
-Explain / Translate / Simplify / Askのprompt templateをUIコンポーネントへ直接埋め込まない。
-
----
-
-## 8. Conversation
-
-### CONV-001 — Persist conversation
-**MUST**
-
-AIとの会話を文書に紐づけて保存する。
-
-### CONV-002 — Message data
-**MUST**
-
-最低限以下を保持する。
-
-```text
-id
-conversation_id
-role
-content
-selected_text
-created_at
-```
-
-必要に応じてsection / location等を追加する。
-
-### CONV-003 — Continue
-**MUST**
-
-同一文書上で過去の会話を踏まえた続きの質問ができる。
-
-### CONV-004 — Context limit
-**MUST**
-
-会話履歴全量を永続的に毎回送信しない。Context Builder側で使用量を制限する。
-
----
-
-## 9. Notes / Vocabulary
-
-### NOTE-001 — Document notes
-**SHOULD**
-
-デスクトップ右ペイン等から文書に紐づく自由メモを保存できる。
-
-### VOC-001 — Save vocabulary
-**SHOULD / Phase C**
-
-単語・フレーズを出典付きで保存できる。
-
-最低候補:
-
-```text
-id
-term
-meaning
-source_document_id
-source_text
-source_location
-created_at
-```
-
-### VOC-002 — Multilingual
-**SHOULD / Phase C**
-
-Vocabularyを英単語専用スキーマにしない。
-
----
-
-## 10. Paper mode
-
-### PAPER-001 — Structure extraction
-**SHOULD / Phase B**
-
-可能な範囲で以下を認識する。
-
-- Title
-- Authors
-- Abstract
-- Introduction
-- Methods
-- Results
-- Discussion
-- Conclusion
-- References
-
-### PAPER-002 — Research prompts
-**SHOULD / Phase B**
-
-以下の質問に適した文脈を構築できる。
-
-- この研究の核心
-- 示したこと
-- 示していないこと
-- 著者の主張
-- 重要な実験
-- 主張を支える結果
-- 限界
-- 今後の研究
-
-### PDF-001 — Render separately from extraction
-**MUST**
-
-PDF表示処理と、AI用テキスト抽出処理を分離する。
-
-### PDF-002 — Reading order
-**SHOULD / Phase B**
-
-2段組等で抽出テキストの読み順を改善する。
-
-誤抽出時にReader表示まで壊さない。
-
----
-
-## 11. Data model
-
-初期候補。実装時に正規化・ORM上の都合で変更してよいが、能力を失わないこと。
-
-### documents
-
-```text
-id
-title
-type
-author
-source_filename
-created_at
-updated_at
-```
-
-### document_sections
-
-```text
-id
-document_id
-section_index
-title
-content
-location_data
-```
-
-### reading_progress
-
-```text
-id
-document_id
-position
-updated_at
-```
-
-### highlights
-
-```text
-id
-document_id
-section_id
-start
-end
-text
-location_data
-note
-created_at
-```
-
-### conversations
-
-```text
-id
-document_id
-created_at
-updated_at
-```
-
-### messages
-
-```text
-id
-conversation_id
-role
-content
-selected_text
-source_location
-created_at
-```
-
-### notes
-
-```text
-id
-document_id
-content
-created_at
-updated_at
-```
-
-### vocabulary
-
-```text
-id
-term
-meaning
-source_document_id
-source_text
-source_location
-created_at
-```
-
----
-
-## 12. Authentication / Security
-
-### SEC-001 — Authentication
-**MUST**
-
-URLを知っているだけではReaderへアクセスできない。
-
-Version 0.1では単一ユーザー認証でよい。
-
-### SEC-002 — Password
-**MUST**
-
-パスワードを平文保存しない。
-
-### SEC-003 — Session
-**MUST**
-
-認証状態を安全なサーバー管理またはHttpOnly cookie等で保持し、認証tokenを不要にJavaScriptへ公開しない。
-
-ProductionではSecure cookieを利用する。
-
-### SEC-004 — Secrets
-**MUST**
-
-`.env*` 等の秘密ファイルをGitへcommitしない。
-
-`.env.example` にはキー名のみを記載する。
-
-### SEC-005 — Upload validation
-**MUST**
-
-アップロード時に最低限以下を行う。
-
-- 許可拡張子 / MIME確認
-- file size上限
-- path traversalを起こさない保存方式
-- 任意ファイル実行を行わない
-
----
-
-## 13. Dependency policy
+## 7. 依存・信頼性・テスト
 
 ### DEP-001 — Prefer proven libraries
 **MUST**
 
-標準機能や既存依存で十分でなければ、成熟したライブラリを使ってよい。PDF / EPUB parser等を理由なく自作しない。
+pdf.js、epub パーサ等を自作しない。新規依存は license / maintenance / security / supply-chain を確認してから。lockfile を commit する。
 
-### DEP-002 — Review before add
+### REL-001 — Isolation
 **MUST**
 
-新規依存追加時に、少なくともlicense、maintenance、security、supply-chain上の懸念を確認する。
-
-### DEP-003 — Pin reproducibly
-**MUST**
-
-lockfileをcommitし、再現可能なinstallを維持する。
-
----
-
-## 14. Reliability
-
-### REL-001 — AI failure isolation
-**MUST**
-
-AI API失敗でReaderや保存済み読書位置を破壊しない。
-
-### REL-002 — Save durability
-**MUST**
-
-progress / highlight / notes等の保存失敗を無言で成功扱いしない。
-
-### REL-003 — Database abstraction
-**MUST**
-
-UIから直接DBを操作しない。Repository / service境界を持つ。
-
-### REL-004 — Backup path
-**SHOULD before production**
-
-DB / user dataのbackupまたはexport経路を用意する。
-
----
-
-## 15. Testing
+vault への書き込み失敗、ノートの解析失敗、PDF の抽出失敗が Reader の表示を壊さない。
 
 ### TEST-001 — Static
 **MUST**
 
-- lint
-- typecheck
-- production build
-
-が通る。
+lint / typecheck / production build が通る。
 
 ### TEST-002 — Unit
 **MUST**
 
-最低対象:
+ノートの往復、union マージと tombstone、Worker のパス検証と秘密の非漏洩、PDF 抽出・構造・outline、選択の正規化、find-range。
 
-- AI Provider adapter
-- Context Builder
-- selection normalization
-- parser utilities
-- repositories / pure utility
-
-### TEST-003 — Integration
+### TEST-003 — E2E
 **MUST**
 
-API → AI Service → Provider mock等の主要境界を検証する。
+Chromium（デスクトップ、iPhone 17 寸法）で: ファイルを開く → 読む → 選択 → コピー → 印 → メモ → 開き直して復元 → vault（メモリ store の実 Worker）に書かれている。
 
-### TEST-004 — E2E
-**MUST**
+### TEST-004 — Real device
+**MUST（HUMAN）**
 
-主要フローを自動化可能な範囲で検証する。
-
-```text
-Login
-→ Import document
-→ Open
-→ Select text
-→ Explain
-→ Response
-→ Continue reading
-```
-
-### TEST-005 — Safari
-**MUST**
-
-iPhone Safariで実機確認が必要な項目を `WORKMAP.md` に残す。
-
-エージェント環境で実機確認できない場合、確認不能を成功扱いしない。
-
-### TEST-006 — Chrome
-**MUST**
-
-Chrome latest stableで主要フローを検証する。
-
-自動E2Eが可能ならChromium系テストをCIへ含める。
+iPhone の PWA で: ファイルを開く → 印 → 機内モードでメモ → 復帰で同期 → PC の Obsidian に現れる。エージェントは実機確認を主張しない。
 
 ---
 
-## 16. Acceptance Criteria — MVP
+## 8. 受け入れ基準 — v2.0
 
-以下がすべて満たされたとき、Version 0.1 MVPを完成扱いにできる。
-
-- [x] 認証できる
-- [x] PDFを取り込んで開ける
-- [x] EPUBを取り込んで開ける
-- [x] Readerとして移動できる
-- [x] 読書位置を復元できる
-- [x] テキスト選択できる
-- [x] Highlightを保存 / 復元できる
-- [x] Explainが動く
-- [x] Translateが動く
-- [x] Simplifyが動く
-- [x] Askが動く
-- [x] AIは周辺contextを受け取れる
-- [x] AI失敗後もReaderを継続利用できる
-- [x] Provider / Modelを設定から変更できる
-- [x] API keyがclient bundleへ露出しない
-- [ ] iPhone Safariで主要フローが成立する（HUMAN-001。2026-08-27にMVPブロッカーから除外）
-- [x] Chromeで主要フローが成立する
-- [x] モバイル幅でReader優先レイアウトが維持される（Chromium自動検証）
-- [x] lint / typecheck / tests / production buildが通る
-- [x] PDFのtext layerがcanvasと一致し、選択位置がずれない
-- [x] EPUB本文が見出し・段落構造を保って表示される
-- [x] 複数端末で同時にログインを維持できる
-- [x] AI providerのrate limitがReaderの失敗として露出しない
-- [x] uploadした文書のbyte列がSQLiteの外に置かれる
-- [x] PWAとして必要な構成が存在する
-
-`SEL-005 PDF selection normalization`、高度な論文構造抽出、Vocabulary等は未完でもMVPを成立させられる。
+- [ ] ファイルを開いて PDF / EPUB を読める（ページ、ズーム、Text 表示、目次、章移動）
+- [ ] 読書位置がこの端末で復元される
+- [ ] 選択メニューから Copy / Copy with source / 色付けができ、段落コピーが Text 表示にある
+- [ ] 印にメモが付き、文書メモが書ける
+- [ ] ノートが仕様の形式で vault に現れ、Obsidian で読める
+- [ ] 利用者が Obsidian で書いた部分をアプリが壊さない（往復テストと E2E）
+- [ ] オフラインで印とメモができ、復帰後に同期される
+- [ ] ブラウザに秘密が無く、Worker が PAT を漏らさない（unit）
+- [ ] Access の内側にあり、CSP が付いている
+- [ ] lint / typecheck / unit / E2E / build が通る
+- [ ] iPhone 実機で主要フローが成立する（HUMAN）

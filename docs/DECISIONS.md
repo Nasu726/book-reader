@@ -907,3 +907,33 @@ PDF の outline（しおり）と EPUB のナビゲーションだけを目次�
 - 目次パネル（リンク一覧）が欲しいと言われたら `<select>` を置き換える。データ側は変わらない
 - 予算はモデル側の制約が分かったら変える。定数 1 つ
 
+---
+
+## D-52. 転回: AI を全部消し、サーバからデータベースを無くし、Obsidian の vault を正本にする
+
+**判断**（2026-09-13、本人との話し合いで）
+
+1. 内蔵 AI（会話・explain・translate・context・履歴・provider）を全部消す
+2. 保存先を D1 / R2 から **GitHub の private repo（Obsidian の vault）**に変える。サーバは静的資産の配信と vault 代理だけ。データベースを持たない
+3. 論文は端末ローカル（IndexedDB）。id はファイルの SHA-256
+4. GitHub のトークンはブラウザに置かず Worker の secret に置く。アプリは Access の内側で本人専用のまま
+5. Next.js を Vite ＋ React に載せ替える
+6. Vocabulary は印のメモに吸収し、独立機能を消す
+
+**理由**
+
+- 質問・説明は Claude / ChatGPT に PDF を渡せば済む。内蔵版は無料モデルと 12,000 字の context に縛られた劣化コピーで、コード（source の 18%、tests の 20%）と設計変更の大半を食っていた。翻訳も同じ。**プラットフォームが持っているものは作らない**
+- 印とメモは Obsidian に置くべきもの。傾向・繋がり・RAG は Obsidian（Graph、Dataview、Smart Connections）や Claude Projects が担う。アプリの責務は出力の型を揃えること
+- D1 / R2 に置く理由が無くなる。ノートが正本なら、サーバは代理だけでよい
+- トークンをブラウザに置くと、XSS で盗まれたとき revoke まで誰でも使える。localStorage / IndexedDB / メモリの差は無く、違いは持続性。サーバの secret なら持ち出せる秘密が無い。その代償として一般公開はしない
+- 論文の端末間共有は repo の容量天井（≈ 500 本 / repo）を持ち込むので諦める。Collector は本人専用の別リポで、境界は PDF ファイルだけ
+- サーバ側の役目が消えた Next.js は足枷（SSR、API routes、OpenNext）。Collector と同じ Vite に揃える
+
+**捨てたもの**: Workers 上の Next、D1、R2、scrypt / Access のセッション（Access 自体は残る）、AI 一式、書き込み予算、Vocabulary、会話履歴。
+
+**覆す条件**
+
+- 一般公開したくなったら、transport（`vault-client.ts`）をブラウザが PAT を持つ版に差し替える。CSP と 1 repo 限定・期限付き PAT が前提
+- 論文を端末間で共有したくなったら、PDF を別 repo か R2 に置く。天井を知った上で
+- Obsidian をやめるなら、ノート形式はそのまま Markdown なので何にでも持っていける
+

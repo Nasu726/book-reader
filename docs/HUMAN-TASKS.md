@@ -370,3 +370,57 @@ sudo apt-get install libgtk-4-1 libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 
 ### 完了の確認
 
 `playwright.config.ts` の `mobile-layout` プロジェクトから `browserName: "chromium"` の2行を消して、`npx playwright test --project=mobile-layout` が通ること。現状は iPhone 17 の画面サイズと dpr3 のまま Chromium で走っている。
+
+---
+
+## H-11. Obsidian の vault 用 private repo
+
+**Status:** TODO
+**なぜ人間なのか:** GitHub 上のリポジトリ作成と、各端末への Obsidian プラグイン導入は本人の操作。
+
+1. 既に vault があればそれを GitHub の **private** repo にする（無ければ新規 repo を作り、Obsidian で vault として開く）
+2. 各端末の Obsidian に **obsidian-git** を入れ、この repo を pull / push する設定にする（自動 pull の間隔は数分でよい）
+3. Reader が書くフォルダを決める（既定 `Reading`）。`wrangler.jsonc` の `VAULT_REPO`（`owner/name`）と `VAULT_DIR` に入れる。どちらも秘密ではない
+
+### 完了の確認
+
+`git ls-remote git@github.com:<owner>/<name>.git` が通り、Obsidian の設定 → Community plugins に obsidian-git がある。
+
+---
+
+## H-12. vault 用の fine-grained PAT を Worker の secret に入れる
+
+**Status:** TODO
+**なぜ人間なのか:** トークンは秘密。エージェントに渡さない。
+
+1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate
+   - Repository access: **Only select repositories** → H-11 の repo だけ
+   - Permissions → Repository permissions → **Contents: Read and write**。他は無し
+   - Expiration: 1 年（切れたら同じ手順で更新）
+2. 端末で:
+
+```bash
+npx wrangler secret put VAULT_TOKEN
+```
+
+   プロンプトにトークンを貼る。**チャットや issue に貼らない。**
+
+### 完了の確認
+
+`npx wrangler secret list` に `VAULT_TOKEN` がある。デプロイ後、Reader で印を付けると数十秒以内に repo に commit が現れる。
+
+---
+
+## H-13. 旧環境の片付け（転回後）
+
+**Status:** TODO
+**なぜ人間なのか:** データの削除は取り消せない。
+
+新 Worker が同名・同ドメインで動き、H-11 / H-12 が済んでから:
+
+1. **先に退避**: `npm run db:backup`（旧環境のハイライト / メモ）。必要なら PIVOT-004 の変換スクリプトでノートにする
+2. D1 データベース `book-reader` — **Collector が同じ D1 を使っている**ので、Reader の表（`documents`、`highlights`、`notes`、`reading_progress`、`vocabulary`、`conversations`、`messages`、`usage_counters`）だけを落とすか、そのまま残す。**D1 自体を消さない**
+3. R2 バケット `book-reader-documents` を空にして削除
+4. secrets: `OPENROUTER_API_KEY`、`AI_MODEL`、旧認証の `AUTH_*` を `npx wrangler secret delete` で消す
+5. OpenRouter のキーを OpenRouter 側でも revoke する
+

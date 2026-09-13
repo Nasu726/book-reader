@@ -1,10 +1,79 @@
-# AI Reader 開発作業マップ
+# book-reader 開発作業マップ
 
-**Version:** 1.1  
+**Version:** 2.0  
 **文書種別:** Living Execution Map  
-**目的:** Codex / Ox Alphaが大きな指示を待たず、自律的に「次に実行可能な小さな作業」を選べるようにする。
+**目的:** エージェントが大きな指示を待たず、自律的に「次に実行可能な小さな作業」を選べるようにする。
 
 ---
+
+# 第 2 期（2026-09-13 の転回後）— 現在の計画
+
+仕様は `docs/SPEC.md` v2.0、理由は `docs/DECISIONS.md` D-52。**この節より下（第 1 期）は歴史で、Task は着手しない。**
+
+```text
+PIVOT-000（記録）
+ └─ PIVOT-001（AI 削除、現行スタック）─ PIVOT-002（コピー 3 種）
+      └─ PIVOT-003（Vite ＋ Worker assets ＋ ローカルファイル）
+           └─ PIVOT-004（ノート形式）─ PIVOT-005（vault 同期）─ PIVOT-006（PWA と配備）
+```
+
+## PIVOT-000 — 記録
+**Status:** DONE
+**Priority:** P0
+
+`docs/SPEC.md` と `docs/PLAN.md` を v2.0 に書き直し、`docs/DECISIONS.md` に D-52、`docs/HUMAN-TASKS.md` に H-11〜H-13 を追加。
+
+## PIVOT-001 — AI を消す（現行スタック上）
+**Status:** TODO
+**Priority:** P0
+**Depends on:** PIVOT-000
+
+消すもの: `src/core/ai/**`、`src/core/context/**`、`src/core/documents/paper-structure.ts`、`src/server/ai/**`、`src/app/api/ai/**`、`ai-answer-panel.tsx`、`use-ai-actions.ts`、`answer-text.tsx`、会話 repository、`scripts/ai-live-smoke.mts`、AI 系の unit / E2E、`/help` の AI 節、`.env.example` の AI 変数。`selection-ai-connector.tsx` → `reader-workbench.tsx`（Marks / Memo の 2 タブ）。選択メニューは色 4 つだけに（Copy は PIVOT-002）。`sectionTitle` / `documentExcerpt` の配管も消す（目次は残す）。
+
+Done when: `npm run verify` 緑、Workers に最後のデプロイ、本人がこれまで通り読める。
+
+## PIVOT-002 — コピー 3 種（現行スタック上）
+**Status:** TODO
+**Priority:** P0
+**Depends on:** PIVOT-001
+
+`selection-actions.tsx` に Copy / Copy with source（`"…" — 題名, §節, p.N`）、`pdf-text-page.tsx` に段落コピー。PDF の整形は `normalizePdfSelectionText` と段落抽出を流用。E2E は clipboard permission で `readText()`。mutation: 整形を外すと改行が残って赤。デプロイ。
+
+## PIVOT-003 — Vite ＋ React ＋ Worker（assets のみ）＋ ローカルファイル
+**Status:** TODO
+**Priority:** P0
+**Depends on:** PIVOT-002
+
+`vite.config.ts`（`@tailwindcss/vite`、`@cloudflare/vite-plugin`）、`index.html`、`src/main.tsx`、hash router（依存無し）、`worker/index.ts`（assets）、`wrangler.jsonc`（D1 / R2 / OpenNext を外す、Access はそのまま）。`src/storage/local-db.ts`（IndexedDB: files / progress / notes / outbox）。Library の「Open a file」→ SHA-256 → 保存 → Reader。Next / server / repositories / migrations を削除。Playwright は Vite dev を webServer に、`login()` 削除、`importDocument()` は `setInputFiles`。
+
+Done when: ローカルファイルで PDF / EPUB が読め、読書位置が復元され、印がローカル状態で描画される。verify 緑。
+
+## PIVOT-004 — ノート形式
+**Status:** TODO
+**Priority:** P0
+**Depends on:** PIVOT-003
+
+`src/notes/format.ts` の `renderNote` / `parseNote` と往復 unit test。Marks（印＋メモ）/ Memo の UI がローカル状態を編集し、ノートをレンダリングして IndexedDB に持つ。必要なら旧 D1 backup → ノート変換スクリプト。
+
+## PIVOT-005 — vault 同期
+**Status:** TODO
+**Priority:** P0
+**Depends on:** PIVOT-004
+
+`worker/vault.ts`（`/api/vault/*`、`github` / `memory` store、パス検証、サイズ上限、秘密の非漏洩）、`src/sync/vault-client.ts`、`queue.ts`（outbox、debounce、再試行）、union マージと tombstone。E2E は `VAULT_STORE=memory` で実 Worker を通す: 衝突、オフライン、別端末の追加。
+
+## PIVOT-006 — PWA と配備
+**Status:** TODO
+**Priority:** P0
+**Depends on:** PIVOT-005
+
+`vite-plugin-pwa`、`navigator.storage.persist()`、`_headers` の CSP、`wrangler deploy`（同名 Worker、同ドメイン、同 Access）、`check:access`、マニュアル、README。H-11〜H-13 が人間側。
+
+---
+
+# 第 1 期（v0.1〜v1.x、AI Reader）— 歴史
+
+以下は転回前の作業記録。仕様は git 履歴の `docs/SPEC.md` v1.1 を参照。
 
 ## 0. この文書の使い方
 
