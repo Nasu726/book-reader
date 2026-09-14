@@ -381,7 +381,12 @@ export function PdfRenderer({
       // the pane showing the next one, they part company immediately.
       const page = pageOfSelection(selection) ?? currentPage;
       onSelectionChange?.(
-        selection ? capturePdfSelection(selection, page, { documentTitle }) : null,
+        selection
+          ? capturePdfSelection(selection, page, {
+            documentTitle,
+            sectionTitle: sectionAt(outline, page)?.title,
+          })
+          : null,
       );
     };
 
@@ -391,7 +396,7 @@ export function PdfRenderer({
       column.removeEventListener("mouseup", updateSelection);
       column.removeEventListener("touchend", updateSelection);
     };
-  }, [currentPage, documentTitle, onSelectionChange]);
+  }, [currentPage, documentTitle, onSelectionChange, outline]);
 
   const section = sectionAt(outline, currentPage);
 

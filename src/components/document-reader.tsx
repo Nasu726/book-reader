@@ -202,7 +202,14 @@ export function DocumentReader({
     function capture() {
       const selection = window.getSelection();
       if (!selection) return;
-      onSelectionChange?.(captureEpubSelection(selection, document, documentTitle || document.title));
+      // The book's own title once it is parsed, not the filename the import
+      // stored: the rename reaches the server, but this prop is from before.
+      onSelectionChange?.(captureEpubSelection(
+        selection,
+        document,
+        epub?.title || documentTitle || document.title,
+        epub?.sections[sectionIndex]?.title,
+      ));
     }
     reader.addEventListener("mouseup", capture);
     reader.addEventListener("touchend", capture);

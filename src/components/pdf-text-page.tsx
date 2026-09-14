@@ -31,6 +31,46 @@ type PdfTextPageProps = {
  * layout was carrying. That is why this is the second way to read and not the
  * only one.
  */
+/**
+ * The copy control at the end of a paragraph.
+ *
+ * A thumb-sized target drawn small: 44 pixels to hit, an icon the size of a
+ * letter to look at, and quiet until pointed at where there is a pointer.
+ */
+function CopyParagraph({ text }: { text: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+    window.setTimeout(() => setState("idle"), 1500);
+  }
+
+  return (
+    <button
+      aria-label={state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy paragraph"}
+      className="text-ink-quiet hover:text-ink focus-visible:text-ink -my-3 ml-1 inline-flex h-11 w-11 items-center justify-center align-middle opacity-60 transition-opacity duration-(--fast) hover:opacity-100 focus-visible:opacity-100"
+      onClick={() => void copy()}
+      type="button"
+    >
+      {state === "copied" ? (
+        <svg aria-hidden fill="none" height="16" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="16">
+          <path d="m5 12.5 4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        <svg aria-hidden fill="none" height="16" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24" width="16">
+          <rect height="13" rx="2" width="13" x="8" y="8" />
+          <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" strokeLinecap="round" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 export function PdfTextPage({
   document: pdfDocument,
   pageNumber,
@@ -100,7 +140,17 @@ export function PdfTextPage({
       data-page-number={pageNumber}
       ref={containerRef}
     >
-      {paragraphs?.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+      {paragraphs?.map((paragraph, index) => (
+        <p key={index}>
+          {paragraph}
+          {/* One tap for the whole paragraph, which is the unit a translator
+              or a question wants and the hardest thing to select by hand on a
+              phone. Inline at the end of the text, with the line box left
+              alone by the negative margins, so the prose does not open up
+              around a row of buttons. */}
+          <CopyParagraph text={paragraph} />
+        </p>
+      ))}
       {error && (
         <p className="border-marker border-l-2 pl-3 text-sm" role="alert">
           Page {pageNumber} could not be read. {error}

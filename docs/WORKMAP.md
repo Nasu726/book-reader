@@ -33,7 +33,7 @@ PIVOT-000（記録）
 Done when: `npm run verify` 緑、Workers に最後のデプロイ、本人がこれまで通り読める。
 
 ## PIVOT-002 — コピー 3 種（現行スタック上）
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Depends on:** PIVOT-001
 

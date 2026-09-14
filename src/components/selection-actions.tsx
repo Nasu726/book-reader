@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 import { HIGHLIGHT_COLORS, type HighlightColor } from "@/core/highlights/colors";
 import type { DocumentSelection } from "@/core/selection/capture";
+import { citation, copyableText } from "@/core/selection/copy-text";
 
 /** The swatch itself, so a colour is picked by looking rather than by reading. */
 const SWATCHES: Record<HighlightColor, string> = {
@@ -63,13 +64,39 @@ function useEdgeAwarePlacement(left: number) {
   }, [left]);
 }
 
+/** The page a PDF selection is on, for the attribution line. */
+function pageOf(selection: DocumentSelection): number | undefined {
+  try {
+    const page = (JSON.parse(selection.location) as { page?: unknown }).page;
+    return typeof page === "number" ? page : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * The colours, offered where the reader is already looking.
+ * The text the reader would want to paste, read from the live selection.
+ *
+ * Read live rather than from the captured envelope: the envelope's text is
+ * flattened to one line for matching, and a copy should keep its paragraphs.
+ */
+function textToCopy(selection: DocumentSelection): string {
+  const live = typeof window === "undefined" ? "" : (window.getSelection()?.toString() ?? "");
+  return copyableText(live) || selection.text;
+}
+
+/**
+ * Copying and colouring, offered where the reader is already looking.
  *
  * Highlighting existed only in the pane beside the text, which is why "how do
  * I add a highlight" was a fair question: nothing near the passage said it was
  * possible. A control that appears against the selection answers that without a
  * manual.
+ *
+ * Copy is here because questions, explanations and translations happen in
+ * other tools now (D-52), and the passage has to get there as prose rather
+ * than as the lines of the page. Copy with source adds the attribution a note
+ * or a question wants.
  *
  * Positioned above the selection, or below it when there is no room. Never over
  * it: on iOS the native selection handles sit at both ends of the range, and
@@ -89,8 +116,28 @@ export function SelectionActions({
   // effect rules warn about.
   const placement = measurePlacement(selection);
   const keepOnScreen = useEdgeAwarePlacement(placement?.left ?? 0);
+  // Which button just copied, so it can say so for a moment.
+  const [copied, setCopied] = useState<"text" | "source" | "failed" | null>(null);
 
   if (!selection || !placement) return null;
+
+  async function copy(kind: "text" | "source") {
+    const text = textToCopy(selection!);
+    const payload = kind === "source"
+      ? citation(text, {
+        page: selection!.format === "pdf" ? pageOf(selection!) : undefined,
+        section: selection!.sectionTitle,
+        title: selection!.documentTitle,
+      })
+      : text;
+    try {
+      await navigator.clipboard.writeText(payload);
+      setCopied(kind);
+    } catch {
+      setCopied("failed");
+    }
+    window.setTimeout(() => setCopied(null), 1500);
+  }
 
   return (
     <div
@@ -112,6 +159,28 @@ export function SelectionActions({
           : "translate(-50%, -100%)",
       }}
     >
+      <button
+        aria-label="Copy"
+        className="min-h-11 rounded-lg px-3 text-sm hover:bg-rule/40"
+        // The menu must not steal the selection it is acting on.
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => void copy("text")}
+        type="button"
+      >
+        {copied === "text" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy"}
+      </button>
+      <button
+        aria-label="Copy with source"
+        className="min-h-11 rounded-lg px-3 text-sm hover:bg-rule/40"
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => void copy("source")}
+        type="button"
+      >
+        {copied === "source" ? "Copied" : "Copy with source"}
+      </button>
+      {/* The rule between the words and the colours goes when the menu wraps
+          onto two rows on a phone, where it would open the second row. */}
+      <span aria-hidden className="mx-1 w-px self-stretch bg-rule max-sm:hidden" />
       {/* Four colours instead of one Highlight button: choosing the colour is
           the same single tap as highlighting, so nothing is asked of a reader
           who does not care which one it is. */}

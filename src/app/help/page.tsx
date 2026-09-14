@@ -45,7 +45,7 @@ export default function HelpPage() {
             <ol className="space-y-1">
               <li><a className="hover:text-ink underline underline-offset-4" href="#add">本を追加する・消す</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#read">読む</a></li>
-              <li><a className="hover:text-ink underline underline-offset-4" href="#mark">文章を選んで印を付ける</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#mark">文章を選んで、コピーするか印を付ける</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#saved">保存されるもの3種と、その居場所</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#keyboard">キーボード</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#display">表示の設定</a></li>
@@ -99,13 +99,29 @@ export default function HelpPage() {
             <strong>読書位置は自動で保存される</strong>ので、閉じて開き直すと続きから始まる。
           </p>
 
-          <h2 className="scroll-mt-4" id="mark">文章を選んで印を付ける</h2>
+          <h2 className="scroll-mt-4" id="mark">文章を選んで、コピーするか印を付ける</h2>
           <p>
             本文をなぞって選択すると、<strong>選択したところのすぐそばに小さなメニューが出る</strong>。
-            丸い色を押すと、その色の印が本文に付く。
+            <strong>Copy</strong> / <strong>Copy with source</strong> と、丸い色。
+          </p>
+          <ul>
+            <li>
+              <strong>Copy</strong> — 選んだ文章を<strong>文章として</strong>コピーする。
+              PDFは1行ごとに改行が入り、行末で単語が「at-」「tend」のように切れているが、
+              それを繋いで段落にする。段落の切れ目だけは残す
+            </li>
+            <li>
+              <strong>Copy with source</strong> — 文章のあとに空行と
+              「— 題名, §節, p.ページ」の行が付く。ノートや質問に貼ったとき、どこからの引用か残る
+            </li>
+            <li>丸い色 — その色の印が本文に付く</li>
+          </ul>
+          <p>
+            <strong>Text</strong> 表示では、各段落の末尾に小さなコピーの印がある。
+            押すと<strong>段落まるごと</strong>がコピーされる。スマホで選択ハンドルを引きずるより早い。
           </p>
           <p>
-            質問したい・訳したいときは、文章をコピーして Claude / ChatGPT / DeepL に貼る。
+            質問したい・訳したいときは、こうしてコピーして Claude / ChatGPT / DeepL に貼る。
             論文全体について聞くなら、最初に PDF そのものを渡しておくとよい。
             アプリの中に AI は無い — 外のものの方がよく出来ているので。
           </p>

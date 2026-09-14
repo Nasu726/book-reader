@@ -3,13 +3,16 @@ export const DOCUMENT_SELECTION_VERSION = 1;
 /**
  * What the reader picked: the text, and where in the document it is.
  *
- * The title rides along so a copy can name its source. Nothing here is
- * about the model that used to read it — the surrounding text and the
- * inferred paper structure went with the AI (D-52).
+ * The title and the section ride along so a copy can name its source; they
+ * are never part of the persisted location. Nothing here is about the model
+ * that used to read it — the surrounding text and the inferred paper
+ * structure went with the AI (D-52).
  */
 export type DocumentSelection = {
   version: typeof DOCUMENT_SELECTION_VERSION;
   documentTitle?: string;
+  /** The heading the passage is under, by the document's own contents. */
+  sectionTitle?: string;
   format: "epub" | "pdf";
   text: string;
   location: string;
@@ -114,9 +117,18 @@ export function normalizeSelectionText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function withContext(captured: DocumentSelection, documentTitle: string): DocumentSelection {
+function withContext(
+  captured: DocumentSelection,
+  documentTitle: string,
+  sectionTitle?: string,
+): DocumentSelection {
   const title = documentTitle.trim();
-  return { ...captured, ...(title && { documentTitle: title }) };
+  const section = sectionTitle?.trim();
+  return {
+    ...captured,
+    ...(title && { documentTitle: title }),
+    ...(section && { sectionTitle: section }),
+  };
 }
 
 export function parseSelectionLocation(value: string): DocumentSelection | null {
@@ -144,6 +156,7 @@ export function captureEpubSelection(
   selection: Selection,
   ownerDocument: Document = document,
   documentTitle = ownerDocument.title,
+  sectionTitle?: string,
 ): DocumentSelection | null {
   const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
   const container = closestSection(selection.anchorNode);
@@ -179,15 +192,15 @@ export function captureEpubSelection(
     } satisfies EpubRangeSource & { version: number }),
     text,
     version: DOCUMENT_SELECTION_VERSION,
-  } satisfies Omit<DocumentSelection, "documentTitle">;
+  } satisfies Omit<DocumentSelection, "documentTitle" | "sectionTitle">;
 
-  return withContext(captured, documentTitle);
+  return withContext(captured, documentTitle, sectionTitle);
 }
 
 export function capturePdfSelection(
   selection: Selection,
   pageNumber: number,
-  context?: { documentTitle: string },
+  context?: { documentTitle: string; sectionTitle?: string },
 ): DocumentSelection | null {
   const text = normalizePdfSelectionText(selection.toString());
   if (!text || !Number.isInteger(pageNumber) || pageNumber < 1) return null;
@@ -201,9 +214,9 @@ export function capturePdfSelection(
     }),
     text,
     version: DOCUMENT_SELECTION_VERSION,
-  } satisfies Omit<DocumentSelection, "documentTitle">;
+  } satisfies Omit<DocumentSelection, "documentTitle" | "sectionTitle">;
 
-  return withContext(captured, context?.documentTitle ?? "");
+  return withContext(captured, context?.documentTitle ?? "", context?.sectionTitle);
 }
 
 export function normalizePdfSelectionText(value: string): string {
