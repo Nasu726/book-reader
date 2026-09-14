@@ -19,7 +19,8 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "verify": "npm run lint && npm run typecheck && npm run test && npm run test:e2e && npm run build",
-    "check:access": "node --import tsx ./scripts/check-access-config.mts"
+    "check:access": "node --import tsx ./scripts/check-access-config.mts",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@likecoin/epub-ts": "^0.7.2",

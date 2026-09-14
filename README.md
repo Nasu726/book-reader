@@ -32,7 +32,7 @@ runs lint, typecheck, the unit tests, the Playwright suites (desktop Chromium an
 
 ## Deployment
 
-`npx wrangler deploy` builds and publishes the Worker with the static assets. The Access policy, the vault repository, and the token are set up by hand: see `docs/HUMAN-TASKS.md`. `npm run check:access` confirms the deployment is behind Access and its audience tag matches.
+`npm run deploy` builds the app and publishes the Worker with the static assets. The Access policy, the vault repository, and the token are set up by hand: see `docs/HUMAN-TASKS.md`. `npm run check:access` confirms the deployment is behind Access and its audience tag matches.
 
 ## Current boundaries
 
