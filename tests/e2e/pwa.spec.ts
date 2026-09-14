@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { expect, test } from "@playwright/test";
 
 test("app exposes installable PWA metadata and icons", async ({ page }) => {
-  await page.goto("/login");
+  await page.goto("/");
 
   const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
   assert.equal(manifestHref, "/manifest.webmanifest");

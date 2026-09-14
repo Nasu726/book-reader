@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
+import { buildEpub, importDocument, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
 
 /** Selects the title line on page 1, the way a reader drags across it. */
 async function selectPassage(page: import("@playwright/test").Page) {
@@ -20,10 +20,9 @@ async function selectPassage(page: import("@playwright/test").Page) {
 
 test("PDF journey imports, reads, selects, highlights, and restores", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
 
   const documentId = await importDocument(page, "journey.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(reader).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("This PDF page could not be rendered.")).toBeHidden({ timeout: 10_000 });
@@ -52,10 +51,6 @@ test("PDF journey imports, reads, selects, highlights, and restores", async ({ p
   await note.fill("Persisted document note.");
   await page.getByRole("button", { name: "Save note" }).click();
   await expect(page.getByText("Note saved.")).toBeVisible({ timeout: 15_000 });
-  const vocabularySection = page.getByRole("region", { name: "Saved vocabulary" });
-  await vocabularySection.getByRole("textbox", { name: "Meaning" }).fill("A short demonstration sentence.");
-  await vocabularySection.getByRole("button", { name: "Save vocabulary" }).click();
-  await expect(page.getByText("Vocabulary saved.")).toBeVisible({ timeout: 15_000 });
 
   await page.reload();
   await page.getByRole("tab", { name: "Marks" }).click();
@@ -64,29 +59,21 @@ test("PDF journey imports, reads, selects, highlights, and restores", async ({ p
 
   await page.getByRole("tab", { name: "Notes" }).click();
   await expect(page.getByRole("textbox", { name: "Document note" })).toHaveValue("Persisted document note.");
-  const savedVocabulary = page.getByRole("region", { name: "Saved vocabulary" }).locator("li");
-  await expect(savedVocabulary).toHaveCount(1);
-  await expect(savedVocabulary).toContainText("A short demonstration sentence.");
 });
 
 test("PDF reading position survives a reload", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "pdf-position.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
   const pageNumber = page.getByRole("spinbutton", { name: "Page number" });
   await expect(pageNumber).toHaveValue("1", { timeout: 10_000 });
   await scrollReaderToEnd(page);
   await expect(pageNumber).toHaveValue("2");
-  // The save that carries page 2, not merely any progress request. Polled
-  // rather than waited on: the request may already have gone out by the time
-  // the page number settles.
-  await expect.poll(async () => {
-    const response = await page.request.get(`/api/documents/${documentId}/progress`);
-    return (await response.json()) as { location: string | null };
-  }, { timeout: 15_000 }).toEqual({ location: JSON.stringify({ page: 2, version: 1 }) });
+  // The save is debounced behind the scroll; give it its moment before the
+  // reload that has to find it.
+  await page.waitForTimeout(600);
 
   await page.reload();
   await expect(pageNumber).toHaveValue("2", { timeout: 10_000 });
@@ -96,7 +83,6 @@ test("PDF reading position survives a reload", async ({ page }) => {
 test("EPUB journey renders authored structure and restores the stored position", async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
 
   const documentId = await importDocument(
     page,
@@ -105,23 +91,17 @@ test("EPUB journey renders authored structure and restores the stored position",
     "application/epub+zip",
   );
 
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   const reader = page.getByRole("region", { name: "EPUB reader" });
   await expect(reader.getByText("Alpha journey text.")).toBeVisible({ timeout: 10_000 });
 
-  // The book's own title replaces the uploaded filename once the browser has
-  // parsed it; the server never opens the file. That rename is a request of its
-  // own, so wait for it rather than racing it to the library.
+  // The book's own title replaces the filename once the browser has parsed
+  // it. Polled at the library, since the rename lands a moment after the text.
   await expect.poll(async () => {
-    const response = await page.request.get("/api/documents");
-    const { documents } = (await response.json()) as { documents: { id: string; title: string }[] };
-    return documents.find((document) => document.id === documentId)?.title;
-  }, { timeout: 15_000 }).toBe("Notes on Thinking Machines");
-
-  await page.goto("/");
-  await expect(page.getByRole("region", { name: "Library" }))
-    .toContainText("Notes on Thinking Machines");
-  await page.goto(`/documents/${documentId}`);
+    await page.goto("/");
+    return page.getByRole("region", { name: "Library" }).textContent();
+  }, { timeout: 15_000 }).toContain("Notes on Thinking Machines");
+  await page.goto(`/read/${documentId}`);
   await expect(reader.getByText("Alpha journey text.")).toBeVisible({ timeout: 10_000 });
 
   // Authored structure must survive the import: a real heading element, real
@@ -130,16 +110,11 @@ test("EPUB journey renders authored structure and restores the stored position",
   await expect(reader.locator("p")).toHaveCount(2);
   await expect(reader.locator("article")).not.toContainText("ch1");
 
-  // Listened for before the click: the save is debounced a quarter of a
-  // second behind the navigation, and under a loaded suite the two visibility
-  // checks could take longer than that — then the response had already come
-  // and gone, and the wait ran out the test's whole timeout.
-  const saved = page.waitForResponse((response) =>
-    response.url().includes("/progress") && response.request().method() === "POST");
   await reader.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("2 / 2")).toBeVisible();
   await expect(reader.getByText("Beta restoration text.")).toBeVisible();
-  await saved;
+  // The save is debounced a quarter of a second behind the navigation.
+  await page.waitForTimeout(600);
 
   await page.reload();
   await expect(reader.getByText("Beta restoration text.")).toBeVisible({ timeout: 10_000 });
@@ -147,7 +122,6 @@ test("EPUB journey renders authored structure and restores the stored position",
 });
 
 test("EPUB chapters cannot execute authored scripts", async ({ page }) => {
-  await login(page);
   const documentId = await importDocument(
     page,
     "hostile.epub",
@@ -164,7 +138,7 @@ test("EPUB chapters cannot execute authored scripts", async ({ page }) => {
     "application/epub+zip",
   );
 
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   const reader = page.getByRole("region", { name: "EPUB reader" });
   await expect(reader.getByText("Body text.")).toBeVisible({ timeout: 10_000 });
   await reader.getByText("Body text.").click();
@@ -182,9 +156,8 @@ test("Chrome QA records no critical console errors across responsive journeys", 
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
-
-  await login(page);
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
   await expect(page.getByRole("region", { name: "Library" })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });

@@ -1,8 +1,5 @@
-"use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import Link from "next/link";
 
 import { ReaderControls } from "./reader-controls";
 
@@ -11,8 +8,6 @@ type AppShellProps = {
   title?: ReactNode;
   reader: ReactNode;
   secondary?: ReactNode;
-  /** Sign-out control, supplied by the server because only it knows how. */
-  account?: ReactNode;
   /** Text size only appears where reflowing the text does something. */
   showTextSize?: boolean;
 };
@@ -38,7 +33,6 @@ export function AppShell({
   title,
   reader,
   secondary,
-  account,
   showTextSize,
 }: AppShellProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -109,13 +103,12 @@ export function AppShell({
         {/* One entry point, in the one header every screen shares. The manual
             answers what nothing on screen can: what a highlight is for, why the
             text size control only appears on some books, and what an EPUB is. */}
-        <Link
+        <a
           className="text-ink-quiet hover:text-ink flex min-h-11 shrink-0 items-center text-xs tracking-wide uppercase transition-colors duration-(--fast)"
           href="/help"
         >
           Help
-        </Link>
-        {account}
+        </a>
       </header>
 
       {/* The sheet and its margin, divided by one line. */}

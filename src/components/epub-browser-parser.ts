@@ -1,5 +1,3 @@
-"use client";
-
 import { Book } from "@likecoin/epub-ts";
 
 import { EpubParser } from "@/core/documents/epub-parser";
@@ -19,7 +17,6 @@ export async function parseEpubInBrowser(
   filename: string,
 ): Promise<ParsedDocument> {
   return new EpubParser(
-    globalThis.DOMParser,
-    Book as unknown as ConstructorParameters<typeof EpubParser>[1],
+    Book as unknown as ConstructorParameters<typeof EpubParser>[0],
   ).parse(source, filename);
 }

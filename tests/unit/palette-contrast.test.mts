@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-const CSS = readFileSync(join(import.meta.dirname, "../../src/app/globals.css"), "utf8");
+const CSS = readFileSync(join(import.meta.dirname, "../../src/styles/globals.css"), "utf8");
 
 /** The tokens as they are declared for one theme. */
 function palette(theme: "light" | "dark"): Record<string, string> {

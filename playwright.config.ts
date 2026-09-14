@@ -1,24 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-import {
-  E2E_DATABASE_PATH,
-  E2E_PASSWORD_HASH,
-  E2E_STORAGE_DIR,
-  E2E_USERNAME,
-} from "./tests/e2e/environment";
-
 export default defineConfig({
   testDir: "./tests/e2e",
-  globalTeardown: "./tests/e2e/global-teardown.ts",
-  // Two at a time. Every reading test now renders PDF pages in a real browser,
-  // and several headless Chromium instances doing that at once starve the
-  // development server until uploads time out.
-  //
-  // The obvious answer — serve `next build` output instead — does not work:
-  // `next start` runs with NODE_ENV=production, so the session cookie is issued
-  // Secure and a browser will not keep it over the suite's plain HTTP. Making
-  // the Secure flag conditional would weaken the deployed cookie to speed up a
-  // test, which is the wrong trade.
+  // Two at a time. Every reading test renders PDF pages in a real browser, and
+  // several headless Chromium instances doing that at once starve the
+  // development server.
   workers: 2,
 
   use: {
@@ -51,16 +37,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1 --port 3100",
-    env: {
-      AUTH_PASSWORD_HASH: E2E_PASSWORD_HASH,
-      AUTH_USERNAME: E2E_USERNAME,
-      DATABASE_PATH: E2E_DATABASE_PATH,
-      DOCUMENT_STORAGE_DIR: E2E_STORAGE_DIR,
-    },
+    // Every test gets a fresh browser context and with it an empty IndexedDB,
+    // so there is no database to isolate and nothing to tear down.
+    command: "npm run dev -- --host 127.0.0.1 --port 3100 --strictPort",
     url: "http://127.0.0.1:3100",
-    // Never reuse a server this config did not configure: a stray `next dev`
-    // would run the suite against the developer's own database and env.
+    // Never reuse a server this config did not start: a stray dev server
+    // could be serving another checkout.
     reuseExistingServer: false,
   },
 });

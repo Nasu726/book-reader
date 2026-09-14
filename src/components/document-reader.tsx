@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ContentsSelect } from "./contents-select";
@@ -7,17 +5,16 @@ import { PdfRenderer } from "./pdf-renderer";
 import { captureEpubSelection, type DocumentSelection } from "@/core/selection/capture";
 import { clearAllHighlights, paintHighlights, type PaintableHighlight } from "./highlight-paint";
 import { usePageShortcuts } from "./use-page-shortcuts";
+import { type StoredDocument, titleFromFilename, updateDocument } from "@/storage/documents";
+import { getProgress, saveProgress } from "@/storage/progress";
 
 type DocumentReaderProps = {
-  documentId: string;
-  documentTitle?: string;
-  /** The uploaded filename, used to tell an untouched title from a rename. */
-  documentSourceFilename?: string;
-  format: "epub" |"pdf";
+  document: StoredDocument;
+  /** The file itself, from this device. */
+  bytes: ArrayBuffer;
   /** Saved highlights, drawn onto the text as it renders. */
   highlights?: readonly PaintableHighlight[];
   onSelectionChange?: (selection: DocumentSelection | null) => void;
-  /** What is in view, for questions that have nothing selected. */
 };
 
 type ParsedEpub = {
@@ -31,28 +28,16 @@ type ParsedEpub = {
 };
 
 /**
- * Replaces the filename the import route stored with the book's own title.
+ * Replaces the filename the book was opened from with the book's own title.
  *
  * Only when the stored title is still exactly the filename stem: a title the
  * reader chose by hand must survive every reopen.
  */
-async function adoptBookTitle(
-  documentId: string,
-  bookTitle: string | undefined,
-  currentTitle: string,
-  sourceFilename: string | undefined,
-): Promise<void> {
+async function adoptBookTitle(stored: StoredDocument, bookTitle: string | undefined): Promise<void> {
   const title = bookTitle?.trim();
-  const untouched = sourceFilename?.replace(/\.(epub|pdf)$/i, "");
-  if (!title || !untouched || currentTitle !== untouched || title === currentTitle) {
-    return;
-  }
+  if (!title || stored.title !== titleFromFilename(stored.name) || title === stored.title) return;
   try {
-    await fetch(`/api/documents/${documentId}`, {
-      body: JSON.stringify({ title }),
-      headers: {"content-type": "application/json" },
-      method: "PATCH",
-    });
+    await updateDocument(stored.id, { title });
   } catch {
     // The reader still works with the filename as its title.
   }
@@ -64,28 +49,15 @@ function useDocumentProgress(documentId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      try {
-        const response = await fetch(`/api/documents/${documentId}/progress`, { cache: "no-store" });
-        if (!response.ok) throw new Error("Progress unavailable.");
-        const payload = (await response.json()) as { location: string | null };
-        if (!cancelled) setInitialLocation(payload.location);
-      } catch {
-        if (!cancelled) setInitialLocation(null);
-      }
-    }
-    void load();
+    void getProgress(documentId)
+      .then((location) => { if (!cancelled) setInitialLocation(location); })
+      .catch(() => { if (!cancelled) setInitialLocation(null); });
     return () => { cancelled = true; };
   }, [documentId]);
 
   const save = useCallback(async (location: string) => {
     try {
-      const response = await fetch(`/api/documents/${documentId}/progress`, {
-        body: JSON.stringify({ location }),
-        headers: {"content-type": "application/json" },
-        method: "POST",
-      });
-      if (!response.ok) throw new Error("Save failed.");
+      await saveProgress(documentId, location);
       setSaveError(false);
     } catch {
       setSaveError(true);
@@ -96,13 +68,14 @@ function useDocumentProgress(documentId: string) {
 }
 
 export function DocumentReader({
-  documentId,
-  documentTitle = "",
-  documentSourceFilename,
-  format,
+  document: stored,
+  bytes,
   highlights = [],
   onSelectionChange,
 }: DocumentReaderProps) {
+  const documentId = stored.id;
+  const documentTitle = stored.title;
+  const format = stored.format;
   const chapterRef = useRef<HTMLElement>(null);
   const readerRef = useRef<HTMLElement>(null);
   const [epub, setEpub] = useState<ParsedEpub | null>(null);
@@ -145,10 +118,6 @@ export function DocumentReader({
     if (restoredSectionIndex > 0) setSectionIndex(restoredSectionIndex);
   }
 
-  // The renderer streams the bytes straight from this URL, so there is nothing
-  // to fetch here; a missing document surfaces as the renderer's own error.
-  const source = `/api/documents/${documentId}/source`;
-
   const sectionCount = epub?.sections.length ?? 0;
   function goToSection(nextIndex: number) {
     if (nextIndex < 0 || nextIndex >= sectionCount) return;
@@ -171,24 +140,20 @@ export function DocumentReader({
     let cancelled = false;
     async function parse() {
       try {
-        // Parsed here rather than on the server: a whole book does not fit in
-        // a Cloudflare Worker's 10ms CPU budget, and the browser has to build
-        // this DOM anyway to reflow the text.
-        const response = await fetch(source, { cache: "no-store" });
-        if (!response.ok) throw new Error("The document could not be opened.");
-        const bytes = await response.arrayBuffer();
+        // Parsed here, in the browser, which has to build this DOM anyway to
+        // reflow the text.
         const { parseEpubInBrowser } = await import("./epub-browser-parser");
-        const parsed = await parseEpubInBrowser(bytes, documentTitle || "document.epub");
+        const parsed = await parseEpubInBrowser(bytes, stored.name || "document.epub");
         if (cancelled) return;
         setEpub(parsed as ParsedEpub);
-        void adoptBookTitle(documentId, parsed.title, documentTitle, documentSourceFilename);
+        void adoptBookTitle(stored, parsed.title);
       } catch {
         if (!cancelled) setError("The document could not be opened.");
       }
     }
     void parse();
     return () => { cancelled = true; };
-  }, [documentId, documentSourceFilename, documentTitle, format, source]);
+  }, [bytes, format, stored]);
 
   // Listened for on the book, not on the whole document.
   //
@@ -288,12 +253,12 @@ export function DocumentReader({
     if (initialLocation === undefined) return <p aria-live="polite">Opening…</p>;
     return (
       <PdfRenderer
+        bytes={bytes}
         documentTitle={documentTitle}
         highlights={highlights}
         initialLocation={initialLocation}
         onSelectionChange={onSelectionChange}
         onLocationChange={(location) => void progress.save(location)}
-        source={source}
       />
     );
   }

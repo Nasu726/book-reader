@@ -1,25 +1,23 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import js from "@eslint/js";
+import reactHooks from "eslint-plugin-react-hooks";
+import globals from "globals";
+import tseslint from "typescript-eslint";
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
+export default tseslint.config(
   {
-    // Vendored or generated, and not ours to lint: the pdf.js worker is a
-    // published build, and .open-next is what the Cloudflare adapter emits.
-    ignores: ["public/pdf.worker.min.mjs", ".open-next/**", ".wrangler/**"],
+    // Vendored or generated, not ours to lint: the pdf.js worker is a
+    // published build; dist and .wrangler are what the build tools emit.
+    ignores: ["public/pdf.worker.min.mjs", "dist/**", ".wrangler/**", ".next/**", ".open-next/**", "test-results/**", "playwright-report/**"],
   },
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-    ".open-next/**",
-    ".wrangler/**",
-  ]),
-]);
-
-export default eslintConfig;
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  reactHooks.configs.flat.recommended,
+  {
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrors: "none" }],
+    },
+  },
+);

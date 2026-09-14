@@ -1,5 +1,3 @@
-"use client";
-
 import {
   useCallback,
   useEffect,
@@ -54,11 +52,11 @@ type PdfRendererProps = {
   documentTitle?: string;
   /** Saved highlights, drawn onto each page as it is rendered. */
   highlights?: readonly PaintableHighlight[];
-  source: string;
+  /** The file itself, from this device. */
+  bytes: ArrayBuffer;
   initialLocation?: string | null;
   onLocationChange?: (location: string) => void;
   onSelectionChange?: (selection: DocumentSelection | null) => void;
-  /** The text of the page in view, for questions that have nothing selected. */
 };
 
 function parsePage(location: string | null | undefined): number {
@@ -88,7 +86,7 @@ export function PdfRenderer({
   initialLocation,
   onLocationChange,
   onSelectionChange,
-  source,
+  bytes,
 }: PdfRendererProps) {
   type PdfLoadingTask = ReturnType<typeof getDocument>;
 
@@ -129,53 +127,20 @@ export function PdfRenderer({
     let cancelled = false;
     let task: PdfLoadingTask | null = null;
 
-    /**
-     * Opens the document, by range if the connection allows it.
-     *
-     * Ranges are what let a phone open a large book at all: handing pdf.js the
-     * whole file as one buffer is how iOS ends up reloading the tab. But a
-     * range request has more that can go wrong than a plain download — a proxy
-     * that strips the header, a runtime that will not answer 206 — and when it
-     * does go wrong every page fails to draw and offers a Try again that fails
-     * the same way. So the whole file is the fallback, not the default.
-     */
-    async function openBy(mode: "ranges" | "whole"): Promise<PdfDocumentProxy> {
-      task = mode === "ranges"
-        ? getDocument({
-          disableAutoFetch: true,
-          // Without this pdf.js opens a stream over the whole file as well, and
-          // on a fast connection that stream simply wins: the entire document
-          // arrives anyway. Ranges only are what keeps memory bounded.
-          disableStream: true,
-          rangeChunkSize: 65_536,
-          url: source,
-          useSystemFonts: true,
-        })
-        : getDocument({ url: source, useSystemFonts: true });
-      const opened = await task.promise;
-      // numPages is known from the first chunk, which proves nothing about
-      // whether the rest can be fetched. Reading a page is the real test.
-      await opened.getPage(1);
-      return opened;
-    }
-
     async function open() {
       let opened: PdfDocumentProxy;
       try {
-        opened = await openBy("ranges");
+        // A copy, because pdf.js takes the buffer it is given and hands it to
+        // its worker, and the file has to stay usable for the next open.
+        task = getDocument({ data: new Uint8Array(bytes.slice(0)), useSystemFonts: true });
+        opened = await task.promise;
       } catch (cause) {
-        if (cancelled) return;
-        console.warn("Falling back to fetching the whole PDF:", cause);
-        try {
-          opened = await openBy("whole");
-        } catch (fallbackCause) {
-          if (!cancelled) {
-            setError(fallbackCause instanceof Error && fallbackCause.message
-              ? `The PDF could not be opened. ${fallbackCause.message}`
-              : "The PDF could not be opened.");
-          }
-          return;
+        if (!cancelled) {
+          setError(cause instanceof Error && cause.message
+            ? `The PDF could not be opened. ${cause.message}`
+            : "The PDF could not be opened.");
         }
+        return;
       }
       if (cancelled) {
         void task?.destroy();
@@ -197,7 +162,7 @@ export function PdfRenderer({
       cancelled = true;
       void task?.destroy();
     };
-  }, [source]);
+  }, [bytes]);
 
   // The column keeps its width however far a page overflows it, so it is the
   // one thing here that can be measured without the zoom measuring itself.

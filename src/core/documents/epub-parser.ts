@@ -8,15 +8,6 @@ import {
 } from "./parser.ts";
 import { sanitizeSectionHtml, toReadableText } from "./html-sanitizer.ts";
 
-type TextDocument = {
-  body?: { textContent?: string | null };
-  title?: string | null;
-};
-
-export type TextDomParserConstructor = new () => {
-  parseFromString(markup: string, mimeType: string): TextDocument;
-};
-
 /**
  * The epub-ts Book implementation to parse with.
  *
@@ -38,14 +29,9 @@ function flattenNavigationItems(items: readonly NavItem[]): NavItem[] {
 }
 
 export class EpubParser implements DocumentParser {
-  readonly #domParser: TextDomParserConstructor;
   readonly #Book: BookConstructor;
 
-  constructor(
-    domParser: TextDomParserConstructor = globalThis.DOMParser,
-    bookImplementation?: BookConstructor,
-  ) {
-    this.#domParser = domParser;
+  constructor(bookImplementation?: BookConstructor) {
     if (!bookImplementation) {
       throw new DocumentParseError({
         filename: "",

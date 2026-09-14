@@ -1,14 +1,7 @@
-"use client";
-
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export type LibraryEntry = {
-  id: string;
-  title: string;
-  format: "epub" |"pdf";
-  lastOpenedAt?: string;
-};
+import { removeDocument, type StoredDocument, updateDocument } from "@/storage/documents";
+import { routeTo } from "@/router";
 
 function formatLastOpened(value?: string): string | null {
   if (!value) return null;
@@ -21,8 +14,14 @@ function formatLastOpened(value?: string): string | null {
   });
 }
 
-export function LibraryList({ documents }: { documents: readonly LibraryEntry[] }) {
-  const router = useRouter();
+export function LibraryList({
+  documents,
+  onChange,
+}: {
+  documents: readonly StoredDocument[];
+  /** Called after a rename or a removal, so the list can be read again. */
+  onChange: () => void;
+}) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -34,14 +33,9 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
     setBusy(id);
     setError(null);
     try {
-      const response = await fetch(`/api/documents/${id}`, {
-        body: JSON.stringify({ title }),
-        headers: {"content-type": "application/json" },
-        method: "PATCH",
-      });
-      if (!response.ok) throw new Error("Rename failed.");
+      await updateDocument(id, { title });
       setRenaming(null);
-      router.refresh();
+      onChange();
     } catch {
       setError("The document could not be renamed.");
     } finally {
@@ -50,15 +44,16 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
   }
 
   async function remove(id: string, title: string) {
-    if (!window.confirm(`Remove “${title}” from the library? This deletes the imported file.`)) {
+    // The file, not the notes: what was marked and written is in the vault
+    // and stays there. This only frees the bytes on this device.
+    if (!window.confirm(`Remove “${title}” from this device? Your notes are kept.`)) {
       return;
     }
     setBusy(id);
     setError(null);
     try {
-      const response = await fetch(`/api/documents/${id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Delete failed.");
-      router.refresh();
+      await removeDocument(id);
+      onChange();
     } catch {
       setError("The document could not be removed.");
     } finally {
@@ -69,7 +64,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
   if (documents.length === 0) {
     return (
       <p className="max-w-prose text-ink-quiet">
-        No documents yet. Import a PDF or EPUB to start reading.
+        Nothing on this device yet. Open a PDF or EPUB to start reading.
       </p>
     );
   }
@@ -81,7 +76,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
       )}
       <ul className="space-y-3">
         {documents.map((document) => {
-          const lastOpened = formatLastOpened(document.lastOpenedAt);
+          const lastOpened = formatLastOpened(document.openedAt);
           return (
             <li
               className="border-rule hover:border-ink-quiet rounded-xl border transition-colors duration-(--fast)"
@@ -133,7 +128,7 @@ export function LibraryList({ documents }: { documents: readonly LibraryEntry[] 
                       that the whole row is the button. */}
                   <a
                     className="flex min-h-11 items-center rounded-lg bg-ink px-4 text-sm font-medium text-white"
-                    href={`/documents/${document.id}`}
+                    href={routeTo({ id: document.id, screen: "read" })}
                   >
                     Read
                   </a>

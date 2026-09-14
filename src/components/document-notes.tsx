@@ -1,5 +1,3 @@
-"use client";
-
 import type { DocumentNote } from "./use-document-note";
 
 export function DocumentNotes({ note }: { note: DocumentNote }) {

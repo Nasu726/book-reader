@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, buildPdf, importDocument, login, type OutlineSpec } from "./helpers";
+import { buildEpub, buildPdf, importDocument, type OutlineSpec } from "./helpers";
 
 /**
  * The document's own table of contents: a PDF's outline, an EPUB's navigation.
@@ -16,9 +16,8 @@ const OUTLINE: readonly OutlineSpec[] = [
 
 test("a PDF's own contents are listed, and choosing one goes there", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "outlined.pdf", buildPdf(8, 0, 30, OUTLINE), "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const contents = page.getByRole("combobox", { name: "Contents" });
   await expect(contents).toBeVisible({ timeout: 15_000 });
@@ -41,9 +40,8 @@ test("a PDF's own contents are listed, and choosing one goes there", async ({ pa
 
 test("an EPUB's chapters are listed, and choosing one goes there", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "chapters.epub", await buildEpub(), "application/epub+zip");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const reader = page.getByRole("region", { name: "EPUB reader" });
   await expect(reader.getByText("Alpha journey text.")).toBeVisible({ timeout: 10_000 });

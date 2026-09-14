@@ -1,5 +1,3 @@
-"use client";
-
 export type ReaderTheme = "light" | "dark";
 
 export const FONT_SIZE_STORAGE_KEY = "book-reader-font-size";

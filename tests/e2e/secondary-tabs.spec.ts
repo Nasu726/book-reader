@@ -1,12 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, importDocument, login } from "./helpers";
+import { buildEpub, importDocument } from "./helpers";
 
 async function openBook(page: import("@playwright/test").Page) {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "tabs.epub", await buildEpub(), "application/epub+zip");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByText("Alpha journey text.")).toBeVisible({ timeout: 10_000 });
 }
 
@@ -22,7 +21,6 @@ test("the marks and the notes are two separate panels", async ({ page }) => {
   // off the bottom of the panel they shared.
   await page.getByRole("tab", { name: "Notes" }).click();
   await expect(page.getByRole("textbox", { name: "Document note" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Saved vocabulary" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Saved highlights" })).toBeHidden();
 });
 

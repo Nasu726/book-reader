@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 
 import { extractPdfParagraphs } from "@/core/documents/pdf-extraction";

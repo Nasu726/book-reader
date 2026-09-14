@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildPdf, buildTaggedPdf, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
+import { buildPdf, buildTaggedPdf, importDocument, MULTIPAGE_PDF, scrollReaderToEnd } from "./helpers";
 
 /**
  * The reader's controls, which sit above the pane rather than inside it.
@@ -15,9 +15,8 @@ function controls(page: import("@playwright/test").Page) {
 
 test("PDF renders with navigation and selectable text", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "navigation.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(reader).toBeVisible({ timeout: 10_000 });
@@ -36,9 +35,8 @@ test("PDF renders with navigation and selectable text", async ({ page }) => {
 
 test("the PDF text layer stays aligned with the rendered canvas", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "alignment.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(reader.getByText("Structure of Scientific Revolutions")).toBeVisible({ timeout: 10_000 });
@@ -96,9 +94,8 @@ test("the PDF text layer stays aligned with the rendered canvas", async ({ page 
 
 test("arrow keys turn pages and the zoom control resizes the page", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "keyboard.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(controls(page).getByText("of 2")).toBeVisible({ timeout: 10_000 });
@@ -134,9 +131,8 @@ test("arrow keys turn pages and the zoom control resizes the page", async ({ pag
 
 test("typing a note never turns the page", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "typing.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   await expect(controls(page).getByText("of 2")).toBeVisible({ timeout: 10_000 });
 
@@ -152,9 +148,8 @@ test("typing a note never turns the page", async ({ page }) => {
 
 test("arrow keys do nothing at the first and last page", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "bounds.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const pageNumber = page.getByRole("spinbutton", { name: "Page number" });
   await expect(pageNumber).toHaveValue("1", { timeout: 10_000 });
@@ -180,50 +175,11 @@ test("arrow keys do nothing at the first and last page", async ({ page }) => {
   await expect(pageNumber).toHaveValue("2");
 });
 
-test("a large PDF is fetched in pieces rather than all at once", async ({ page }) => {
-  test.setTimeout(90_000);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
-
-  const file = buildPdf(60, 4_000);
-  expect(file.byteLength).toBeGreaterThan(200_000);
-  const documentId = await importDocument(page, "ranged.pdf", file, "application/pdf");
-
-  const statuses: number[] = [];
-  let rangedBytes = 0;
-  page.on("response", (response) => {
-    if (!response.url().includes(`/documents/${documentId}/source`)) return;
-    statuses.push(response.status());
-    // Only the ranges. The viewer opens one full request to learn the length
-    // and abandons it, so counting what that one declared would count bytes
-    // that never crossed the wire.
-    if (response.status() === 206) {
-      rangedBytes += Number(response.headers()["content-length"] ?? 0);
-    }
-  });
-
-  await page.goto(`/documents/${documentId}`);
-  await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
-  await page.waitForFunction(
-    () => document.querySelectorAll(".textLayer span").length > 0,
-    undefined,
-    { timeout: 15_000 },
-  );
-
-  // Answered as ranges, and only the part the first pages need. Handing the
-  // viewer the whole file is what made a phone reload the tab before it could
-  // draw anything.
-  expect(statuses).toContain(206);
-  expect(rangedBytes).toBeGreaterThan(0);
-  expect(rangedBytes).toBeLessThan(file.byteLength / 2);
-});
-
 test("a PDF can be read as text as well as as pages", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "as-text.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(reader).toBeVisible({ timeout: 15_000 });
@@ -268,9 +224,8 @@ test("a PDF can be read as text as well as as pages", async ({ page }) => {
 test("a passage selected in the text view is highlighted in both views", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "text-marks.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
   await controls(page).getByRole("button", { name: "Text" }).click();
   await expect(page.locator('[data-page-number="1"] p').first())
@@ -291,9 +246,16 @@ test("a passage selected in the text view is highlighted in both views", async (
   // Filed under the page it is on. It used to be filed under whichever page
   // was in front of the reader, which in the text view is the next one down as
   // soon as a page is short enough to leave the middle of the pane past it.
-  const saved = await page.request.get(`/api/documents/${documentId}/highlights`);
-  const { highlights } = (await saved.json()) as { highlights: { location: string }[] };
-  expect(JSON.parse(highlights[0].location).page).toBe(1);
+  const location = await page.evaluate((id) => new Promise<string>((resolve, reject) => {
+    const opening = indexedDB.open("book-reader");
+    opening.onerror = () => reject(opening.error);
+    opening.onsuccess = () => {
+      const read = opening.result.transaction("notes").objectStore("notes").get(id);
+      read.onerror = () => reject(read.error);
+      read.onsuccess = () => resolve(read.result?.highlights?.[0]?.location ?? "");
+    };
+  }), documentId);
+  expect(JSON.parse(location).page).toBe(1);
 
   const painted = () => page.evaluate(() => {
     const registered = CSS.highlights.get("book-reader-green");
@@ -315,14 +277,13 @@ test("a passage selected in the text view is highlighted in both views", async (
 test("the page number keeps up in the text view", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(
     page,
     "text-count.pdf",
     buildPdf(8, 0, 12),
     "application/pdf",
   );
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
   await controls(page).getByRole("button", { name: "Text" }).click();
   await expect(page.locator('[data-page-number="1"] p').first()).toBeVisible({ timeout: 15_000 });
@@ -343,9 +304,8 @@ test("the page number keeps up in the text view", async ({ page }) => {
 
 test("the view switch does not move when the zoom control leaves with it", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "switch.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
 
   const toggle = controls(page).getByRole("button", { name: "Text" });
@@ -365,7 +325,6 @@ test("the view switch does not move when the zoom control leaves with it", async
 test("a tagged PDF is read as the paragraphs it says it has", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(
     page,
     "tagged.pdf",
@@ -381,7 +340,7 @@ test("a tagged PDF is read as the paragraphs it says it has", async ({ page }) =
     ]),
     "application/pdf",
   );
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
   await controls(page).getByRole("button", { name: "Text" }).click();
 

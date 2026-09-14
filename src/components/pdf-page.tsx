@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { getDocument, TextLayer } from "pdfjs-dist/legacy/build/pdf.mjs";
 

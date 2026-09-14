@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * The document's contents, as one native control.
  *

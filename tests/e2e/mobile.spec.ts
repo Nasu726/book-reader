@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, buildPdf, importDocument, login, MULTIPAGE_PDF, scrollReaderToEnd, swipeSheetDown } from "./helpers";
+import { buildEpub, buildPdf, importDocument, MULTIPAGE_PDF, scrollReaderToEnd, swipeSheetDown } from "./helpers";
 
 /**
  * Mobile layout regression, run under the `mobile-layout` project: Chromium
@@ -14,14 +14,13 @@ import { buildEpub, buildPdf, importDocument, login, MULTIPAGE_PDF, scrollReader
  */
 
 test("the reader stays the primary pane and never scrolls sideways", async ({ page }) => {
-  await login(page);
   const documentId = await importDocument(
     page,
     "mobile.epub",
     await buildEpub(),
     "application/epub+zip",
   );
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const reader = page.getByRole("region", { name: "EPUB reader" });
   await expect(reader.getByText("Alpha journey text.")).toBeVisible({ timeout: 10_000 });
@@ -37,9 +36,8 @@ test("the reader stays the primary pane and never scrolls sideways", async ({ pa
 });
 
 test("a PDF page fits the phone width without horizontal scrolling", async ({ page }) => {
-  await login(page);
   const documentId = await importDocument(page, "mobile.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
 
   const reader = page.getByRole("region", { name: "PDF reader" });
   await expect(reader.getByText("Structure of Scientific Revolutions")).toBeVisible({ timeout: 10_000 });
@@ -60,14 +58,13 @@ test("a PDF page fits the phone width without horizontal scrolling", async ({ pa
 });
 
 test("the notes drawer opens over the reader and returns to it", async ({ page }) => {
-  await login(page);
   const documentId = await importDocument(
     page,
     "mobile-drawer.epub",
     await buildEpub(),
     "application/epub+zip",
   );
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible({ timeout: 10_000 });
 
   await page.getByRole("button", { name: "Notes", exact: true }).tap();
@@ -81,7 +78,6 @@ test("the notes drawer opens over the reader and returns to it", async ({ page }
 });
 
 test("every control is large enough to tap", async ({ page }) => {
-  await login(page);
 
   // 44px is the smallest comfortable touch target; the reader controls and the
   // import form are the first thing a phone user meets. Polled, because the
@@ -101,9 +97,8 @@ test("every control is large enough to tap", async ({ page }) => {
 });
 
 test("the selection menu stays on the screen and every colour is a thumb wide", async ({ page }) => {
-  await login(page);
   const documentId = await importDocument(page, "menu.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await page.waitForFunction(
     () => document.querySelectorAll(".textLayer span").length > 0,
     undefined,
@@ -155,9 +150,8 @@ test("the selection menu stays on the screen and every colour is a thumb wide", 
 
 test("a long PDF gives back the pages it has scrolled past", async ({ page }) => {
   test.setTimeout(90_000);
-  await login(page);
   const documentId = await importDocument(page, "long.pdf", buildPdf(12), "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
   await page.waitForFunction(
     () => document.querySelectorAll(".textLayer span").length > 0,
@@ -182,14 +176,13 @@ test("a long PDF gives back the pages it has scrolled past", async ({ page }) =>
 });
 
 test("a small tug on the sheet does not throw it away", async ({ page }) => {
-  await login(page);
   const documentId = await importDocument(
     page,
     "sheet-tug.epub",
     await buildEpub(),
     "application/epub+zip",
   );
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: "Notes", exact: true }).tap();
 
@@ -214,14 +207,13 @@ test("a small tug on the sheet does not throw it away", async ({ page }) => {
 });
 
 test("nothing you type into is small enough to make iOS zoom", async ({ page }) => {
-  await login(page);
   const documentId = await importDocument(
     page,
     "typing.epub",
     await buildEpub(),
     "application/epub+zip",
   );
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByRole("region", { name: "EPUB reader" })).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: "Notes", exact: true }).tap();
   await page.getByRole("tab", { name: "Notes" }).tap();
@@ -242,9 +234,8 @@ test("nothing you type into is small enough to make iOS zoom", async ({ page }) 
 
 test("zooming grows the page from the middle and can be scrolled to either edge", async ({ page }) => {
   test.setTimeout(90_000);
-  await login(page);
   const documentId = await importDocument(page, "zoom.pdf", buildPdf(4), "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await expect(page.getByRole("region", { name: "PDF reader" })).toBeVisible({ timeout: 15_000 });
   await page.waitForFunction(
     () => document.querySelectorAll(".textLayer span").length > 0,
@@ -298,9 +289,8 @@ test("zooming grows the page from the middle and can be scrolled to either edge"
 
 test("the page count follows the page under the middle of the pane, zoomed or not", async ({ page }) => {
   test.setTimeout(90_000);
-  await login(page);
   const documentId = await importDocument(page, "zoom-count.pdf", buildPdf(6), "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   const pageNumber = page.getByRole("spinbutton", { name: "Page number" });
   await expect(pageNumber).toHaveValue("1", { timeout: 15_000 });
 

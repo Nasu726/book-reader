@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildEpub, importDocument, login, MULTIPAGE_PDF } from "./helpers";
+import { buildEpub, importDocument, MULTIPAGE_PDF } from "./helpers";
 
 /**
  * Copying is how a passage reaches the tools that answer questions about it
@@ -31,9 +31,8 @@ const clipboard = (page: import("@playwright/test").Page) =>
 test("a PDF passage is copied as prose, with or without its source", async ({ context, page }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "clip.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await page.waitForFunction(
     () => document.querySelectorAll(".textLayer span").length > 0,
     undefined,
@@ -56,9 +55,8 @@ test("a PDF passage is copied as prose, with or without its source", async ({ co
 test("an EPUB passage names its chapter when copied with its source", async ({ context, page }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "clip.epub", await buildEpub(), "application/epub+zip");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   const reader = page.getByRole("region", { name: "EPUB reader" });
   await expect(reader.getByText("Alpha journey text.")).toBeVisible({ timeout: 10_000 });
 
@@ -81,9 +79,8 @@ test("an EPUB passage names its chapter when copied with its source", async ({ c
 test("the text view copies a whole paragraph in one tap", async ({ context, page }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await login(page);
   const documentId = await importDocument(page, "paragraph.pdf", MULTIPAGE_PDF, "application/pdf");
-  await page.goto(`/documents/${documentId}`);
+  await page.goto(`/read/${documentId}`);
   await page.getByRole("group", { name: "Reading view" }).getByRole("button", { name: "Text" }).click();
 
   const reader = page.getByRole("region", { name: "PDF reader" });

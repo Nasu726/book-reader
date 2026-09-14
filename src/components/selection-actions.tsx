@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useState } from "react";
 
 import { HIGHLIGHT_COLORS, type HighlightColor } from "@/core/highlights/colors";

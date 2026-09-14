@@ -31,7 +31,7 @@ test("the reader and the worker come from the same build", () => {
   // Legacy on both sides. The modern build assumes browser features the legacy
   // one polyfills, and pairing them across that line is the same mismatch by
   // another route.
-  const sources = ["src/components/pdf-renderer.tsx", "src/core/pdf/renderer.ts"];
+  const sources = ["src/components/pdf-renderer.tsx", "src/components/pdf-page.tsx", "src/components/pdf-text-page.tsx"];
   for (const source of sources) {
     const text = readFileSync(join(import.meta.dirname, "../..", source), "utf8");
     if (!text.includes("pdfjs-dist")) continue;

@@ -40,7 +40,7 @@ Done when: `npm run verify` 緑、Workers に最後のデプロイ、本人が�
 `selection-actions.tsx` に Copy / Copy with source（`"…" — 題名, §節, p.N`）、`pdf-text-page.tsx` に段落コピー。PDF の整形は `normalizePdfSelectionText` と段落抽出を流用。E2E は clipboard permission で `readText()`。mutation: 整形を外すと改行が残って赤。デプロイ。
 
 ## PIVOT-003 — Vite ＋ React ＋ Worker（assets のみ）＋ ローカルファイル
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Depends on:** PIVOT-002
 

@@ -1,45 +1,31 @@
 import { expect, type Page } from "@playwright/test";
 import JSZip from "jszip";
 
-import { E2E_PASSWORD, E2E_USERNAME } from "./environment";
-
 /** Two pages of real prose, so navigation and text extraction have something to assert on. */
 export const MULTIPAGE_PDF = Buffer.from(
   "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUiA0IDAgUl0gL0NvdW50IDIgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA1IDAgUiA+PiA+PiAvQ29udGVudHMgNiAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA1IDAgUiA+PiA+PiAvQ29udGVudHMgNyAwIFIgPj4KZW5kb2JqCjUgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago2IDAgb2JqCjw8IC9MZW5ndGggMzQ2ID4+CnN0cmVhbQpCVAovRjEgMTQgVGYKMSAwIDAgMSA2MCA3NDAgVG0KMjAgVEwKKFRoZSBTdHJ1Y3R1cmUgb2YgU2NpZW50aWZpYyBSZXZvbHV0aW9ucykgVGogVCoKKENoYXB0ZXIgMTogSW50cm9kdWN0aW9uKSBUaiBUKgooQSBSb2xlIGZvciBIaXN0b3J5KSBUaiBUKgooSGlzdG9yeSwgaWYgdmlld2VkIGFzIGEgcmVwb3NpdG9yeSBmb3IgbW9yZSB0aGFuKSBUaiBUKgooYW5lY2RvdGUgb3IgY2hyb25vbG9neSwgY291bGQgcHJvZHVjZSBhIGRlY2lzaXZlKSBUaiBUKgoodHJhbnNmb3JtYXRpb24gaW4gdGhlIGltYWdlIG9mIHNjaWVuY2UgYnkgd2hpY2ggd2UpIFRqIFQqCihhcmUgbm93IHBvc3Nlc3NlZC4pIFRqIFQqCkVUCmVuZHN0cmVhbQplbmRvYmoKNyAwIG9iago8PCAvTGVuZ3RoIDMwNCA+PgpzdHJlYW0KQlQKL0YxIDE0IFRmCjEgMCAwIDEgNjAgNzQwIFRtCjIwIFRMCihQYWdlIDIpIFRqIFQqCihOb3JtYWwgc2NpZW5jZSBtZWFucyByZXNlYXJjaCBmaXJtbHkgYmFzZWQgdXBvbikgVGogVCoKKG9uZSBvciBtb3JlIHBhc3Qgc2NpZW50aWZpYyBhY2hpZXZlbWVudHMsIHRoYXQgc29tZSkgVGogVCoKKHBhcnRpY3VsYXIgc2NpZW50aWZpYyBjb21tdW5pdHkgYWNrbm93bGVkZ2VzIGZvciBhKSBUaiBUKgoodGltZSBhcyBzdXBwbHlpbmcgdGhlIGZvdW5kYXRpb24gZm9yIGl0cyBmdXJ0aGVyKSBUaiBUKgoocHJhY3RpY2UuKSBUaiBUKgpFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA4CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMjEgMDAwMDAgbiAKMDAwMDAwMDI0NyAwMDAwMCBuIAowMDAwMDAwMzczIDAwMDAwIG4gCjAwMDAwMDA0NDMgMDAwMDAgbiAKMDAwMDAwMDg0MCAwMDAwMCBuIAp0cmFpbGVyCjw8IC9TaXplIDggL1Jvb3QgMSAwIFIgPj4Kc3RhcnR4cmVmCjExOTUKJSVFT0YK",
   "base64",
 );
 
-export async function login(page: Page): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Username").fill(E2E_USERNAME);
-  await page.getByLabel("Password").fill(E2E_PASSWORD);
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page).toHaveURL("/");
-}
-
+/**
+ * Opens a file the way a reader does, and lands in it.
+ *
+ * Choosing the file hashes it, keeps it on the device, and opens the reader;
+ * the document's id is the hash, read back from the URL. Retried, because a
+ * file set before React has attached the input's handler goes nowhere.
+ */
 export async function importDocument(
   page: Page,
   name: string,
   file: Buffer,
   mimeType: string,
 ): Promise<string> {
-  // Choosing a file submits the form, but that submit is wired up by React, so
-  // a file set before hydration silently does nothing. Retry until the upload
-  // actually leaves rather than waiting out a request that was never made.
+  await page.goto("/");
   await expect(async () => {
-    const upload = page.waitForResponse(
-      (response) => response.url().endsWith("/api/documents"),
-      { timeout: 5_000 },
-    );
     await page.setInputFiles("#document-file", { buffer: file, mimeType, name });
-    await upload;
+    await expect(page).toHaveURL(/\/read\/[0-9a-f]{64}$/, { timeout: 5_000 });
   }).toPass({ timeout: 40_000 });
-  await expect(page).toHaveURL("/");
-  const documents = await page.request.get("/api/documents");
-  const payload = (await documents.json()) as { documents: { id: string; sourceFilename?: string }[] };
-  const imported = payload.documents.find((document) => document.sourceFilename === name);
-  if (!imported) throw new Error(`Imported document ${name} is missing from the library.`);
-  return imported.id;
+  return new URL(page.url()).pathname.split("/").pop()!;
 }
 
 /** A structurally valid EPUB with headings and paragraphs, built in memory. */

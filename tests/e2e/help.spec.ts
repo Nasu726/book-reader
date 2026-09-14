@@ -1,10 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { login } from "./helpers";
-
-test("the manual is reachable without signing in", async ({ page }) => {
-  // Deliberately public. The one document worth reading when sign-in is what
-  // is broken, and it holds no reader's data.
+test("the manual is a screen of its own, with a real address", async ({ page }) => {
   await page.goto("/help");
   await expect(page).toHaveURL(/\/help$/);
   await expect(page.getByRole("heading", { name: "使い方", exact: true })).toBeVisible();
@@ -12,8 +8,7 @@ test("the manual is reachable without signing in", async ({ page }) => {
 });
 
 test("the header offers the manual from every screen", async ({ page }) => {
-  await login(page);
-
+  await page.goto("/");
   await page.getByRole("link", { name: "Help" }).click();
   await expect(page).toHaveURL(/\/help$/);
   await expect(page.getByRole("heading", { name: "文章を選んで、コピーするか印を付ける" })).toBeVisible();
