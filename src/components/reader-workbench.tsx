@@ -9,8 +9,22 @@ import { useDocumentNote } from "./use-document-note";
 import { getStoredPdfView, serverPdfView, subscribe } from "./reader-preferences";
 import type { HighlightColor } from "@/core/highlights/colors";
 import type { DocumentSelection } from "@/core/selection/capture";
+import { renderNote } from "@/notes/format";
 import type { StoredDocument } from "@/storage/documents";
-import { getNote, putNote, type StoredHighlight } from "@/storage/notes";
+import { getNote, noteStateOf, putNote, type StoredHighlight } from "@/storage/notes";
+
+/** Where a passage is, for a person: the page, or the chapter. */
+function whereOf(captured: DocumentSelection): string | undefined {
+  if (captured.format === "pdf") {
+    try {
+      const page = (JSON.parse(captured.location) as { page?: unknown }).page;
+      if (typeof page === "number") return `p.${page}`;
+    } catch {
+      return undefined;
+    }
+  }
+  return captured.sectionTitle ? `§${captured.sectionTitle}` : undefined;
+}
 
 /** Matches the swatches in the selection menu, so the list reads as the same thing. */
 const SWATCH_CLASS: Record<HighlightColor, string> = {
@@ -38,6 +52,9 @@ export function ReaderWorkbench({
   const [tab, setTab] = useState<SecondaryTab>("highlights");
   const [highlightState, setHighlightState] = useState<"idle" | "saved" | "error">("idle");
   const [highlights, setHighlights] = useState<readonly StoredHighlight[]>([]);
+  const [finished, setFinished] = useState(false);
+  // Which mark's note is being written, and what it says so far.
+  const [noteEditing, setNoteEditing] = useState<{ id: string; draft: string } | null>(null);
   const note = useDocumentNote(stored.id);
   // Reflowed text can be resized; a drawn page has zoom instead.
   const pdfView = useSyncExternalStore(subscribe, getStoredPdfView, serverPdfView);
@@ -45,7 +62,9 @@ export function ReaderWorkbench({
   useEffect(() => {
     let cancelled = false;
     void getNote(stored.id).then((saved) => {
-      if (!cancelled) setHighlights(saved.highlights);
+      if (cancelled) return;
+      setHighlights(saved.highlights);
+      setFinished(saved.status === "done");
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [stored.id]);
@@ -72,12 +91,40 @@ export function ReaderWorkbench({
         id: crypto.randomUUID().slice(0, 8),
         location: captured.location,
         selectedText: captured.text,
+        ...(whereOf(captured) ? { where: whereOf(captured) } : {}),
       }]);
       setHighlightState("saved");
       window.setTimeout(() => setHighlightState("idle"), 5000);
     } catch {
       setHighlightState("error");
     }
+  }
+
+  async function saveHighlightNote(highlightId: string, text: string) {
+    const trimmed = text.trim();
+    try {
+      await writeHighlights(highlights.map((item) => item.id !== highlightId
+        ? item
+        : trimmed ? { ...item, note: trimmed } : (({ note: _dropped, ...rest }) => rest)(item)));
+      setNoteEditing(null);
+    } catch {
+      setHighlightState("error");
+    }
+  }
+
+  async function markFinished(done: boolean) {
+    setFinished(done);
+    try {
+      const saved = await getNote(stored.id);
+      await putNote({ ...saved, status: done ? "done" : "reading" });
+    } catch {
+      setFinished(!done);
+    }
+  }
+
+  async function renderMarkdown(): Promise<string> {
+    const saved = await getNote(stored.id);
+    return renderNote(noteStateOf(stored, saved), saved.outside ?? { after: "\n", before: "" });
   }
 
   return (
@@ -143,9 +190,53 @@ export function ReaderWorkbench({
                             aria-hidden
                             className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ${SWATCH_CLASS[highlight.color]}`}
                           />
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm">{highlight.selectedText}</p>
-                            {highlight.note && <p className="mt-1 text-xs">{highlight.note}</p>}
+                            {highlight.where && <p className="text-ink-quiet mt-0.5 text-xs">{highlight.where}</p>}
+                            {noteEditing?.id === highlight.id ? (
+                              <form
+                                className="mt-2 space-y-2"
+                                onSubmit={(event) => {
+                                  event.preventDefault();
+                                  void saveHighlightNote(highlight.id, noteEditing.draft);
+                                }}
+                              >
+                                <label className="sr-only" htmlFor={`highlight-note-${highlight.id}`}>Note on this highlight</label>
+                                <textarea
+                                  autoFocus
+                                  className="border-edge bg-field min-h-20 w-full rounded-lg border p-2 text-base"
+                                  id={`highlight-note-${highlight.id}`}
+                                  onChange={(event) => setNoteEditing({ draft: event.target.value, id: highlight.id })}
+                                  value={noteEditing.draft}
+                                />
+                                <div className="flex gap-2">
+                                  <button className="min-h-9 rounded-lg bg-ink px-3 text-xs font-medium text-white" type="submit">
+                                    Save note
+                                  </button>
+                                  <button
+                                    className="border-edge min-h-9 rounded-lg border px-3 text-xs"
+                                    onClick={() => setNoteEditing(null)}
+                                    type="button"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </form>
+                            ) : (
+                              <>
+                                {highlight.note && <p className="mt-1 text-sm whitespace-pre-wrap">{highlight.note}</p>}
+                                {/* A word and its meaning, a passage and a thought: the
+                                    note on a mark is where the vocabulary went. */}
+                                <button
+                                  aria-label={`${highlight.note ? "Edit" : "Add"} note: ${highlight.selectedText}`}
+                                  className="text-ink-quiet hover:text-ink mt-1 min-h-9 text-xs tracking-wide uppercase transition-colors duration-(--fast)"
+                                  onClick={() => setNoteEditing({ draft: highlight.note ?? "", id: highlight.id })}
+                                  type="button"
+                                >
+                                  {highlight.note ? "Edit note" : "Add note"}
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                         <button
@@ -162,7 +253,14 @@ export function ReaderWorkbench({
                 )}
               </section>
             ),
-            notes: <DocumentNotes note={note} />,
+            notes: (
+              <DocumentNotes
+                finished={finished}
+                note={note}
+                onFinishedChange={(done) => void markFinished(done)}
+                renderMarkdown={renderMarkdown}
+              />
+            ),
           }}
         />
       }

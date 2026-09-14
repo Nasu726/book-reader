@@ -49,7 +49,7 @@ Done when: `npm run verify` 緑、Workers に最後のデプロイ、本人が�
 Done when: ローカルファイルで PDF / EPUB が読め、読書位置が復元され、印がローカル状態で描画される。verify 緑。
 
 ## PIVOT-004 — ノート形式
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Depends on:** PIVOT-003
 
