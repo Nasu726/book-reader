@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { flush, useSyncStatus } from "@/sync/sync";
+import { flush, useSyncRuns, useSyncStatus } from "@/sync/sync";
 
 function describe(status: ReturnType<typeof useSyncStatus>): string {
   switch (status.state) {
@@ -21,11 +21,12 @@ function describe(status: ReturnType<typeof useSyncStatus>): string {
  */
 export function VaultStatus({ documentId }: { documentId: string }) {
   const status = useSyncStatus();
+  const runs = useSyncRuns();
   const [busy, setBusy] = useState(false);
 
   return (
     <div className="border-rule flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-      <p aria-live="polite" className="text-ink-quiet min-w-0 flex-1 text-xs" data-sync-state={status.state}>
+      <p aria-live="polite" className="text-ink-quiet min-w-0 flex-1 text-xs" data-sync-run={runs} data-sync-state={status.state}>
         {describe(status)}
       </p>
       <button

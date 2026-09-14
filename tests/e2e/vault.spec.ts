@@ -30,10 +30,15 @@ async function markLine(page: import("@playwright/test").Page, text: string, col
   await expect(page.getByText("Highlight saved.")).toBeVisible();
 }
 
+/** Presses Sync now and waits for that run — not an earlier one — to finish. */
 async function syncNow(page: import("@playwright/test").Page) {
   await page.getByRole("tab", { name: "Notes" }).click();
+  const status = page.locator("[data-sync-state]");
+  const before = Number(await status.getAttribute("data-sync-run"));
   await page.getByRole("button", { name: "Sync now" }).click();
-  await expect(page.locator("[data-sync-state]")).toHaveAttribute("data-sync-state", "synced", { timeout: 15_000 });
+  await expect.poll(async () => Number(await status.getAttribute("data-sync-run")), { timeout: 15_000 })
+    .toBeGreaterThan(before);
+  await expect(status).toHaveAttribute("data-sync-state", "synced");
 }
 
 const noteName = (title: string, id: string) => `${title} (${id.slice(0, 8)}).md`;

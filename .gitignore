@@ -56,3 +56,6 @@ next-env.d.ts
 
 # Copied from pdfjs-dist at build time by scripts/copy-pdf-worker.mjs.
 public/pdf.worker.min.mjs
+
+# vite
+/dist/

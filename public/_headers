@@ -1,0 +1,15 @@
+# Served by the Worker's static assets. The policy is the second lock on a
+# document viewer that opens files it did not make: no script that is not ours,
+# no eval (pdf.js has had a font-driven code-execution bug that needed it), no
+# framing, nothing loaded from anywhere but this origin.
+#
+# base-uri 'none' is reported once per EPUB chapter: epub-ts puts a <base> in
+# the document it parses each chapter into, and a parsed document inherits the
+# page's policy. The block is the point — nothing may move the base — and the
+# chapter renders all the same, since its links and images never leave the
+# sanitizer anyway.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

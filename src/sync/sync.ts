@@ -29,9 +29,10 @@ export type SyncStatus =
 const SYNC_DELAY_MS = 30_000;
 
 let status: SyncStatus = { state: "idle" };
+/** How many runs have finished, so a caller can tell a fresh result from a stale one. */
+let runs = 0;
 const listeners = new Set<() => void>();
 let timer: number | undefined;
-let flushing: Promise<void> | null = null;
 
 function setStatus(next: SyncStatus): void {
   status = next;
@@ -43,6 +44,14 @@ export function useSyncStatus(): SyncStatus {
     (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
     () => status,
     () => status,
+  );
+}
+
+export function useSyncRuns(): number {
+  return useSyncExternalStore(
+    (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
+    () => runs,
+    () => runs,
   );
 }
 
@@ -104,34 +113,44 @@ export async function syncDocument(documentId: string): Promise<"written" | "unc
  * Sends everything in the outbox, one note at a time — and, when asked,
  * one more: the document in front of the reader, so what another device
  * marked arrives even when nothing changed here.
+ *
+ * Calls are run one after another, never merged: a Sync now pressed while
+ * the sync that opening the book started is still in flight must see the
+ * mark made in between, not ride on the earlier run's result.
  */
+let chain: Promise<void> = Promise.resolve();
+
 export function flush(options: { include?: string } = {}): Promise<void> {
-  if (flushing) return flushing;
-  flushing = (async () => {
-    window.clearTimeout(timer);
-    const pending = await localDb.list<OutboxEntry>("outbox");
-    const ids = pending.sort((a, b) => a.queuedAt.localeCompare(b.queuedAt)).map((entry) => entry.id);
-    if (options.include && !ids.includes(options.include)) ids.push(options.include);
-    if (ids.length === 0) {
-      if (status.state !== "synced") setStatus({ state: "idle" });
-      return;
-    }
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      setStatus({ reason: "Offline — will sync when the connection is back.", state: "waiting" });
-      return;
-    }
-    setStatus({ state: "syncing" });
-    try {
-      for (const id of ids) await syncDocument(id);
-      setStatus({ at: new Date().toISOString(), state: "synced" });
-    } catch (cause) {
-      const unavailable = cause instanceof VaultUnavailableError;
-      setStatus(unavailable && cause.status === 503
-        ? { reason: cause.message, state: "unavailable" }
-        : { reason: unavailable ? cause.message : "The vault could not be reached.", state: "waiting" });
-    }
-  })().finally(() => { flushing = null; });
-  return flushing;
+  const run = chain.then(() => runFlush(options));
+  chain = run.catch(() => undefined);
+  return run;
+}
+
+async function runFlush(options: { include?: string }): Promise<void> {
+  window.clearTimeout(timer);
+  const pending = await localDb.list<OutboxEntry>("outbox");
+  const ids = pending.sort((a, b) => a.queuedAt.localeCompare(b.queuedAt)).map((entry) => entry.id);
+  if (options.include && !ids.includes(options.include)) ids.push(options.include);
+  if (ids.length === 0) {
+    if (status.state !== "synced") setStatus({ state: "idle" });
+    return;
+  }
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    setStatus({ reason: "Offline — will sync when the connection is back.", state: "waiting" });
+    return;
+  }
+  setStatus({ state: "syncing" });
+  try {
+    for (const id of ids) await syncDocument(id);
+    runs += 1;
+    setStatus({ at: new Date().toISOString(), state: "synced" });
+  } catch (cause) {
+    const unavailable = cause instanceof VaultUnavailableError;
+    runs += 1;
+    setStatus(unavailable && cause.status === 503
+      ? { reason: cause.message, state: "unavailable" }
+      : { reason: unavailable ? cause.message : "The vault could not be reached.", state: "waiting" });
+  }
 }
 
 /** Wires the outbox to the connection: on start, and whenever it comes back. */

@@ -937,3 +937,41 @@ PDF の outline（しおり）と EPUB のナビゲーションだけを目次�
 - 論文を端末間で共有したくなったら、PDF を別 repo か R2 に置く。天井を知った上で
 - Obsidian をやめるなら、ノート形式はそのまま Markdown なので何にでも持っていける
 
+---
+
+## D-53. Worker は Vite の middleware で動かす。Cloudflare の Vite plugin は入れない
+
+**判断**
+`/api/vault/*` を担う Worker のコード（`worker/index.ts`）を、開発と E2E では Vite の dev server に 30 行の plugin で直接マウントする（`vite.config.ts` の `workerApi`）。`@cloudflare/vite-plugin`（workerd をローカルで走らせる）は使わない。
+
+**理由**
+- Worker は fetch handler の平文で、Node にも Request / Response がある。同じモジュールをそのまま呼べる
+- workerd の起動と依存 1 つ分を、テストのたびに払わなくてよい。E2E は 30 秒台のまま
+- 本番の忠実度が要るのは配信（assets、`_headers`、SPA fallback）で、それは `npx wrangler dev` で別途確かめた（CSP、`/read/*` → index.html、`/api` → Worker）
+
+**覆す条件**: Worker が Cloudflare 固有の binding（KV、D1、Durable Objects）を使い始めたら、Node では再現できないので plugin に切り替える。
+
+---
+
+## D-54. CSP は厳格に。`base-uri 'none'` の報告は放置する
+
+**判断**
+`public/_headers` で `script-src 'self'`、`style-src 'self'`、`base-uri 'none'`、`object-src 'none'`、`frame-ancestors 'none'`。`unsafe-inline` も `unsafe-eval` も無し。
+
+**理由**
+- 秘密はブラウザに無いが（D-52）、XSS が Access のセッション中に vault へ書けることは変わらない。第二の鍵として CSP が要る
+- pdf.js のフォント経由の任意実行（CVE-2024-4367）は `eval` 系を使う。`unsafe-eval` 無しなら不発
+- epub-ts は章ごとに parse した document へ `<base>` を挿す。parse された document はページの CSP を継承するので `base-uri 'none'` が章ごとに 1 件報告される。**遮断が目的どおりに働いている**だけで、章は描画され、リンクと画像はサニタイザで消えているので影響はゼロ。許可する方が筋が悪い
+
+---
+
+## D-55. 同期の実行は直列。まとめない
+
+**判断**
+`flush()` は呼ばれるたびに 1 回走る。進行中の run があれば、その後ろに並ぶ。
+
+**理由**
+本を開いたときの pull がまだ走っている間に Sync now を押すと、以前は進行中の Promise を返していた。その run は押す直前の印を知らないので、「同期した」のに印が vault に無い。E2E が 3 回に 1 回それを踏んだ。並べれば、後の run は必ず前の結果の上で動く。
+
+状態には run の完了回数（`data-sync-run`）を出し、テストは「自分の run が終わった」ことを待つ。「状態が synced」は前の run の残りかもしれないので、それだけでは待てない。
+

@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 /**
  * Runs the Worker's API inside the development server.
@@ -45,7 +46,25 @@ function workerApi(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), workerApi()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    workerApi(),
+    // The app shell, the pdf.js worker and the icons are cached on install,
+    // so the reader opens on a train. The manifest is the hand-written one in
+    // public/. Nothing under /api is ever answered from the cache.
+    VitePWA({
+      registerType: "autoUpdate",
+      manifest: false,
+      includeAssets: ["icon-192.png", "icon-512.png", "pdf.worker.min.mjs"],
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,png,mjs,webmanifest}"],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api\//],
+      },
+    }),
+  ],
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },

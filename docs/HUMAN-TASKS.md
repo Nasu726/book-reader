@@ -380,7 +380,7 @@ sudo apt-get install libgtk-4-1 libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 
 
 1. 既に vault があればそれを GitHub の **private** repo にする（無ければ新規 repo を作り、Obsidian で vault として開く）
 2. 各端末の Obsidian に **obsidian-git** を入れ、この repo を pull / push する設定にする（自動 pull の間隔は数分でよい）
-3. Reader が書くフォルダを決める（既定 `Reading`）。`wrangler.jsonc` の `VAULT_REPO`（`owner/name`）と `VAULT_DIR` に入れる。どちらも秘密ではない
+3. Reader が書くフォルダを決める（既定 `Reading`）。`wrangler.jsonc` の `VAULT_REPO`（`owner/name`）と `VAULT_DIR` に入れて commit し、`npx wrangler deploy` で反映する。どちらも秘密ではない
 
 ### 完了の確認
 

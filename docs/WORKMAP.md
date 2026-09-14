@@ -63,11 +63,19 @@ Done when: ローカルファイルで PDF / EPUB が読め、読書位置が復
 `worker/vault.ts`（`/api/vault/*`、`github` / `memory` store、パス検証、サイズ上限、秘密の非漏洩）、`src/sync/vault-client.ts`、`queue.ts`（outbox、debounce、再試行）、union マージと tombstone。E2E は `VAULT_STORE=memory` で実 Worker を通す: 衝突、オフライン、別端末の追加。
 
 ## PIVOT-006 — PWA と配備
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Depends on:** PIVOT-005
 
-`vite-plugin-pwa`、`navigator.storage.persist()`、`_headers` の CSP、`wrangler deploy`（同名 Worker、同ドメイン、同 Access）、`check:access`、マニュアル、README。H-11〜H-13 が人間側。
+`vite-plugin-pwa`（app shell ＋ pdf worker ＋ icon を precache、`/api` は絶対にキャッシュしない）、`navigator.storage.persist()`、`public/_headers` の CSP（D-54）、`wrangler deploy`（同名 Worker、同ドメイン、同 Access）、`check:access`、マニュアル、README。
+
+Done: 2026-09-14。デプロイ後、vault が繋がるのは H-11（repo）と H-12（`VAULT_TOKEN`）を本人が済ませ、`wrangler.jsonc` の `VAULT_REPO` を入れて再デプロイしてから。それまでアプリは「The vault is not set up.」と言いながらこの端末だけで動く。
+
+### Verify
+
+- unit 92（vault Worker: パス検証・メモリ store の衝突・GitHub store の contents API と token の非漏洩、merge の union / tombstone / 後勝ち、ノート往復）、E2E 57（vault 4 件は実 Worker コード＋メモリ store）
+- `npx wrangler dev` で built の配信を確認: CSP ヘッダ、`/read/*` が index.html、`/api/vault/notes` が Worker、service worker 登録 1
+- mutation: tombstone 無し・union 無し・利用者の領域を local から取る、の 3 件で E2E が赤
 
 ---
 
