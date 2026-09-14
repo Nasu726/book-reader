@@ -12,6 +12,7 @@ import type { DocumentSelection } from "@/core/selection/capture";
 import { renderNote } from "@/notes/format";
 import type { StoredDocument } from "@/storage/documents";
 import { getNote, noteStateOf, putNote, type StoredHighlight } from "@/storage/notes";
+import { flush, useSyncStatus } from "@/sync/sync";
 
 /** Where a passage is, for a person: the page, or the chapter. */
 function whereOf(captured: DocumentSelection): string | undefined {
@@ -59,6 +60,14 @@ export function ReaderWorkbench({
   // Reflowed text can be resized; a drawn page has zoom instead.
   const pdfView = useSyncExternalStore(subscribe, getStoredPdfView, serverPdfView);
 
+  // Opening a document asks the vault for it, so marks made on another
+  // device are here before the first page is read.
+  useEffect(() => { void flush({ include: stored.id }); }, [stored.id]);
+
+  // Read again after every sync: a mark made on another device arrives
+  // through the vault, and the list should show it without a reload.
+  const sync = useSyncStatus();
+  const syncedAt = sync.state === "synced" ? sync.at : null;
   useEffect(() => {
     let cancelled = false;
     void getNote(stored.id).then((saved) => {
@@ -67,7 +76,7 @@ export function ReaderWorkbench({
       setFinished(saved.status === "done");
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [stored.id]);
+  }, [stored.id, syncedAt]);
 
   async function writeHighlights(next: readonly StoredHighlight[]) {
     const saved = await getNote(stored.id);
@@ -77,7 +86,12 @@ export function ReaderWorkbench({
 
   async function deleteHighlight(highlightId: string) {
     try {
-      await writeHighlights(highlights.filter((item) => item.id !== highlightId));
+      // A tombstone as well as a removal, so the vault's copy of the mark
+      // does not come back at the next sync.
+      const saved = await getNote(stored.id);
+      const next = highlights.filter((item) => item.id !== highlightId);
+      await putNote({ ...saved, deleted: [...(saved.deleted ?? []), highlightId], highlights: [...next] });
+      setHighlights(next);
     } catch {
       setHighlightState("error");
     }
@@ -116,7 +130,7 @@ export function ReaderWorkbench({
     setFinished(done);
     try {
       const saved = await getNote(stored.id);
-      await putNote({ ...saved, status: done ? "done" : "reading" });
+      await putNote({ ...saved, editedAt: new Date().toISOString(), status: done ? "done" : "reading" });
     } catch {
       setFinished(!done);
     }
@@ -255,6 +269,7 @@ export function ReaderWorkbench({
             ),
             notes: (
               <DocumentNotes
+                documentId={stored.id}
                 finished={finished}
                 note={note}
                 onFinishedChange={(done) => void markFinished(done)}

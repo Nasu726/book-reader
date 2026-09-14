@@ -56,7 +56,7 @@ Done when: ローカルファイルで PDF / EPUB が読め、読書位置が復
 `src/notes/format.ts` の `renderNote` / `parseNote` と往復 unit test。Marks（印＋メモ）/ Memo の UI がローカル状態を編集し、ノートをレンダリングして IndexedDB に持つ。必要なら旧 D1 backup → ノート変換スクリプト。
 
 ## PIVOT-005 — vault 同期
-**Status:** TODO
+**Status:** DONE
 **Priority:** P0
 **Depends on:** PIVOT-004
 

@@ -42,6 +42,7 @@ export function HelpScreen() {
               <li><a className="hover:text-ink underline underline-offset-4" href="#read">読む</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#mark">文章を選んで、コピーするか印を付ける</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#saved">保存されるもの2種と、その居場所</a></li>
+              <li><a className="hover:text-ink underline underline-offset-4" href="#vault">印とメモは vault へ行く</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#keyboard">キーボード</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#display">表示の設定</a></li>
               <li><a className="hover:text-ink underline underline-offset-4" href="#epub">EPUBとは何か</a></li>
@@ -145,6 +146,26 @@ export function HelpScreen() {
               <strong>Save note</strong>。空にして保存すると消える
             </li>
           </ul>
+
+          <h2 className="scroll-mt-4" id="vault">印とメモは vault へ行く</h2>
+          <p>
+            本ごとに <strong>Markdown のノート 1 枚</strong>が、あなたの Obsidian vault（GitHub の repo）に書かれる。
+            場所は <code>Reading/題名 (id).md</code>。中身は上から、frontmatter（題名・追加日・status・tags）、
+            印の引用（色とページ付き、その下にメモ）、Document note。この部分は
+            <code>&lt;!-- book-reader:start --&gt;</code> と <code>&lt;!-- book-reader:end --&gt;</code> の
+            2 行に挟まれていて、<strong>アプリが書き換えるのはその間だけ</strong>。
+            その外に書いたこと、Obsidian で足したプロパティは、そのまま残る。
+          </p>
+          <p>
+            書き込みはまずこの端末に保存され、少し経ってから vault に送られる。
+            すぐ送りたいときは <strong>Notes</strong> タブの <strong>Sync now</strong>。
+            オフラインなら、繋がったときに送られる。別の端末で付けた印は、本を開いたときに vault から届く。
+            同じ印を両方で変えたときは、印は合算、メモと status は後に書いた方が残る。
+          </p>
+          <p>
+            <strong>Copy note as Markdown</strong> は、そのノートを今の状態で丸ごとコピーする。
+            vault の設定が済んでいない間の手動の代わりに。
+          </p>
 
           <h2 className="scroll-mt-4" id="keyboard">キーボード</h2>
           <ul>

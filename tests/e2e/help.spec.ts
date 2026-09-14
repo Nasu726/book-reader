@@ -22,7 +22,7 @@ test("the manual can be looked things up in", async ({ page }) => {
 
   const contents = page.getByRole("navigation", { name: "Contents" });
   const links = contents.getByRole("link");
-  await expect(links).toHaveCount(8);
+  await expect(links).toHaveCount(9);
 
   // Every entry has somewhere to go. A table of contents that points at a
   // heading someone renamed is worse than none.

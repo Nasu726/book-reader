@@ -27,6 +27,14 @@ export type LocalNote = {
    */
   outside?: Outside;
   extraFrontmatter?: string[];
+  /** Ids of marks removed here, so the vault's copy does not come back. */
+  deleted?: string[];
+  /** When the memo or the status was last changed here. */
+  editedAt?: string;
+  /** When this device last agreed with the vault, and on which version. */
+  syncedAt?: string;
+  remoteName?: string;
+  remoteSha?: string;
 };
 
 export async function getNote(documentId: string): Promise<LocalNote> {
@@ -34,8 +42,11 @@ export async function getNote(documentId: string): Promise<LocalNote> {
   return stored ?? { highlights: [], id: documentId, memo: "", status: "reading" };
 }
 
-export function putNote(note: LocalNote): Promise<void> {
-  return localDb.put("notes", note);
+/** Writes a note on this device and queues it for the vault. */
+export async function putNote(note: LocalNote): Promise<void> {
+  await localDb.put("notes", note);
+  const { markDirty } = await import("@/sync/sync");
+  await markDirty(note.id);
 }
 
 /** The note as the vault will see it: the document's facts and the reader's marks. */

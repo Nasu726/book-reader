@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getNote, putNote } from "@/storage/notes";
+import { useSyncStatus } from "@/sync/sync";
 
 export type DocumentNote = ReturnType<typeof useDocumentNote>;
 
@@ -15,6 +16,10 @@ export function useDocumentNote(documentId: string) {
   // Typing before the stored note arrives must not be overwritten by it.
   const edited = useRef(false);
 
+  // Read again after every sync, so a memo written elsewhere shows up —
+  // unless something is being typed here, which is never overwritten.
+  const sync = useSyncStatus();
+  const syncedAt = sync.state === "synced" ? sync.at : null;
   useEffect(() => {
     let cancelled = false;
     void getNote(documentId).then((note) => {
@@ -23,12 +28,12 @@ export function useDocumentNote(documentId: string) {
       if (!edited.current) setContent(note.memo);
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [documentId]);
+  }, [documentId, syncedAt]);
 
   const save = useCallback(async (next: string) => {
     try {
       const note = await getNote(documentId);
-      await putNote({ ...note, memo: next });
+      await putNote({ ...note, editedAt: new Date().toISOString(), memo: next });
       setStored(next);
       setStatus("saved");
       window.setTimeout(() => setStatus((current) => current === "saved" ? "idle" : current), 5000);

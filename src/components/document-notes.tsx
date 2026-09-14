@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { DocumentNote } from "./use-document-note";
+import { VaultStatus } from "./vault-status";
 
 /**
  * The memo, whether the book is finished, and the note as text.
@@ -10,11 +11,13 @@ import type { DocumentNote } from "./use-document-note";
  * wants to see what will be written.
  */
 export function DocumentNotes({
+  documentId,
   note,
   finished,
   onFinishedChange,
   renderMarkdown,
 }: {
+  documentId: string;
   note: DocumentNote;
   finished: boolean;
   onFinishedChange: (finished: boolean) => void;
@@ -81,6 +84,8 @@ export function DocumentNotes({
       >
         {copied === "copied" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy note as Markdown"}
       </button>
+
+      <VaultStatus documentId={documentId} />
     </section>
   );
 }
